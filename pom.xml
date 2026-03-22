@@ -68,6 +68,14 @@
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-rest</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-rest-jackson</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
             <artifactId>quarkus-junit</artifactId>
             <scope>test</scope>
         </dependency>
@@ -115,6 +123,10 @@
                 <version>${surefire-plugin.version}</version>
                 <configuration>
                     <argLine>@{argLine}</argLine>
+                    <excludes>
+                        <exclude>**/OllamaWorkstationIntegrationTest.java</exclude>
+                        <exclude>**/OllamaToolRequestIntegrationTest.java</exclude>
+                    </excludes>
                     <systemPropertyVariables>
                         <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
                         <maven.home>${maven.home}</maven.home>
@@ -145,6 +157,12 @@
     </build>
 
     <profiles>
+        <profile>
+            <id>ollama-workstation-tests</id>
+            <properties>
+                <test>OllamaWorkstationIntegrationTest,OllamaToolRequestIntegrationTest</test>
+            </properties>
+        </profile>
         <profile>
             <id>native</id>
             <activation>

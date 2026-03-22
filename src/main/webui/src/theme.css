@@ -1,0 +1,156 @@
+@import "xp.css/dist/XP.css";
+
+:root {
+  --bg0: #061122;
+  --bg1: #0b1f3a;
+  --bg2: #12315d;
+  --neon: #44e7ff;
+  --neon-2: #6eff96;
+  --warn: #ffd166;
+  --surface: rgba(8, 20, 42, 0.76);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: radial-gradient(circle at 20% 10%, var(--bg2), var(--bg0) 60%);
+  color: #c7ecff;
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+}
+
+#scene {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+}
+
+#app {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  padding: 14px;
+  display: grid;
+  grid-template-columns: 320px 1fr 360px;
+  gap: 12px;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid rgba(68, 231, 255, 0.4);
+  backdrop-filter: blur(4px);
+}
+
+.left-rail,
+.right-rail {
+  overflow: auto;
+  padding: 8px;
+}
+
+.window-host {
+  position: relative;
+  overflow: hidden;
+}
+
+.window-card {
+  position: absolute;
+  min-width: 420px;
+  min-height: 260px;
+  max-width: 88%;
+  max-height: 86%;
+  resize: both;
+  overflow: hidden;
+  border: 1px solid rgba(110, 255, 150, 0.35);
+  animation: spawn 250ms ease-out;
+}
+
+@keyframes spawn {
+  from {
+    transform: translateY(12px) scale(0.98);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+.win-title {
+  cursor: move;
+}
+
+.win-body {
+  display: grid;
+  grid-template-columns: 38% 62%;
+  height: calc(100% - 30px);
+}
+
+.tree-pane,
+.file-pane {
+  overflow: auto;
+  padding: 8px;
+  border-top: 1px solid rgba(68, 231, 255, 0.25);
+}
+
+.file-node {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 6px;
+  margin: 2px 0;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.file-node:hover {
+  background: rgba(68, 231, 255, 0.16);
+}
+
+.file-node.highlight {
+  outline: 1px solid var(--warn);
+  animation: pulse 900ms infinite;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 209, 102, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(255, 209, 102, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 209, 102, 0);
+  }
+}
+
+pre {
+  margin: 0;
+  white-space: pre-wrap;
+  font-size: 12px;
+  line-height: 1.35;
+  color: #d4f7ff;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.activity-item {
+  border-bottom: 1px solid rgba(68, 231, 255, 0.2);
+  padding: 6px 2px;
+  font-size: 12px;
+}
+
+kbd {
+  color: var(--neon-2);
+}

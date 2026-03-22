@@ -1,6 +1,6 @@
 package ac.uk.sussex.kn253.model;
 
-import io.quarkus.hibernate.orm.panache.PanacheEntity;
+import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -9,7 +9,10 @@ import lombok.*;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class Project extends PanacheEntity {
+public class Project extends PanacheEntityBase {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    public Long id;
     @Column
     private String directory;
     @OneToOne

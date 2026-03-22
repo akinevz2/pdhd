@@ -1,36 +1,53 @@
 package ac.uk.sussex.kn253.services;
 
+import ac.uk.sussex.kn253.model.OllamaSettings;
 import ac.uk.sussex.kn253.ollama.OllamaChatSession;
+import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 @ApplicationScoped
 public class ChatService {
 
-    private static final String BASE_URL = "http://VISION-WS:11434";
-    private static final String MODEL_NAME = "qwen3-coder:30b";
-    OllamaChatSession chatSession;
-
     @Inject
     ToolService toolService;
 
-    public ChatService() {
-        super();
-        final var env = System.getenv();
-        final String baseUrl = env.getOrDefault("OLLAMA_ENDPOINT", BASE_URL);
-        final String modelName = env.getOrDefault("OLLAMA_MODEL", MODEL_NAME);
-        final OllamaChatSession session = OllamaChatSession.builder()
-                .baseUrl(baseUrl)
-                .model(modelName)
+    @Inject
+    ToolActivityService toolActivityService;
+
+    @Inject
+    OllamaConfigService ollamaConfigService;
+
+    private OllamaChatSession chatSession;
+
+    @PostConstruct
+    void init() {
+        reconfigure(ollamaConfigService.load());
+    }
+
+    /**
+     * Rebuilds the underlying chat session from the given settings.
+     * Called on startup and after the user saves new config.
+     */
+    public void reconfigure(final OllamaSettings settings) {
+        final String systemPrompt = settings.getSystemPrompt() == null || settings.getSystemPrompt().isBlank()
+                ? OllamaSettings.DEFAULT_SYSTEM_PROMPT
+                : settings.getSystemPrompt();
+
+        this.chatSession = OllamaChatSession.builder()
+                .baseUrl(settings.getBaseUrl())
+                .model(settings.getModelName())
+                .timeoutSeconds(settings.getTimeoutSeconds())
+                .temperature(settings.getTemperature())
+                .numPredict(settings.getNumPredict())
+                .numCtx(settings.getNumCtx())
                 .toolService(toolService)
-                .build();
-        this.chatSession = session;
+                .toolActivityService(toolActivityService)
+                .build()
+                .setSystemPrompt(systemPrompt);
     }
 
     public String sendMessage(final String message) {
-
         return chatSession.send(message);
-
     }
-
 }

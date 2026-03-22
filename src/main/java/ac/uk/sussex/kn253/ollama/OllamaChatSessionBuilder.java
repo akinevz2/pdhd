@@ -1,5 +1,6 @@
 package ac.uk.sussex.kn253.ollama;
 
+import ac.uk.sussex.kn253.services.ToolActivityService;
 import ac.uk.sussex.kn253.services.ToolService;
 
 public class OllamaChatSessionBuilder implements OllamaConfig {
@@ -12,6 +13,7 @@ public class OllamaChatSessionBuilder implements OllamaConfig {
     private int numPredict = -1;
     private int numCtx = 0;
     private ToolService toolService;
+    private ToolActivityService toolActivityService;
 
     public OllamaChatSessionBuilder baseUrl(final String baseUrl) {
         this.baseUrl = baseUrl;
@@ -94,6 +96,15 @@ public class OllamaChatSessionBuilder implements OllamaConfig {
 
     public ToolService toolService() {
         return toolService;
+    }
+
+    public OllamaChatSessionBuilder toolActivityService(final ToolActivityService toolActivityService) {
+        this.toolActivityService = toolActivityService;
+        return this;
+    }
+
+    public ToolActivityService toolActivityService() {
+        return toolActivityService;
     }
 
 }

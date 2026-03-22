@@ -2,19 +2,23 @@ package ac.uk.sussex.kn253.model;
 
 import java.net.URL;
 
-import io.quarkus.hibernate.orm.panache.PanacheEntity;
 import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
+import jakarta.persistence.Embeddable;
 import lombok.*;
 
-@Entity
+@Embeddable
 @NoArgsConstructor
 @AllArgsConstructor
 @Setter
 @Getter
-public class Origin extends PanacheEntity {
+public class Origin {
     @Column(nullable = false)
     String name;
     @Column(nullable = true)
-    URL url;
+    String url;
+
+    public Origin(final String name, final URL url) {
+        this.name = name;
+        this.url = url != null ? url.toString() : null;
+    }
 }

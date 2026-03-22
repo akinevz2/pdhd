@@ -12,12 +12,17 @@
     "build": "webpack --mode production"
   },
   "devDependencies": {
+    "@types/three": "^0.183.1",
+    "css-loader": "^7.1.2",
+    "style-loader": "^4.0.0",
     "ts-loader": "^9.5.4",
     "typescript": "^5.9.3",
     "webpack": "^5.105.2",
     "webpack-cli": "^6.0.1"
   },
   "dependencies": {
-    "copy-webpack-plugin": "^13.0.1"
+    "copy-webpack-plugin": "^13.0.1",
+    "three": "^0.176.0",
+    "xp.css": "^0.2.6"
   }
 }

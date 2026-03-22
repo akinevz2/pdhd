@@ -1,8 +1,7 @@
 package ac.uk.sussex.kn253.model;
 
-import io.quarkus.hibernate.orm.panache.PanacheEntity;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
+import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
+import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
@@ -10,7 +9,10 @@ import lombok.*;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class GithubRepository extends PanacheEntity {
+public class GithubRepository extends PanacheEntityBase {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    public Long id;
     @Column(nullable = true)
     private String name;
     @Column(nullable = true)

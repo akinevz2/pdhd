@@ -2,7 +2,10 @@ package ac.uk.sussex.kn253.services;
 
 import java.util.List;
 
-import ac.uk.sussex.kn253.services.tools.ExploreTool;
+import ac.uk.sussex.kn253.services.tools.ExploreToolset;
+import ac.uk.sussex.kn253.services.tools.ReadToolset;
+import ac.uk.sussex.kn253.services.tools.WriteToolset;
+import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -11,14 +14,38 @@ import jakarta.inject.Inject;
 public class ToolService {
 
     @Inject
-    ExploreTool exploreTool;
+    ExploreToolset exploreToolset;
 
-    public List<ToolSpecification> all() {
-        return List.of(exploreTool.spec);
+    @Inject
+    ReadToolset readToolset;
+
+    @Inject
+    WriteToolset writeToolset;
+
+    public List<ToolSpecification> toolSpecifications() {
+        return java.util.stream.Stream.of(
+                exploreToolset.toolSpecifications(),
+                readToolset.toolSpecifications(),
+                writeToolset.toolSpecifications())
+                .flatMap(List::stream)
+                .toList();
     }
 
     public List<ToolSpecification> getTools() {
-        return all();
+        return toolSpecifications();
+    }
+
+    public String execute(final ToolExecutionRequest request, final Object memoryId) {
+        if (exploreToolset.canHandle(request.name())) {
+            return exploreToolset.execute(request, memoryId);
+        }
+        if (readToolset.canHandle(request.name())) {
+            return readToolset.execute(request, memoryId);
+        }
+        if (writeToolset.canHandle(request.name())) {
+            return writeToolset.execute(request, memoryId);
+        }
+        return "Unknown tool: " + request.name();
     }
 
 }
