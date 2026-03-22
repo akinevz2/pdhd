@@ -355,7 +355,9 @@ public class OllamaChatSession {
                 }
             }
 
-            if (name != null && toolService.toolSpecifications().stream().anyMatch(s -> s.name().equals(name))) {
+            final String resolvedName = name;
+            if (resolvedName != null
+                    && toolService.toolSpecifications().stream().anyMatch(s -> s.name().equals(resolvedName))) {
                 return Optional.of(ToolExecutionRequest.builder().name(name).arguments(arguments).build());
             }
             LOG.debugf("Text contained JSON but no matching tool found for name: %s", name);
