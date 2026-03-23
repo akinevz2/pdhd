@@ -4,25 +4,28 @@
   "description": "",
   "license": "ISC",
   "author": "",
-  "type": "commonjs",
-  "main": "src/index.ts",
+  "type": "module",
+  "main": "src/main.tsx",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "webpack serve --mode development --open",
-    "build": "webpack --mode production"
+    "start": "vite",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
   },
   "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
     "@types/three": "^0.183.1",
-    "css-loader": "^7.1.2",
-    "style-loader": "^4.0.0",
-    "ts-loader": "^9.5.4",
+    "@vitejs/plugin-react": "^4.4.1",
     "typescript": "^5.9.3",
-    "webpack": "^5.105.2",
-    "webpack-cli": "^6.0.1"
+    "vite": "^5.4.10"
   },
   "dependencies": {
-    "copy-webpack-plugin": "^13.0.1",
-    "three": "^0.176.0",
-    "xp.css": "^0.2.6"
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "three": "^0.176.0"
   }
 }

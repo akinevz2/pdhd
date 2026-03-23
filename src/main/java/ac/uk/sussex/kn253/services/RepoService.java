@@ -18,13 +18,14 @@ import jakarta.transaction.Transactional;
 @ApplicationScoped
 public class RepoService {
 
-    private static final String CURRENT_PATH = ".";
-
     /** Matches SCP-style SSH remote URLs: {@code user@host:path/to/repo.git} */
     private static final Pattern SSH_REMOTE_PATTERN = Pattern.compile("^[^@]+@([^:]+):(.+)$");
 
+    @jakarta.inject.Inject
+    WorkingDirectoryService workingDirectoryService;
+
     public Path getCurrentDirectory() {
-        return Path.of(CURRENT_PATH).toAbsolutePath();
+        return workingDirectoryService.getCurrentWorkingDirectory();
     }
 
     /**

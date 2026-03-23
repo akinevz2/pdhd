@@ -78,10 +78,36 @@ class WriteToolsetTest {
     }
 
     @Test
+    void createPlanWritesFullMarkdownContentWhenProvided(@TempDir final Path tempDir) throws Exception {
+        final String markdown = "# Execution Plan\\n\\n## Goals\\n\\n- Analyse\\n- Ship\\n";
+        final String args = "{\"projectDirectory\":\"" + escape(tempDir)
+                + "\",\"title\":\"Execution Plan\",\"content\":\"" + markdown + "\"}";
+        final String result = toolset.execute(request("create_plan", args), null);
+
+        assertTrue(result.contains("Plan created"));
+        final Path output = tempDir.resolve(".pdhd/plans/execution-plan.md");
+        final String content = Files.readString(output);
+        assertEquals("# Execution Plan\n\n## Goals\n\n- Analyse\n- Ship\n", content);
+    }
+
+    @Test
+    void createPlanParsesStepsWhenProvidedAsMarkdownString(@TempDir final Path tempDir) throws Exception {
+        final String args = "{\"projectDirectory\":\"" + escape(tempDir)
+                + "\",\"title\":\"Execution Plan\",\"steps\":\"1. Analyse\\n2. Ship\"}";
+        final String result = toolset.execute(request("create_plan", args), null);
+
+        assertTrue(result.contains("Plan created"));
+        final Path output = tempDir.resolve(".pdhd/plans/execution-plan.md");
+        final String content = Files.readString(output);
+        assertTrue(content.contains("1. Analyse"));
+        assertTrue(content.contains("2. Ship"));
+    }
+
+    @Test
     void createTodoAppendsToTodoFile(@TempDir final Path tempDir) throws Exception {
         final String args = "{\"projectDirectory\":\"" + escape(tempDir)
                 + "\",\"todo\":\"Refactor parser\"}";
-        final String result = toolset.execute(request("create_todo_in_project", args), null);
+        final String result = toolset.execute(request("append_project_todo", args), null);
 
         assertTrue(result.contains("TODO added"));
         final String content = Files.readString(tempDir.resolve("TODO.md"));

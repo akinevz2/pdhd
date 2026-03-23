@@ -2,27 +2,18 @@ package ac.uk.sussex.kn253.services.tools;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
+import java.nio.file.*;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolSpecification;
-import dev.langchain4j.model.chat.request.json.JsonArraySchema;
-import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
-import dev.langchain4j.model.chat.request.json.JsonStringSchema;
-import dev.langchain4j.service.tool.ToolExecutor;
-import dev.langchain4j.service.tool.ToolProvider;
-import dev.langchain4j.service.tool.ToolProviderRequest;
-import dev.langchain4j.service.tool.ToolProviderResult;
+import dev.langchain4j.model.chat.request.json.*;
+import dev.langchain4j.service.tool.*;
 import jakarta.enterprise.context.ApplicationScoped;
 
 @ApplicationScoped
@@ -30,6 +21,9 @@ public class WriteToolset implements ToolProvider, ToolExecutor {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final boolean DEFAULT_APPEND = false;
+    private static final String APPEND_PROJECT_TODO = "append_project_todo";
+    private static final Map<String, String> LEGACY_TOOL_NAME_ALIASES = Map.of(
+            "create_todo_in_project", APPEND_PROJECT_TODO);
 
     private final List<ToolSpecification> toolSpecifications = List.of(
             writeFileSpec(),
@@ -43,7 +37,8 @@ public class WriteToolset implements ToolProvider, ToolExecutor {
     }
 
     public boolean canHandle(final String toolName) {
-        return toolSpecifications.stream().anyMatch(spec -> spec.name().equals(toolName));
+        final String canonicalToolName = canonicalToolName(toolName);
+        return toolSpecifications.stream().anyMatch(spec -> spec.name().equals(canonicalToolName));
     }
 
     @Override
@@ -59,12 +54,13 @@ public class WriteToolset implements ToolProvider, ToolExecutor {
     public String execute(final ToolExecutionRequest request, final Object memoryId) {
         try {
             final Map<String, Object> args = parseArgs(request.arguments());
-            return switch (request.name()) {
+            final String toolName = canonicalToolName(request.name());
+            return switch (toolName) {
                 case "write_file" -> writeFileTool(args);
                 case "create_report" -> createReport(args);
                 case "create_timeline" -> createTimeline(args);
                 case "create_plan" -> createPlan(args);
-                case "create_todo_in_project" -> createTodoInProject(args);
+                case APPEND_PROJECT_TODO -> appendProjectTodo(args);
                 default -> "Unknown tool for WriteToolset: " + request.name();
             };
         } catch (final IllegalArgumentException e) {
@@ -74,15 +70,25 @@ public class WriteToolset implements ToolProvider, ToolExecutor {
         }
     }
 
+    private String canonicalToolName(final String toolName) {
+        if (toolName == null || toolName.isBlank()) {
+            return "";
+        }
+        return LEGACY_TOOL_NAME_ALIASES.getOrDefault(toolName, toolName);
+    }
+
     private ToolSpecification writeFileSpec() {
         return ToolSpecification.builder()
                 .name("write_file")
                 .description("Write a UTF-8 text file within the project directory.")
                 .parameters(JsonObjectSchema.builder()
-                        .addProperty("projectDirectory", JsonStringSchema.builder().description("Absolute path to project root").build())
-                        .addProperty("filePath", JsonStringSchema.builder().description("Path relative to project root").build())
+                        .addProperty("projectDirectory",
+                                JsonStringSchema.builder().description("Absolute path to project root").build())
+                        .addProperty("filePath",
+                                JsonStringSchema.builder().description("Path relative to project root").build())
                         .addProperty("content", JsonStringSchema.builder().description("File content to write").build())
-                        .addProperty("append", JsonStringSchema.builder().description("Optional true/false; default false").build())
+                        .addProperty("append",
+                                JsonStringSchema.builder().description("Optional true/false; default false").build())
                         .required("projectDirectory")
                         .required("filePath")
                         .required("content")
@@ -95,9 +101,11 @@ public class WriteToolset implements ToolProvider, ToolExecutor {
                 .name("create_report")
                 .description("Create a markdown report under <project>/.pdhd/reports.")
                 .parameters(JsonObjectSchema.builder()
-                        .addProperty("projectDirectory", JsonStringSchema.builder().description("Absolute path to project root").build())
+                        .addProperty("projectDirectory",
+                                JsonStringSchema.builder().description("Absolute path to project root").build())
                         .addProperty("title", JsonStringSchema.builder().description("Report title").build())
-                        .addProperty("content", JsonStringSchema.builder().description("Report markdown content").build())
+                        .addProperty("content",
+                                JsonStringSchema.builder().description("Report markdown content").build())
                         .required("projectDirectory")
                         .required("title")
                         .required("content")
@@ -110,9 +118,12 @@ public class WriteToolset implements ToolProvider, ToolExecutor {
                 .name("create_timeline")
                 .description("Create a timeline markdown under <project>/.pdhd/timelines.")
                 .parameters(JsonObjectSchema.builder()
-                        .addProperty("projectDirectory", JsonStringSchema.builder().description("Absolute path to project root").build())
+                        .addProperty("projectDirectory",
+                                JsonStringSchema.builder().description("Absolute path to project root").build())
                         .addProperty("title", JsonStringSchema.builder().description("Timeline title").build())
-                        .addProperty("milestones", JsonArraySchema.builder().description("Array of milestone strings in chronological order").build())
+                        .addProperty("milestones",
+                                JsonArraySchema.builder()
+                                        .description("Array of milestone strings in chronological order").build())
                         .required("projectDirectory")
                         .required("title")
                         .required("milestones")
@@ -125,22 +136,26 @@ public class WriteToolset implements ToolProvider, ToolExecutor {
                 .name("create_plan")
                 .description("Create an execution plan markdown under <project>/.pdhd/plans.")
                 .parameters(JsonObjectSchema.builder()
-                        .addProperty("projectDirectory", JsonStringSchema.builder().description("Absolute path to project root").build())
+                        .addProperty("projectDirectory",
+                                JsonStringSchema.builder().description("Absolute path to project root").build())
                         .addProperty("title", JsonStringSchema.builder().description("Plan title").build())
-                        .addProperty("steps", JsonArraySchema.builder().description("Ordered list of plan steps").build())
+                        .addProperty("content", JsonStringSchema.builder()
+                                .description("Optional full markdown content for the plan file").build())
+                        .addProperty("steps",
+                                JsonArraySchema.builder().description("Ordered list of plan steps").build())
                         .required("projectDirectory")
                         .required("title")
-                        .required("steps")
                         .build())
                 .build();
     }
 
     private ToolSpecification createTodoSpec() {
         return ToolSpecification.builder()
-                .name("create_todo_in_project")
+                .name(APPEND_PROJECT_TODO)
                 .description("Append a todo entry to <project>/TODO.md.")
                 .parameters(JsonObjectSchema.builder()
-                        .addProperty("projectDirectory", JsonStringSchema.builder().description("Absolute path to project root").build())
+                        .addProperty("projectDirectory",
+                                JsonStringSchema.builder().description("Absolute path to project root").build())
                         .addProperty("todo", JsonStringSchema.builder().description("Todo text to append").build())
                         .required("projectDirectory")
                         .required("todo")
@@ -205,10 +220,16 @@ public class WriteToolset implements ToolProvider, ToolExecutor {
     private String createPlan(final Map<String, Object> args) {
         final Path project = Path.of(require(args, "projectDirectory")).normalize();
         final String title = require(args, "title");
+        final String content = getString(args, "content", "").trim();
         final List<String> steps = toStringList(args.get("steps"));
         final Path output = project.resolve(".pdhd/plans/" + slug(title) + ".md").normalize();
         if (!output.startsWith(project)) {
             return "Invalid plan path.";
+        }
+
+        if (!content.isBlank()) {
+            final String body = content.endsWith("\n") ? content : content + "\n";
+            return writeFile(output, body, false, "Plan created");
         }
 
         final StringBuilder body = new StringBuilder();
@@ -220,7 +241,7 @@ public class WriteToolset implements ToolProvider, ToolExecutor {
         return writeFile(output, body.toString(), false, "Plan created");
     }
 
-    private String createTodoInProject(final Map<String, Object> args) {
+    private String appendProjectTodo(final Map<String, Object> args) {
         final Path project = Path.of(require(args, "projectDirectory")).normalize();
         final String todo = require(args, "todo");
         final Path output = project.resolve("TODO.md").normalize();
@@ -266,14 +287,22 @@ public class WriteToolset implements ToolProvider, ToolExecutor {
         if (value == null) {
             return defaultValue;
         }
-        if (value instanceof Boolean boolValue) {
+        if (value instanceof final Boolean boolValue) {
             return boolValue;
         }
         return Boolean.parseBoolean(String.valueOf(value));
     }
 
     private List<String> toStringList(final Object value) {
-        if (!(value instanceof List<?> raw)) {
+        if (value instanceof final String rawString) {
+            return rawString.lines()
+                    .map(String::trim)
+                    .filter(line -> !line.isBlank())
+                    .map(line -> line.replaceFirst("^[-*]\\s+", ""))
+                    .map(line -> line.replaceFirst("^\\d+\\.\\s+", ""))
+                    .toList();
+        }
+        if (!(value instanceof final List<?> raw)) {
             return List.of();
         }
         final List<String> out = new ArrayList<>();

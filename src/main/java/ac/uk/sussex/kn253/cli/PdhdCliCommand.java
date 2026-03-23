@@ -19,6 +19,7 @@ import picocli.CommandLine.ParentCommand;
 @Command(name = "pdhd", description = "PDHD command entry point", mixinStandardHelpOptions = true, subcommands = {
         PdhdCliCommand.AssistantCommand.class,
         PdhdCliCommand.WebUiCommand.class,
+        PdhdCliCommand.DebugCommand.class,
         PdhdCliCommand.ConfigureOllamaCommand.class,
         PdhdCliCommand.ConfigureSystemPromptCommand.class,
         PdhdCliCommand.ExitCommand.class
@@ -36,6 +37,9 @@ public class PdhdCliCommand implements Runnable {
 
     @Inject
     SystemPromptMenu systemPromptMenu;
+
+    @Inject
+    DebugMenu debugMenu;
 
     @Override
     public void run() {
@@ -74,6 +78,14 @@ public class PdhdCliCommand implements Runnable {
         @Override
         public void run() {
             parent.webui.launch();
+        }
+    }
+
+    @Command(name = "debug", description = "Open debugging menu")
+    static class DebugCommand extends BaseSubcommand {
+        @Override
+        public void run() {
+            parent.debugMenu.run(parent.newReader());
         }
     }
 

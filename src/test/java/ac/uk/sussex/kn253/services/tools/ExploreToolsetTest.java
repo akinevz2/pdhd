@@ -10,10 +10,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import ac.uk.sussex.kn253.model.GitRepository;
-import ac.uk.sussex.kn253.model.GithubRepository;
-import ac.uk.sussex.kn253.model.Origin;
-import ac.uk.sussex.kn253.model.Project;
+import ac.uk.sussex.kn253.model.*;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.transaction.Transactional;
@@ -21,11 +18,12 @@ import jakarta.transaction.Transactional;
 @QuarkusTest
 class ExploreToolsetTest {
 
-    private final ExploreToolset toolset = new ExploreToolset();
+    private ExploreToolset toolset;
 
     @BeforeEach
     @Transactional
     void clearDatabase() {
+        toolset = new ExploreToolset();
         Project.deleteAll();
         GitRepository.deleteAll();
         GithubRepository.deleteAll();
@@ -33,7 +31,7 @@ class ExploreToolsetTest {
 
     @Test
     void getCwdReturnsAbsolutePath() {
-        final String result = toolset.execute(request("get_cwd", "{}"), null);
+        final String result = toolset.execute(request("get_current_working_directory", "{}"), null);
         assertTrue(Path.of(result).isAbsolute());
     }
 
@@ -49,7 +47,7 @@ class ExploreToolsetTest {
         Files.writeString(file, "hello");
 
         final String result = toolset.execute(
-                request("path_info", "{\"path\":\"" + escape(file) + "\"}"),
+                request("get_path_info", "{\"path\":\"" + escape(file) + "\"}"),
                 null);
 
         assertTrue(result.contains("exists=true"));
@@ -64,12 +62,112 @@ class ExploreToolsetTest {
         Files.writeString(tempDir.resolve("plain.txt"), "x");
 
         final String result = toolset.execute(
-                request("list_folders", "{\"path\":\"" + escape(tempDir) + "\"}"),
+                request("list_subdirectories", "{\"path\":\"" + escape(tempDir) + "\"}"),
                 null);
 
         assertTrue(result.contains("a"));
         assertTrue(result.contains("b"));
         assertFalse(result.contains("plain.txt"));
+    }
+
+    @Test
+    void navigateToolChangesWorkingDirectory(@TempDir final Path tempDir) throws Exception {
+        final Path workspace = tempDir.resolve("workspace");
+        Files.createDirectories(workspace.resolve("src"));
+
+        final String navigate = toolset.execute(
+                request("change_working_directory", "{\"path\":\"" + escape(workspace) + "\"}"),
+                null);
+        assertTrue(navigate.contains("cwd=" + workspace.toAbsolutePath().normalize()));
+
+        final String cwd = toolset.execute(request("get_current_working_directory", "{}"), null);
+        assertEquals(workspace.toAbsolutePath().normalize().toString(), cwd);
+
+        final String listResult = toolset.execute(request("list_subdirectories", "{}"), null);
+        assertTrue(listResult.contains("path=" + workspace.toAbsolutePath().normalize()));
+        assertTrue(listResult.contains("src"));
+    }
+
+    @Test
+    void navigateToolSupportsGoingUpOneFolder(@TempDir final Path tempDir) throws Exception {
+        final Path level1 = tempDir.resolve("level1");
+        final Path level2 = level1.resolve("level2");
+        Files.createDirectories(level2);
+
+        final String enterChild = toolset.execute(
+                request("change_working_directory", "{\"path\":\"" + escape(level2) + "\"}"),
+                null);
+        assertTrue(enterChild.contains("cwd=" + level2.toAbsolutePath().normalize()));
+
+        final String upOne = toolset.execute(request("change_working_directory", "{\"path\":\"..\"}"), null);
+        assertTrue(upOne.contains("cwd=" + level1.toAbsolutePath().normalize()));
+
+        final String cwd = toolset.execute(request("get_current_working_directory", "{}"), null);
+        assertEquals(level1.toAbsolutePath().normalize().toString(), cwd);
+    }
+
+    @Test
+    void navigateToolSupportsGoingUpTwoFolders(@TempDir final Path tempDir) throws Exception {
+        final Path level1 = tempDir.resolve("level1");
+        final Path level2 = level1.resolve("level2");
+        final Path level3 = level2.resolve("level3");
+        Files.createDirectories(level3);
+
+        final String enterDeep = toolset.execute(
+                request("change_working_directory", "{\"path\":\"" + escape(level3) + "\"}"),
+                null);
+        assertTrue(enterDeep.contains("cwd=" + level3.toAbsolutePath().normalize()));
+
+        final String upTwo = toolset.execute(request("change_working_directory", "{\"path\":\"../..\"}"), null);
+        assertTrue(upTwo.contains("cwd=" + level1.toAbsolutePath().normalize()));
+
+        final String cwd = toolset.execute(request("get_current_working_directory", "{}"), null);
+        assertEquals(level1.toAbsolutePath().normalize().toString(), cwd);
+    }
+
+    @Test
+    void listFolderReturnsAllFilesRecursively(@TempDir final Path tempDir) throws Exception {
+        final Path src = tempDir.resolve("src");
+        Files.createDirectories(src.resolve("nested"));
+        Files.writeString(src.resolve("Main.java"), "class Main {}\n");
+        Files.writeString(src.resolve("nested/Helper.java"), "class Helper {}\n");
+
+        final String result = toolset.execute(
+                request("list_files_recursive", "{\"path\":\"" + escape(src) + "\"}"),
+                null);
+
+        assertTrue(result.contains("Main.java"));
+        assertTrue(result.contains("nested/Helper.java"));
+    }
+
+    @Test
+    void explainToolAnalyzesFile(@TempDir final Path tempDir) throws Exception {
+        final Path file = tempDir.resolve("notes.md");
+        Files.writeString(file, "# Title\n\nSome content here.\n");
+
+        final String result = toolset.execute(
+                request("analyze_path_detailed", "{\"path\":\"" + escape(file) + "\"}"),
+                null);
+
+        assertTrue(result.contains("Detailed file analysis"));
+        assertTrue(result.contains("extension=md"));
+        assertTrue(result.contains("contentPreview="));
+    }
+
+    @Test
+    void summariseToolAnalyzesDirectory(@TempDir final Path tempDir) throws Exception {
+        Files.createDirectories(tempDir.resolve("pkg"));
+        Files.writeString(tempDir.resolve("Main.java"), "class Main {}\n");
+        Files.writeString(tempDir.resolve("pkg/Helper.java"), "class Helper {}\n");
+        Files.writeString(tempDir.resolve("README.md"), "hello\n");
+
+        final String result = toolset.execute(
+                request("summarize_path", "{\"path\":\"" + escape(tempDir) + "\"}"),
+                null);
+
+        assertTrue(result.contains("Directory summary"));
+        assertTrue(result.contains("files=3"));
+        assertTrue(result.contains("extensions="));
     }
 
     @Test
@@ -81,7 +179,7 @@ class ExploreToolsetTest {
 
         final String args = "{\"projectDirectory\":\"" + escape(tempDir)
                 + "\",\"relativePath\":\"src\"}";
-        final String result = toolset.execute(request("list_files_in_project", args), null);
+        final String result = toolset.execute(request("list_project_entries", args), null);
 
         assertTrue(result.contains("Main.java"));
         assertTrue(result.contains("nested/"));
@@ -121,6 +219,32 @@ class ExploreToolsetTest {
     }
 
     @Test
+    void getGitLogReturnsRecentCommits(@TempDir final Path tempDir) throws Exception {
+        runCommand(tempDir, "git", "init");
+        runCommand(tempDir, "git", "config", "user.name", "PDHD Test");
+        runCommand(tempDir, "git", "config", "user.email", "pdhd-test@example.com");
+
+        final Path readme = tempDir.resolve("README.md");
+        Files.writeString(readme, "# Demo\n");
+        runCommand(tempDir, "git", "add", "README.md");
+        runCommand(tempDir, "git", "commit", "-m", "initial commit");
+
+        final String args = "{\"path\":\"" + escape(tempDir) + "\",\"maxCount\":5}";
+        final String result = toolset.execute(request("get_git_log", args), null);
+
+        assertTrue(result.contains("path=" + tempDir.toAbsolutePath().normalize()));
+        assertTrue(result.toLowerCase().contains("initial commit"));
+    }
+
+    @Test
+    void getGitLogReturnsHelpfulErrorForNonRepository(@TempDir final Path tempDir) {
+        final String args = "{\"path\":\"" + escape(tempDir) + "\"}";
+        final String result = toolset.execute(request("get_git_log", args), null);
+
+        assertTrue(result.contains("Failed to get git log"));
+    }
+
+    @Test
     void unknownToolReturnsHelpfulMessage() {
         final String result = toolset.execute(request("not_a_tool", "{}"), null);
         assertTrue(result.contains("Unknown tool"));
@@ -135,5 +259,16 @@ class ExploreToolsetTest {
 
     private String escape(final Path path) {
         return path.toString().replace("\\", "\\\\");
+    }
+
+    private static void runCommand(final Path cwd, final String... command) throws Exception {
+        final Process process = new ProcessBuilder(command)
+                .directory(cwd.toFile())
+                .start();
+        final int exit = process.waitFor();
+        if (exit != 0) {
+            final String stderr = new String(process.getErrorStream().readAllBytes());
+            throw new IllegalStateException("Command failed: " + String.join(" ", command) + "\n" + stderr);
+        }
     }
 }

@@ -15,7 +15,9 @@ public class ToolActivityService {
 
     private static final int MAX_EVENTS = 300;
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    private static final Pattern RELATIVE_FILE = Pattern.compile("\"(filePath|relativePath)\"\\s*:\\s*\"([^\"]+)\"");
+    private static final Pattern REQUEST_PATH = Pattern
+            .compile("\"(filePath|relativePath|path|projectDirectory)\"\\s*:\\s*\"([^\"]+)\"");
+    private static final Pattern RESULT_PATH = Pattern.compile("(?m)^path=(.+)$");
 
     private final Deque<ToolActivityEvent> events = new ArrayDeque<>();
 
@@ -41,41 +43,61 @@ public class ToolActivityService {
     }
 
     private List<String> extractRequestedFiles(final String toolName, final String argumentsJson, final String result) {
-        if (argumentsJson == null || argumentsJson.isBlank()) {
-            return List.of();
-        }
         final Set<String> files = new LinkedHashSet<>();
 
-        try {
-            final JsonNode node = MAPPER.readTree(argumentsJson);
-            final JsonNode filePath = node.get("filePath");
-            if (filePath != null && !filePath.asText().isBlank()) {
-                files.add(filePath.asText());
+        if (argumentsJson != null && !argumentsJson.isBlank()) {
+            try {
+                final JsonNode node = MAPPER.readTree(argumentsJson);
+                addJsonPath(node, "filePath", files);
+                addJsonPath(node, "relativePath", files);
+                addJsonPath(node, "path", files);
+                addJsonPath(node, "projectDirectory", files);
+            } catch (final Exception ignored) {
+                final Matcher matcher = REQUEST_PATH.matcher(argumentsJson);
+                while (matcher.find()) {
+                    files.add(matcher.group(2));
+                }
             }
-            final JsonNode relativePath = node.get("relativePath");
-            if (relativePath != null && !relativePath.asText().isBlank()) {
-                files.add(relativePath.asText());
-            }
-        } catch (final Exception ignored) {
-            final Matcher matcher = RELATIVE_FILE.matcher(argumentsJson);
-            while (matcher.find()) {
-                files.add(matcher.group(2));
+        }
+
+        if (result != null && !result.isBlank()) {
+            final Matcher pathLine = RESULT_PATH.matcher(result);
+            while (pathLine.find()) {
+                final String value = pathLine.group(1).trim();
+                if (!value.isBlank()) {
+                    files.add(value);
+                }
             }
         }
 
         // For tree/list tools, parse returned entries and keep file-like names.
-        if (("list_files_in_project".equals(toolName) || "list_folders".equals(toolName))
+        if (("list_project_entries".equals(toolName)
+                || "list_subdirectories".equals(toolName)
+                || "list_files_recursive".equals(toolName)
+                || "list_files_in_project".equals(toolName)
+                || "list_folders".equals(toolName)
+                || "list_folder".equals(toolName))
                 && result != null
                 && !result.isBlank()) {
             for (final String line : result.split("\\R")) {
                 final String trimmed = line.trim();
-                if (!trimmed.isEmpty() && !trimmed.endsWith("/") && !trimmed.startsWith("Failed")) {
+                if (!trimmed.isEmpty()
+                        && !trimmed.endsWith("/")
+                        && !trimmed.startsWith("Failed")
+                        && !trimmed.startsWith("path=")) {
                     files.add(trimmed);
                 }
             }
         }
 
         return List.copyOf(files);
+    }
+
+    private void addJsonPath(final JsonNode node, final String key, final Set<String> files) {
+        final JsonNode value = node.get(key);
+        if (value != null && !value.asText().isBlank()) {
+            files.add(value.asText());
+        }
     }
 
     private String truncate(final String value, final int maxLen) {

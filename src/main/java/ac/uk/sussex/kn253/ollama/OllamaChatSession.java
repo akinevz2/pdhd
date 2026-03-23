@@ -56,6 +56,7 @@ public class OllamaChatSession {
     private static final Logger LOG = Logger.getLogger(OllamaChatSession.class);
     private static final int MAX_TOOL_ROUNDS = 8;
     private static final ObjectMapper TOOL_MAPPER = new ObjectMapper();
+    private static final Pattern CONTROL_TOKEN_PATTERN = Pattern.compile("<\\|[^|>]+\\|>");
     // Matches tool calls wrapped in <tool_call>…</tool_call> or ```json…``` fences
     private static final Pattern TOOL_CALL_PATTERN = Pattern.compile(
             "<tool_call>\\s*(\\{[\\s\\S]*?\\})\\s*</tool_call>" +
@@ -63,6 +64,7 @@ public class OllamaChatSession {
             Pattern.CASE_INSENSITIVE);
 
     private final ChatModel chatModel;
+    private final String configuredModelName;
     private final ToolService toolService;
     private final ToolActivityService toolActivityService;
     private final List<ChatMessage> history = new ArrayList<>();
@@ -85,6 +87,7 @@ public class OllamaChatSession {
                 .numCtx(config.numCtx() > 0 ? config.numCtx() : null)
                 .timeout(Duration.ofSeconds(config.timeoutSeconds()))
                 .build();
+        this.configuredModelName = config.modelName();
         this.toolService = null;
         this.toolActivityService = null;
     }
@@ -98,6 +101,7 @@ public class OllamaChatSession {
                 .numCtx(builder.numCtx() > 0 ? builder.numCtx() : null)
                 .timeout(Duration.ofSeconds(builder.timeoutSeconds()))
                 .build();
+        this.configuredModelName = builder.modelName();
         this.toolService = builder.toolService();
         this.toolActivityService = builder.toolActivityService();
     }
@@ -113,6 +117,7 @@ public class OllamaChatSession {
                 .baseUrl(baseUrl)
                 .modelName(modelName)
                 .build();
+        this.configuredModelName = modelName;
         this.toolService = null;
         this.toolActivityService = null;
     }
@@ -125,6 +130,7 @@ public class OllamaChatSession {
      */
     public OllamaChatSession(final ChatModel chatModel) {
         this.chatModel = chatModel;
+        this.configuredModelName = null;
         this.toolService = null;
         this.toolActivityService = null;
     }
@@ -266,7 +272,17 @@ public class OllamaChatSession {
         if (toolService == null || toolService.toolSpecifications().isEmpty()) {
             return systemPrompt;
         }
+        if (isLlama32FamilyModel()) {
+            return systemPrompt;
+        }
         return systemPrompt + "\n\n" + buildToolCallingAddendum(toolService.toolSpecifications());
+    }
+
+    private boolean isLlama32FamilyModel() {
+        if (configuredModelName == null || configuredModelName.isBlank()) {
+            return false;
+        }
+        return configuredModelName.toLowerCase(Locale.ROOT).startsWith("llama3.2");
     }
 
     private static String buildToolCallingAddendum(final List<ToolSpecification> specs) {
@@ -282,7 +298,8 @@ public class OllamaChatSession {
             if (spec.description() != null && !spec.description().isBlank()) {
                 sb.append("  description: ").append(spec.description()).append("\n");
             }
-            if (spec.parameters() instanceof final JsonObjectSchema schema && schema.properties() != null) {
+            final JsonObjectSchema schema = spec.parameters();
+            if (schema != null && schema.properties() != null) {
                 sb.append("  parameters:\n");
                 schema.properties().forEach((paramName, paramSchema) -> {
                     sb.append("    - ").append(paramName);
@@ -313,29 +330,112 @@ public class OllamaChatSession {
         if (text == null || text.isBlank()) {
             return List.of();
         }
+
+        final String sanitized = sanitizeModelText(text);
         final List<ToolExecutionRequest> results = new ArrayList<>();
 
         // Try tagged / fenced blocks first
-        final Matcher m = TOOL_CALL_PATTERN.matcher(text);
+        final Matcher m = TOOL_CALL_PATTERN.matcher(sanitized);
         while (m.find()) {
             final String json = m.group(1) != null ? m.group(1) : m.group(2);
-            parseOneToolCall(json).ifPresent(results::add);
+            results.addAll(parseToolCallsFromJson(json));
         }
         if (!results.isEmpty()) {
             return results;
         }
 
+        // Handle malformed outputs that start a <tool_call> block but never close it.
+        final Optional<String> embeddedJson = extractJsonAfterToolCallTag(sanitized);
+        if (embeddedJson.isPresent()) {
+            results.addAll(parseToolCallsFromJson(embeddedJson.get()));
+            if (!results.isEmpty()) {
+                return results;
+            }
+        }
+
         // Fall back to treating the entire trimmed text as a bare JSON object
-        final String trimmed = text.trim();
-        if (trimmed.startsWith("{")) {
-            parseOneToolCall(trimmed).ifPresent(results::add);
+        final String trimmed = sanitized.trim();
+        if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+            results.addAll(parseToolCallsFromJson(trimmed));
         }
         return results;
+    }
+
+    private String sanitizeModelText(final String raw) {
+        return CONTROL_TOKEN_PATTERN.matcher(raw).replaceAll("").trim();
+    }
+
+    private Optional<String> extractJsonAfterToolCallTag(final String text) {
+        final String lower = text.toLowerCase(Locale.ROOT);
+        final int tagIdx = lower.indexOf("<tool_call>");
+        if (tagIdx < 0) {
+            return Optional.empty();
+        }
+        final int jsonStart = text.indexOf('{', tagIdx);
+        if (jsonStart < 0) {
+            return Optional.empty();
+        }
+
+        int depth = 0;
+        for (int i = jsonStart; i < text.length(); i++) {
+            final char ch = text.charAt(i);
+            if (ch == '{') {
+                depth++;
+            } else if (ch == '}') {
+                depth--;
+                if (depth == 0) {
+                    return Optional.of(text.substring(jsonStart, i + 1));
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    private List<ToolExecutionRequest> parseToolCallsFromJson(final String json) {
+        try {
+            final JsonNode root = TOOL_MAPPER.readTree(json);
+            final List<ToolExecutionRequest> calls = new ArrayList<>();
+            if (root == null || root.isNull()) {
+                return calls;
+            }
+
+            if (root.isArray()) {
+                for (final JsonNode node : root) {
+                    parseOneToolCall(node).ifPresent(calls::add);
+                }
+                return calls;
+            }
+
+            // OpenAI-style wrapper: { "tool_calls": [ ... ] }
+            if (root.has("tool_calls") && root.get("tool_calls").isArray()) {
+                for (final JsonNode node : root.get("tool_calls")) {
+                    parseOneToolCall(node).ifPresent(calls::add);
+                }
+                if (!calls.isEmpty()) {
+                    return calls;
+                }
+            }
+
+            parseOneToolCall(root).ifPresent(calls::add);
+            return calls;
+        } catch (final Exception e) {
+            LOG.debugf("Could not parse text as tool call JSON payload: %s", e.getMessage());
+            return List.of();
+        }
     }
 
     private Optional<ToolExecutionRequest> parseOneToolCall(final String json) {
         try {
             final JsonNode node = TOOL_MAPPER.readTree(json);
+            return parseOneToolCall(node);
+        } catch (final Exception e) {
+            LOG.debugf("Could not parse text as tool call: %s", e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    private Optional<ToolExecutionRequest> parseOneToolCall(final JsonNode node) {
+        try {
             String name = null;
             String arguments = "{}";
 

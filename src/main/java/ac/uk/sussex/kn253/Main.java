@@ -35,6 +35,9 @@ public class Main implements QuarkusApplication {
     SystemPromptMenu systemPromptMenu;
 
     @Inject
+    DebugMenu debugMenu;
+
+    @Inject
     @TopCommand
     PdhdCliCommand pdhdCliCommand;
 
@@ -64,19 +67,21 @@ public class Main implements QuarkusApplication {
             System.out.println("\n=== " + name + " ===");
             System.out.println("1. Launch assistant");
             System.out.println("2. Launch web UI");
-            System.out.println("3. Configure Ollama");
-            System.out.println("4. Configure system prompt");
-            System.out.println("5. Exit");
+            System.out.println("3. Debug menu");
+            System.out.println("4. Configure Ollama");
+            System.out.println("5. Configure system prompt");
+            System.out.println("6. Exit");
 
             try {
                 final String input = reader.readLine("> ");
                 switch (input.trim()) {
                     case "1" -> assistant.launch();
                     case "2" -> webui.launch();
-                    case "3" -> ollamaConfigMenu.run(reader);
-                    case "4" -> systemPromptMenu.run(reader);
-                    case "5" -> exit();
-                    default -> System.out.println("Please choose 1, 2, 3, 4, or 5.");
+                    case "3" -> debugMenu.run(reader);
+                    case "4" -> ollamaConfigMenu.run(reader);
+                    case "5" -> systemPromptMenu.run(reader);
+                    case "6" -> exit();
+                    default -> System.out.println("Please choose 1, 2, 3, 4, 5, or 6.");
                 }
             } catch (final UserInterruptException e) {
                 exit();

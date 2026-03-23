@@ -50,4 +50,14 @@ public class ChatService {
     public String sendMessage(final String message) {
         return chatSession.send(message);
     }
+
+    public String sendOneShotMessage(final String message) {
+        return chatSession.sendOneShot(message);
+    }
+
+    public void resetConversation() {
+        if (chatSession != null) {
+            chatSession.reset();
+        }
+    }
 }

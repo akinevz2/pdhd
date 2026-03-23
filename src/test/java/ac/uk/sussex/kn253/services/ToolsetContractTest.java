@@ -23,19 +23,24 @@ class ToolsetContractTest {
                 .map(ToolSpecification::name)
                 .collect(Collectors.toSet());
 
-        assertTrue(names.contains("list_folders"));
-        assertTrue(names.contains("get_cwd"));
+        assertTrue(names.contains("list_subdirectories"));
+        assertTrue(names.contains("list_files_recursive"));
+        assertTrue(names.contains("change_working_directory"));
+        assertTrue(names.contains("analyze_path_detailed"));
+        assertTrue(names.contains("summarize_path"));
+        assertTrue(names.contains("get_current_working_directory"));
         assertTrue(names.contains("resolve_path"));
-        assertTrue(names.contains("path_info"));
+        assertTrue(names.contains("get_path_info"));
         assertTrue(names.contains("list_git_projects"));
+        assertTrue(names.contains("get_git_log"));
         assertTrue(names.contains("list_github_projects"));
-        assertTrue(names.contains("list_files_in_project"));
+        assertTrue(names.contains("list_project_entries"));
         assertTrue(names.contains("read_file"));
         assertTrue(names.contains("create_report"));
         assertTrue(names.contains("create_timeline"));
         assertTrue(names.contains("create_plan"));
-        assertTrue(names.contains("create_todo_in_project"));
+        assertTrue(names.contains("append_project_todo"));
 
-        assertTrue(names.size() >= 12, "Expected at least 12 tool specifications");
+        assertTrue(names.size() >= 17, "Expected at least 17 tool specifications");
     }
 }
