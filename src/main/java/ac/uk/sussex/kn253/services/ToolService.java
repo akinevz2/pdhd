@@ -2,9 +2,7 @@ package ac.uk.sussex.kn253.services;
 
 import java.util.List;
 
-import ac.uk.sussex.kn253.services.tools.ExploreToolset;
-import ac.uk.sussex.kn253.services.tools.ReadToolset;
-import ac.uk.sussex.kn253.services.tools.WriteToolset;
+import ac.uk.sussex.kn253.services.tools.*;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -22,11 +20,15 @@ public class ToolService {
     @Inject
     WriteToolset writeToolset;
 
+    @Inject
+    IntrospectToolset introspectToolset;
+
     public List<ToolSpecification> toolSpecifications() {
         return java.util.stream.Stream.of(
-                exploreToolset.toolSpecifications(),
-                readToolset.toolSpecifications(),
-                writeToolset.toolSpecifications())
+                exploreToolset == null ? List.<ToolSpecification>of() : exploreToolset.toolSpecifications(),
+                readToolset == null ? List.<ToolSpecification>of() : readToolset.toolSpecifications(),
+                writeToolset == null ? List.<ToolSpecification>of() : writeToolset.toolSpecifications(),
+                introspectToolset == null ? List.<ToolSpecification>of() : introspectToolset.toolSpecifications())
                 .flatMap(List::stream)
                 .toList();
     }
@@ -36,14 +38,17 @@ public class ToolService {
     }
 
     public String execute(final ToolExecutionRequest request, final Object memoryId) {
-        if (exploreToolset.canHandle(request.name())) {
+        if (exploreToolset != null && exploreToolset.canHandle(request.name())) {
             return exploreToolset.execute(request, memoryId);
         }
-        if (readToolset.canHandle(request.name())) {
+        if (readToolset != null && readToolset.canHandle(request.name())) {
             return readToolset.execute(request, memoryId);
         }
-        if (writeToolset.canHandle(request.name())) {
+        if (writeToolset != null && writeToolset.canHandle(request.name())) {
             return writeToolset.execute(request, memoryId);
+        }
+        if (introspectToolset != null && introspectToolset.canHandle(request.name())) {
+            return introspectToolset.execute(request, memoryId);
         }
         return "Unknown tool: " + request.name();
     }

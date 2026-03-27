@@ -1,11 +1,12 @@
 package ac.uk.sussex.kn253.services;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.net.URI;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -15,11 +16,21 @@ import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
+/**
+ * Service for resolving and persisting project metadata from Git and GitHub.
+ *
+ * <p>
+ * Given a directory path, {@link #resolveProject(Path)} detects the local
+ * {@link GitRepository} (via {@code git remote -v}), queries GitHub metadata
+ * (via the {@code gh} CLI when available), and persists a {@link Project}
+ * record to the database.
+ */
 @ApplicationScoped
 public class RepoService {
 
     /** Matches SCP-style SSH remote URLs: {@code user@host:path/to/repo.git} */
     private static final Pattern SSH_REMOTE_PATTERN = Pattern.compile("^[^@]+@([^:]+):(.+)$");
+    private static final int PROCESS_TIMEOUT_SECONDS = 6;
 
     @jakarta.inject.Inject
     WorkingDirectoryService workingDirectoryService;
@@ -35,6 +46,12 @@ public class RepoService {
      */
     @Transactional
     public Project resolveProject(final Path path) {
+        final String directory = path.toAbsolutePath().normalize().toString();
+        final Project existing = Project.find("directory", directory).firstResult();
+        if (existing != null) {
+            return existing;
+        }
+
         final GitRepository gitRepo = getGitRepository(path);
         final GithubRepository githubRepo = getGithubRepository(path);
 
@@ -45,7 +62,7 @@ public class RepoService {
             githubRepo.persist();
         }
 
-        final Project project = new Project(null, path.toAbsolutePath().toString(), githubRepo, gitRepo);
+        final Project project = new Project(null, directory, githubRepo, gitRepo);
         project.persist();
         return project;
     }
@@ -69,10 +86,10 @@ public class RepoService {
             final Process process = pb.start();
             final String output;
             try (final BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(process.getInputStream()))) {
+                    new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
                 output = reader.lines().collect(Collectors.joining("\n"));
             }
-            if (process.waitFor() != 0) {
+            if (!waitForProcess(process, "gh repo view", path) || process.exitValue() != 0) {
                 return null;
             }
             return parseGhRepoJson(output);
@@ -130,8 +147,8 @@ public class RepoService {
             final Process process = new ProcessBuilder("gh", "--version")
                     .redirectErrorStream(true)
                     .start();
-            process.getInputStream().transferTo(java.io.OutputStream.nullOutputStream());
-            return process.waitFor() == 0;
+            process.getInputStream().transferTo(OutputStream.nullOutputStream());
+            return waitForProcess(process, "gh --version", null) && process.exitValue() == 0;
         } catch (final Exception e) {
             return false;
         }
@@ -145,14 +162,18 @@ public class RepoService {
 
             final Process process = pb.start();
             try (final BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(process.getInputStream()))) {
-                return reader.lines()
+                    new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+                final List<Origin> origins = reader.lines()
                         .filter(line -> line.endsWith("(fetch)"))
                         .map(line -> {
                             final String[] parts = line.split("\\s+");
                             return new Origin(parts[0], parseRemoteUrl(parts[1]));
                         })
                         .toList();
+                if (!waitForProcess(process, "git remote -v", path) || process.exitValue() != 0) {
+                    return List.of();
+                }
+                return origins;
             }
         } catch (final Exception e) {
             return List.of();
@@ -192,10 +213,25 @@ public class RepoService {
             pb.redirectErrorStream(true);
 
             final Process process = pb.start();
-            process.getInputStream().transferTo(java.io.OutputStream.nullOutputStream());
-            return process.waitFor() == 0;
+            process.getInputStream().transferTo(OutputStream.nullOutputStream());
+            return waitForProcess(process, "git rev-parse --git-dir", path) && process.exitValue() == 0;
         } catch (final Exception e) {
             return false;
         }
+    }
+
+    private boolean waitForProcess(final Process process, final String command, final Path path)
+            throws InterruptedException {
+        final boolean finished = process.waitFor(PROCESS_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        if (finished) {
+            return true;
+        }
+        process.destroyForcibly();
+        if (path != null) {
+            Log.warnf("Command timed out after %ds (%s) in %s", PROCESS_TIMEOUT_SECONDS, command, path);
+        } else {
+            Log.warnf("Command timed out after %ds (%s)", PROCESS_TIMEOUT_SECONDS, command);
+        }
+        return false;
     }
 }

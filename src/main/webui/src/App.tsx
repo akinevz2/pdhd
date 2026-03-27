@@ -1,94 +1,49 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { api, apiPost } from "./api";
+import { CwdNavigator } from "./components/CwdNavigator";
+import { ProjectWindow } from "./components/ProjectWindow";
+import { TopMenuAndModals } from "./components/TopMenuAndModals";
+import { useMenuPanels } from "./hooks/useMenuPanels";
+import { useHighlightedFiles } from "./hooks/useHighlightedFiles";
+import {
+  CHAT_TIMEOUT_MS,
+  POLL_MS,
+  isBrowsableRepoUrl,
+  isImagePath,
+  openExternalUrl,
+} from "./utils";
+import type { ProjectSummary as ProjectSummaryType } from "./types";
+import type {
+  AssistantChatResponse,
+  ChatMessage,
+  CwdResponse,
+  FileContentResponse,
+  FsBrowserEntry,
+  FsListResponse,
+  ProjectSummary,
+  ToolActivityItem,
+  ToolActivityResponse,
+  TreeNode,
+  WindowState,
+} from "./types";
 
-type ProjectSummary = {
-  id: number;
-  directory: string;
-  hasGitRepository: boolean;
-  githubName?: string | null;
-  githubDescription?: string | null;
-};
-
-type TreeNode = {
-  name: string;
-  relativePath: string;
-  directory: boolean;
-  children: TreeNode[];
-};
-
-type ToolActivityItem = {
-  timestamp: string;
-  toolName: string;
-  argumentsJson: string;
-  result: string;
-  requestedFiles: string[];
-};
-
-type ToolActivityResponse = {
-  items: ToolActivityItem[];
-};
-
-type FileContentResponse = {
-  projectDirectory: string;
-  filePath: string;
-  content: string;
-};
-
-type CwdResponse = {
-  cwd: string;
-};
-
-type AssistantChatResponse = {
-  reply: string;
-};
-
-type ChatMessage = {
-  role: "user" | "assistant" | "system";
-  content: string;
-};
-
-type WindowState = {
-  id: number;
-  project: ProjectSummary;
-  treeLoading: boolean;
-  treeError?: string;
-  tree?: TreeNode;
-  selectedFilePath?: string;
-  fileContent?: string;
-  fileLoading?: boolean;
-  fileError?: string;
-  x: number;
-  y: number;
-  z: number;
-};
-
-const POLL_MS = 2000;
-const API_TIMEOUT_MS = 10000;
+const MARKDOWN_FILE_PATTERN = /\.(md|markdown|mdx)$/i;
 
 export function App() {
-  const [projects, setProjects] = useState<ProjectSummary[]>([]);
-  const [projectsLoading, setProjectsLoading] = useState(true);
-  const [projectsError, setProjectsError] = useState<string | null>(null);
-  const [hiddenProjectIds, setHiddenProjectIds] = useState<Set<number>>(
-    new Set(),
-  );
-
-  const dismissProject = useCallback((id: number) => {
-    setHiddenProjectIds((prev) => new Set(prev).add(id));
-  }, []);
+  const [browserPath, setBrowserPath] = useState<string>("");
+  const [browserEntries, setBrowserEntries] = useState<FsBrowserEntry[]>([]);
+  const [browserLoading, setBrowserLoading] = useState(false);
+  const [browserError, setBrowserError] = useState<string | null>(null);
+  const [browserRepoUrl, setBrowserRepoUrl] = useState<string | null>(null);
 
   const [activityItems, setActivityItems] = useState<ToolActivityItem[]>([]);
   const [activityError, setActivityError] = useState<string | null>(null);
 
   const [cwd, setCwd] = useState<string>("");
   const [cwdError, setCwdError] = useState<string | null>(null);
+  const [cwdUpdating, setCwdUpdating] = useState(false);
 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState<string>("");
@@ -97,41 +52,17 @@ export function App() {
   const [assistantUnreachable, setAssistantUnreachable] =
     useState<boolean>(false);
   const chatLogRef = useRef<HTMLDivElement | null>(null);
+  const chatInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const handledCanvasActionKeysRef = useRef<Set<string>>(new Set());
+  const handledCwdActionKeysRef = useRef<Set<string>>(new Set());
 
   const [windows, setWindows] = useState<WindowState[]>([]);
   const nextWindowId = useRef(1);
   const nextZ = useRef(10);
 
-  const highlightedByProject = useMemo(() => {
-    const out = new Map<string, Set<string>>();
-    const openProjects = new Set(windows.map((w) => w.project.directory));
+  const menuPanels = useMenuPanels();
 
-    for (const event of activityItems) {
-      for (const requested of event.requestedFiles || []) {
-        const normalized = normalize(requested);
-        for (const projectDirectory of openProjects) {
-          if (!out.has(projectDirectory)) {
-            out.set(projectDirectory, new Set<string>());
-          }
-          out.get(projectDirectory)?.add(normalized);
-        }
-      }
-    }
-    return out;
-  }, [activityItems, windows]);
-
-  const loadProjects = useCallback(async () => {
-    setProjectsLoading(true);
-    setProjectsError(null);
-    try {
-      const data = await api<ProjectSummary[]>("/api/projects");
-      setProjects(data);
-    } catch (e) {
-      setProjectsError("Failed to load projects.");
-    } finally {
-      setProjectsLoading(false);
-    }
-  }, []);
+  const highlightedByProject = useHighlightedFiles(activityItems, windows);
 
   const loadActivity = useCallback(async (quiet = true) => {
     try {
@@ -140,7 +71,7 @@ export function App() {
       );
       setActivityItems(data.items || []);
       setActivityError(null);
-    } catch (e) {
+    } catch {
       if (!quiet) {
         setActivityError("Failed to load tool activity.");
       }
@@ -152,25 +83,57 @@ export function App() {
       const data = await api<CwdResponse>("/api/cwd");
       setCwd(data.cwd || "");
       setCwdError(null);
-    } catch (e) {
+    } catch {
       setCwdError("Failed to resolve working folder");
     }
   }, []);
 
-  const setWorkingFolder = useCallback(async (path: string) => {
-    try {
-      const data = await apiPost<{ path: string }, CwdResponse>("/api/cwd", {
-        path,
-      });
-      setCwd(data.cwd || "");
-      setCwdError(null);
-    } catch (e) {
-      setCwdError("Failed to update working folder");
-    }
-  }, []);
+  const loadBrowser = useCallback(
+    async (path?: string) => {
+      const targetPath = (path || cwd || "").trim();
+      if (!targetPath) {
+        return;
+      }
+      setBrowserLoading(true);
+      setBrowserError(null);
+      try {
+        const data = await api<FsListResponse>(
+          `/api/fs/list?path=${encodeURIComponent(targetPath)}`,
+        );
+        setBrowserPath(data.path || targetPath);
+        setBrowserEntries(data.entries || []);
+        setBrowserRepoUrl(data.repoUrl || null);
+      } catch {
+        setBrowserError("Failed to list directory.");
+        setBrowserRepoUrl(null);
+      } finally {
+        setBrowserLoading(false);
+      }
+    },
+    [cwd],
+  );
+
+  const setWorkingFolder = useCallback(
+    async (path: string) => {
+      setCwdUpdating(true);
+      try {
+        const data = await apiPost<{ path: string }, CwdResponse>("/api/cwd", {
+          path,
+        });
+        setCwd(data.cwd || "");
+        setCwdError(null);
+        await loadBrowser(data.cwd || path);
+        await loadActivity(false);
+      } catch {
+        setCwdError("Failed to update working folder");
+      } finally {
+        setCwdUpdating(false);
+      }
+    },
+    [loadActivity, loadBrowser],
+  );
 
   useEffect(() => {
-    loadProjects();
     loadActivity(false);
     loadCwd();
     const timer = window.setInterval(() => {
@@ -182,7 +145,16 @@ export function App() {
       });
     }, POLL_MS);
     return () => window.clearInterval(timer);
-  }, [loadActivity, loadProjects, loadCwd]);
+  }, [loadActivity, loadCwd]);
+
+  useEffect(() => {
+    if (!cwd) {
+      return;
+    }
+    loadBrowser(cwd).catch(() => {
+      // surfaced by browser state
+    });
+  }, [cwd, loadBrowser]);
 
   const focusWindow = useCallback((id: number) => {
     setWindows((prev) =>
@@ -211,15 +183,17 @@ export function App() {
   );
 
   const loadTreeForWindow = useCallback(
-    async (windowId: number, projectId: number) => {
+    async (windowId: number, directory: string) => {
       try {
-        const tree = await api<TreeNode>(`/api/projects/${projectId}/tree`);
+        const tree = await api<TreeNode>(
+          `/api/fs/tree?path=${encodeURIComponent(directory)}`,
+        );
         updateWindow(windowId, {
           tree,
           treeLoading: false,
           treeError: undefined,
         });
-      } catch (e) {
+      } catch {
         updateWindow(windowId, {
           treeLoading: false,
           treeError: "Failed to load project tree.",
@@ -229,63 +203,201 @@ export function App() {
     [updateWindow],
   );
 
-  const openProjectWindow = useCallback(
-    async (project: ProjectSummary) => {
-      await setWorkingFolder(project.directory);
-      const id = nextWindowId.current++;
-      const win: WindowState = {
-        id,
-        project,
-        treeLoading: true,
-        x: 80 + Math.floor(Math.random() * 140),
-        y: 40 + Math.floor(Math.random() * 120),
-        z: ++nextZ.current,
-      };
-      setWindows((prev) => [...prev, win]);
-      loadTreeForWindow(id, project.id).catch(() => {
-        // handled in updater
-      });
-      loadProjects().catch(() => {
-        // handled in loader state
-      });
+  const openInCanvas = useCallback(
+    async (path: string) => {
+      const target = path || cwd;
+      if (!target) return;
+      const projects = await api<ProjectSummaryType[]>("/api/projects");
+      const match = projects
+        .filter(
+          (p) =>
+            target === p.directory ||
+            target.startsWith(p.directory + "/") ||
+            target.startsWith(p.directory + "\\"),
+        )
+        .sort((a, b) => b.directory.length - a.directory.length)[0];
+      if (!match) return;
+      const existing = windows.find((w) => w.project.id === match.id);
+      if (existing) {
+        focusWindow(existing.id);
+        setWorkingFolder(match.directory).catch(() => {});
+        return;
+      }
+      const winId = ++nextWindowId.current;
+      setWindows((prev) => [
+        ...prev,
+        {
+          id: winId,
+          project: match,
+          treeLoading: true,
+          x: 60 + (winId % 6) * 30,
+          y: 40 + (winId % 6) * 30,
+          z: ++nextZ.current,
+        },
+      ]);
+      await loadTreeForWindow(winId, match.directory);
     },
-    [loadProjects, loadTreeForWindow, setWorkingFolder],
+    [cwd, windows, focusWindow, loadTreeForWindow],
   );
 
+  useEffect(() => {
+    if (!activityItems.length) {
+      return;
+    }
+
+    for (const item of activityItems) {
+      if (item.toolName !== "open_workspace_canvas") {
+        continue;
+      }
+
+      const actionKey = `${item.timestamp}|${item.argumentsJson}`;
+      if (handledCanvasActionKeysRef.current.has(actionKey)) {
+        continue;
+      }
+      handledCanvasActionKeysRef.current.add(actionKey);
+
+      let requestedPath = "";
+      try {
+        const parsed = JSON.parse(item.argumentsJson || "{}") as {
+          path?: string;
+        };
+        requestedPath = (parsed.path || "").trim();
+      } catch {
+        requestedPath = "";
+      }
+
+      const targetPath = requestedPath || cwd;
+      if (!targetPath) {
+        continue;
+      }
+
+      openInCanvas(targetPath).catch(() => {
+        // Non-fatal: tool request is best-effort.
+      });
+    }
+  }, [activityItems, cwd, openInCanvas]);
+
+  useEffect(() => {
+    if (!activityItems.length) {
+      return;
+    }
+
+    let shouldReloadCwd = false;
+    for (const item of activityItems) {
+      if (
+        item.toolName !== "change_working_directory" &&
+        item.toolName !== "navigate_tool"
+      ) {
+        continue;
+      }
+
+      const actionKey = `${item.timestamp}|${item.argumentsJson}`;
+      if (handledCwdActionKeysRef.current.has(actionKey)) {
+        continue;
+      }
+      handledCwdActionKeysRef.current.add(actionKey);
+
+      // Always reload cwd from backend state rather than replaying tool-event
+      // payloads, which may be historical and stale by the time they are polled.
+      shouldReloadCwd = true;
+    }
+
+    if (shouldReloadCwd) {
+      loadCwd().catch(() => {
+        // surfaced by cwd state
+      });
+    }
+  }, [activityItems, loadBrowser, loadCwd]);
+
   const openFile = useCallback(
-    async (windowId: number, projectId: number, path: string) => {
-      if (isImagePath(path)) {
+    async (
+      windowId: number,
+      projectDirectory: string,
+      relativePath: string,
+    ) => {
+      if (isImagePath(relativePath)) {
         updateWindow(windowId, {
-          selectedFilePath: path,
+          selectedFilePath: relativePath,
           fileLoading: false,
+          fileLoadingFolderSummary: false,
           fileContent: undefined,
+          fileContentMarkdown: false,
           fileError: undefined,
         });
         return;
       }
 
       updateWindow(windowId, {
-        selectedFilePath: path,
+        selectedFilePath: relativePath,
         fileLoading: true,
+        fileLoadingFolderSummary: false,
+        fileContentMarkdown: MARKDOWN_FILE_PATTERN.test(relativePath),
         fileError: undefined,
       });
+      const absolutePath =
+        projectDirectory.replace(/\\/g, "/") + "/" + relativePath;
       try {
         const file = await api<FileContentResponse>(
-          `/api/projects/${projectId}/file?path=${encodeURIComponent(path)}`,
+          `/api/fs/file?path=${encodeURIComponent(absolutePath)}`,
         );
         updateWindow(windowId, {
           fileLoading: false,
+          fileLoadingFolderSummary: false,
           fileContent: file.content,
+          fileContentMarkdown: MARKDOWN_FILE_PATTERN.test(relativePath),
           fileError: undefined,
         });
-      } catch (e) {
+      } catch {
         updateWindow(windowId, {
           fileLoading: false,
+          fileLoadingFolderSummary: false,
+          fileContentMarkdown: false,
           fileError: "Failed to read file.",
         });
       }
     },
     [updateWindow],
+  );
+
+  const openFileInCanvas = useCallback(
+    async (filePath: string) => {
+      if (!filePath) return;
+      const projects = await api<ProjectSummaryType[]>("/api/projects");
+      const match = projects
+        .filter(
+          (p) =>
+            filePath.startsWith(p.directory + "/") ||
+            filePath.startsWith(p.directory + "\\"),
+        )
+        .sort((a, b) => b.directory.length - a.directory.length)[0];
+      if (!match) return;
+      const relativePath = filePath
+        .slice(match.directory.length)
+        .replace(/^[\/\\]/, "");
+      let winId: number;
+      const existing = windows.find((w) => w.project.id === match.id);
+      if (existing) {
+        focusWindow(existing.id);
+        setWorkingFolder(match.directory).catch(() => {});
+        winId = existing.id;
+      } else {
+        winId = ++nextWindowId.current;
+        setWindows((prev) => [
+          ...prev,
+          {
+            id: winId,
+            project: match,
+            treeLoading: true,
+            x: 60 + (winId % 6) * 30,
+            y: 40 + (winId % 6) * 30,
+            z: ++nextZ.current,
+          },
+        ]);
+        await loadTreeForWindow(winId, match.directory);
+      }
+      await openFile(winId, match.directory, relativePath);
+    },
+    [cwd, windows, focusWindow, setWorkingFolder, loadTreeForWindow, openFile],
   );
 
   const openFolderSummary = useCallback(
@@ -302,6 +414,8 @@ export function App() {
       updateWindow(windowId, {
         selectedFilePath: safeRelativePath || ".",
         fileLoading: true,
+        fileLoadingFolderSummary: true,
+        fileContentMarkdown: true,
         fileError: undefined,
       });
       setChatError(null);
@@ -310,8 +424,12 @@ export function App() {
       try {
         const message = [
           `Summarise the contents of this folder: ${folderPath}`,
-          "Use tools to inspect the folder and files before answering.",
-          "Return a concise but useful 'file contents' summary for a developer.",
+          "First call read_folder_manifest with this exact folder path and use its evidence as the primary source.",
+          "Use read_file only for specific follow-up files if required.",
+          "Use read_project_manifest tool only when the request is explicitly about the whole project.",
+          "Return the final answer as Markdown with short section headings and bullet points.",
+          "Include fenced code blocks for small code examples when relevant.",
+          "Keep the summary concise but useful for a developer.",
         ].join(" ");
 
         setChatMessages((prev) => [
@@ -319,10 +437,27 @@ export function App() {
           { role: "user", content: `Summarise folder: ${folderPath}` },
         ]);
 
-        const result = await apiPost<
-          { message: string },
-          AssistantChatResponse
-        >("/api/chat/oneshot", { message });
+        const MAX_ATTEMPTS = 3;
+        let result: AssistantChatResponse | undefined;
+        let lastErr: unknown;
+        for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+          if (attempt > 0) {
+            await new Promise((r) => setTimeout(r, 1000 * 2 ** (attempt - 1)));
+          }
+          try {
+            result = await apiPost<{ message: string }, AssistantChatResponse>(
+              "/api/chat/oneshot",
+              { message },
+              CHAT_TIMEOUT_MS,
+            );
+            break;
+          } catch (err) {
+            lastErr = err;
+            // don't retry on 4xx client errors
+            if (err instanceof Error && /^4\d\d /.test(err.message)) break;
+          }
+        }
+        if (!result) throw lastErr;
         const reply = result.reply || "No summary returned.";
 
         setChatMessages((prev) => [
@@ -333,10 +468,12 @@ export function App() {
         setAssistantUnreachable(false);
         updateWindow(windowId, {
           fileLoading: false,
+          fileLoadingFolderSummary: false,
           fileError: undefined,
           fileContent: reply,
+          fileContentMarkdown: true,
         });
-      } catch (e) {
+      } catch {
         setAssistantUnreachable(true);
         setChatError("Failed to summarize folder contents.");
         setChatMessages((prev) => {
@@ -360,6 +497,8 @@ export function App() {
         });
         updateWindow(windowId, {
           fileLoading: false,
+          fileLoadingFolderSummary: false,
+          fileContentMarkdown: false,
           fileError: "Failed to summarize folder contents.",
         });
       } finally {
@@ -376,48 +515,60 @@ export function App() {
     [updateWindow],
   );
 
-  const sendChatMessage = useCallback(async () => {
-    const message = chatInput.trim();
-    if (!message || chatLoading) {
-      return;
-    }
+  const [retryMessage, setRetryMessage] = useState<string | null>(null);
+  const sendChatMessage = useCallback(
+    async (overrideMessage?: string) => {
+      const message = (overrideMessage ?? chatInput).trim();
+      if (!message || chatLoading) {
+        return;
+      }
 
-    setChatError(null);
-    setChatLoading(true);
-    setChatInput("");
-    setChatMessages((prev) => [...prev, { role: "user", content: message }]);
+      setChatError(null);
+      setChatLoading(true);
+      if (!overrideMessage) setChatInput("");
+      setChatMessages((prev) => [...prev, { role: "user", content: message }]);
+      setRetryMessage(null);
+      setChatError(null);
+      // Refocus the chat input for accessibility
+      setTimeout(() => {
+        if (chatInputRef.current) chatInputRef.current.focus();
+      }, 0);
 
-    try {
-      const result = await apiPost<{ message: string }, AssistantChatResponse>(
-        "/api/chat",
-        { message },
-      );
-      setChatMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: result.reply || "" },
-      ]);
-      setAssistantUnreachable(false);
-    } catch (e) {
-      setAssistantUnreachable(true);
-      setChatError("Failed to contact assistant.");
-      setChatMessages((prev) => [
-        ...prev,
-        {
-          role: "system",
-          content: "Assistant request failed. Check Ollama configuration.",
-        },
-      ]);
-    } finally {
-      setChatLoading(false);
-    }
-  }, [chatInput, chatLoading]);
+      try {
+        const result = await apiPost<
+          { message: string },
+          AssistantChatResponse
+        >("/api/chat", { message }, CHAT_TIMEOUT_MS);
+        setChatMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: result.reply || "" },
+        ]);
+        setAssistantUnreachable(false);
+        setRetryMessage(null);
+      } catch {
+        setAssistantUnreachable(true);
+        setChatError("Failed to contact assistant.");
+        setRetryMessage(message);
+        setChatMessages((prev) => [
+          ...prev,
+          {
+            role: "system",
+            content: "Assistant request failed. Check Ollama configuration.",
+          },
+        ]);
+      } finally {
+        setChatLoading(false);
+      }
+    },
+    [chatInput, chatLoading],
+  );
 
   const resetChat = useCallback(async () => {
     try {
       await apiPost<{}, unknown>("/api/chat/reset", {});
       setChatMessages([]);
       setChatError(null);
-    } catch (e) {
+    } catch {
       setChatError("Failed to reset assistant conversation.");
     }
   }, []);
@@ -431,6 +582,38 @@ export function App() {
   return (
     <>
       <main id="app-shell">
+        <TopMenuAndModals
+          ollamaLoading={menuPanels.ollamaLoading}
+          onOpenOllamaConfig={menuPanels.openOllamaConfig}
+          onOpenSystemPrompt={menuPanels.openSystemPrompt}
+          onOpenDebug={() => menuPanels.setDebugOpen(true)}
+          onExit={menuPanels.handleExit}
+          ollamaOpen={menuPanels.ollamaOpen}
+          ollamaForm={menuPanels.ollamaForm}
+          ollamaError={menuPanels.ollamaError}
+          availableModels={menuPanels.availableModels}
+          modelsLoading={menuPanels.modelsLoading}
+          setOllamaOpen={menuPanels.setOllamaOpen}
+          setOllamaForm={menuPanels.setOllamaForm}
+          fetchModels={menuPanels.fetchModels}
+          saveOllamaConfig={menuPanels.saveOllamaConfig}
+          ollamaSaving={menuPanels.ollamaSaving}
+          promptOpen={menuPanels.promptOpen}
+          promptDraft={menuPanels.promptDraft}
+          promptError={menuPanels.promptError}
+          promptDefault={menuPanels.promptDefault}
+          toolPromptDraft={menuPanels.toolPromptDraft}
+          toolPromptDefault={menuPanels.toolPromptDefault}
+          setPromptOpen={menuPanels.setPromptOpen}
+          setPromptDraft={menuPanels.setPromptDraft}
+          setToolPromptDraft={menuPanels.setToolPromptDraft}
+          saveSystemPrompt={menuPanels.saveSystemPrompt}
+          promptSaving={menuPanels.promptSaving}
+          debugOpen={menuPanels.debugOpen}
+          setDebugOpen={menuPanels.setDebugOpen}
+          cwd={cwd}
+          activityItems={activityItems}
+        />
         <header className="cwd-bar panel">
           <strong>Working Folder</strong>
           <CwdNavigator
@@ -442,47 +625,102 @@ export function App() {
 
         <section className="left-rail panel">
           <div className="toolbar">
-            <strong>Projects</strong>
-            <button onClick={() => loadProjects()}>Refresh</button>
+            <strong>File Browser</strong>
+            <div style={{ display: "flex", gap: "4px" }}>
+              <button
+                onClick={() => {
+                  openInCanvas(browserPath || cwd).catch(() => {});
+                }}
+                disabled={!browserPath && !cwd}
+                title="Open folder in canvas"
+              >
+                Open
+              </button>
+              <button
+                onClick={() => {
+                  setWorkingFolder("..").catch(() => {
+                    // handled in cwd state
+                  });
+                }}
+                disabled={cwdUpdating}
+              >
+                Up
+              </button>
+            </div>
           </div>
 
           <div id="projectList">
-            {projectsLoading && <p>Loading projects...</p>}
-            {!projectsLoading && projectsError && <p>{projectsError}</p>}
-            {!projectsLoading && !projectsError && projects.length === 0 && (
-              <p>No projects discovered yet.</p>
-            )}
-            {!projectsLoading &&
-              !projectsError &&
-              projects
-                .filter((p) => !hiddenProjectIds.has(p.id))
-                .map((project) => (
-                  <div key={project.id} className="window panel project-card">
-                    <div className="title-bar">
-                      <div className="title-bar-text">
-                        {project.githubName || project.directory}
-                      </div>
-                      <div className="title-bar-controls">
-                        <button
-                          aria-label="Close"
-                          onClick={() => dismissProject(project.id)}
-                        />
-                      </div>
-                    </div>
-                    <div className="window-body project-body">
-                      <p>{project.directory}</p>
-                      <button
-                        onClick={() => {
-                          openProjectWindow(project).catch(() => {
-                            // handled in setWorkingFolder
-                          });
-                        }}
+            <div className="browser-location-row">
+              <div className="browser-location-copy">
+                <span className="browser-location-label">Current folder</span>
+                <p className="browser-location-path" title={browserPath || cwd}>
+                  {browserPath || cwd}
+                </p>
+              </div>
+              {isBrowsableRepoUrl(browserRepoUrl) && (
+                <button
+                  className="repo-popout-button"
+                  onClick={() => openExternalUrl(browserRepoUrl!)}
+                  title="Open repository in browser"
+                  aria-label="Open repository in browser"
+                >
+                  ↗
+                </button>
+              )}
+            </div>
+            {browserLoading && <p>Loading files...</p>}
+            {!browserLoading && browserError && <p>{browserError}</p>}
+            {!browserLoading &&
+              !browserError &&
+              browserEntries.length === 0 && <p>Folder is empty.</p>}
+            {!browserLoading &&
+              !browserError &&
+              browserEntries.map((entry) => (
+                <div key={entry.path} className="browser-row">
+                  {entry.directory ? (
+                    <button
+                      className="browser-row-main"
+                      onClick={() => {
+                        setWorkingFolder(entry.path).catch(() => {
+                          // handled in setWorkingFolder
+                        });
+                      }}
+                      title={entry.path}
+                    >
+                      <span className="browser-row-icon" aria-hidden="true">
+                        ▸
+                      </span>
+                      <span className="browser-row-name">{entry.name}</span>
+                    </button>
+                  ) : (
+                    <button
+                      className="browser-row-main browser-row-main-static"
+                      title={entry.path}
+                      onClick={() => {
+                        openFileInCanvas(entry.path).catch(() => {});
+                      }}
+                    >
+                      <span
+                        className="browser-row-icon browser-row-icon-file"
+                        aria-hidden="true"
                       >
-                        Open Explorer
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                        •
+                      </span>
+                      <span className="browser-row-name">{entry.name}</span>
+                    </button>
+                  )}
+                  {isBrowsableRepoUrl(entry.repoUrl) && (
+                    <button
+                      className="repo-popout-button browser-row-action"
+                      onClick={() => openExternalUrl(entry.repoUrl!)}
+                      title="Open repository in browser"
+                      aria-label={`Open repository for ${entry.name}`}
+                    >
+                      ↗
+                    </button>
+                  )}
+                </div>
+              ))}
           </div>
         </section>
 
@@ -498,7 +736,9 @@ export function App() {
               onClose={() => closeWindow(win.id)}
               onFocus={() => focusWindow(win.id)}
               onMove={(x, y) => moveWindow(win.id, x, y)}
-              onOpenFile={(path) => openFile(win.id, win.project.id, path)}
+              onOpenFile={(path) =>
+                openFile(win.id, win.project.directory, path)
+              }
               onOpenFolderSummary={(path) =>
                 openFolderSummary(win.id, win.project.directory, path)
               }
@@ -555,15 +795,15 @@ export function App() {
           {assistantUnreachable && (
             <div className="assistant-unreachable-notice">
               <span>
-                ⚠ Assistant is unreachable — check that Ollama is running and
-                the model is loaded.
+                Assistant is unreachable - check that Ollama is running and the
+                model is loaded.
               </span>
               <button
                 className="notice-dismiss"
                 onClick={() => setAssistantUnreachable(false)}
                 aria-label="Dismiss"
               >
-                ✕
+                X
               </button>
             </div>
           )}
@@ -610,6 +850,7 @@ export function App() {
 
           <div className="chat-compose">
             <textarea
+              ref={chatInputRef}
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
               placeholder="Type a message..."
@@ -633,400 +874,20 @@ export function App() {
             >
               Send
             </button>
+            {retryMessage && (
+              <button
+                className="retry-button"
+                onClick={() => sendChatMessage(retryMessage)}
+                disabled={chatLoading}
+                style={{ marginLeft: 8 }}
+              >
+                Retry
+              </button>
+            )}
           </div>
           {chatError && <p className="chat-error">{chatError}</p>}
         </section>
       </main>
     </>
   );
-}
-
-type ProjectWindowProps = {
-  windowState: WindowState;
-  highlighted: Set<string>;
-  onClose: () => void;
-  onFocus: () => void;
-  onMove: (x: number, y: number) => void;
-  onOpenFile: (path: string) => void;
-  onOpenFolderSummary: (path: string) => void;
-};
-
-function ProjectWindow({
-  windowState,
-  highlighted,
-  onClose,
-  onFocus,
-  onMove,
-  onOpenFile,
-  onOpenFolderSummary,
-}: ProjectWindowProps) {
-  const dragRef = useRef<{
-    active: boolean;
-    startX: number;
-    startY: number;
-    originX: number;
-    originY: number;
-  }>({
-    active: false,
-    startX: 0,
-    startY: 0,
-    originX: 0,
-    originY: 0,
-  });
-
-  useEffect(() => {
-    const onMouseMove = (e: MouseEvent) => {
-      if (!dragRef.current.active) {
-        return;
-      }
-      const x = dragRef.current.originX + (e.clientX - dragRef.current.startX);
-      const y = dragRef.current.originY + (e.clientY - dragRef.current.startY);
-      onMove(x, y);
-    };
-
-    const onMouseUp = () => {
-      dragRef.current.active = false;
-    };
-
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onMouseUp);
-    return () => {
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup", onMouseUp);
-    };
-  }, [onMove]);
-
-  const beginDrag = (e: React.MouseEvent) => {
-    onFocus();
-    dragRef.current.active = true;
-    dragRef.current.startX = e.clientX;
-    dragRef.current.startY = e.clientY;
-    dragRef.current.originX = windowState.x;
-    dragRef.current.originY = windowState.y;
-  };
-
-  return (
-    <section
-      className="window-card window"
-      style={{ left: windowState.x, top: windowState.y, zIndex: windowState.z }}
-      onMouseDown={() => onFocus()}
-    >
-      <div className="title-bar win-title" onMouseDown={beginDrag}>
-        <div className="title-bar-text">{windowState.project.directory}</div>
-        <div className="title-bar-controls">
-          <button aria-label="Close" onClick={onClose} />
-        </div>
-      </div>
-
-      <div className="win-body">
-        <aside className="tree-pane">
-          {windowState.treeLoading && <div>Loading tree...</div>}
-          {!windowState.treeLoading && windowState.treeError && (
-            <div>{windowState.treeError}</div>
-          )}
-          {!windowState.treeLoading &&
-            !windowState.treeError &&
-            windowState.tree && (
-              <TreeView
-                root={windowState.tree}
-                highlighted={highlighted}
-                onOpenFile={(path) => onOpenFile(path)}
-                onOpenFolderSummary={(path) => onOpenFolderSummary(path)}
-              />
-            )}
-        </aside>
-
-        <article className="file-pane">
-          {windowState.fileLoading && <pre>Loading file...</pre>}
-          {!windowState.fileLoading && windowState.fileError && (
-            <pre>{windowState.fileError}</pre>
-          )}
-          {!windowState.fileLoading &&
-            !windowState.fileError &&
-            windowState.selectedFilePath &&
-            isImagePath(windowState.selectedFilePath) && (
-              <div className="image-preview-wrap">
-                <img
-                  className="image-preview"
-                  src={rawImageUrl(
-                    windowState.project.id,
-                    windowState.selectedFilePath,
-                  )}
-                  alt={windowState.selectedFilePath}
-                />
-                <div className="image-caption">
-                  {windowState.selectedFilePath}
-                </div>
-              </div>
-            )}
-          {!windowState.fileLoading &&
-            !windowState.fileError &&
-            (!windowState.selectedFilePath ||
-              !isImagePath(windowState.selectedFilePath)) && (
-              <pre>
-                {windowState.fileContent || "Select a file to view content."}
-              </pre>
-            )}
-        </article>
-      </div>
-    </section>
-  );
-}
-
-type TreeViewProps = {
-  root: TreeNode;
-  highlighted: Set<string>;
-  onOpenFile: (path: string) => void;
-  onOpenFolderSummary: (path: string) => void;
-};
-
-function TreeView({
-  root,
-  highlighted,
-  onOpenFile,
-  onOpenFolderSummary,
-}: TreeViewProps) {
-  const rows: React.ReactNode[] = [];
-
-  const walk = (node: TreeNode, depth: number) => {
-    if (!node.relativePath && depth === 0) {
-      for (const child of node.children || []) {
-        walk(child, depth + 1);
-      }
-      return;
-    }
-
-    const isHighlighted = highlighted.has(normalize(node.relativePath || ""));
-    rows.push(
-      <div
-        key={node.relativePath}
-        className={`file-node ${isHighlighted ? "highlight" : ""}`}
-        style={{ marginLeft: `${Math.max(0, depth - 1) * 12}px` }}
-        onClick={
-          node.directory
-            ? () => onOpenFolderSummary(node.relativePath)
-            : () => onOpenFile(node.relativePath)
-        }
-      >
-        <span className="node-entry">
-          <span
-            className={`node-icon ${node.directory ? "folder" : "file"}`}
-            aria-hidden="true"
-          >
-            {node.directory ? "▸" : "●"}
-          </span>
-          <span className="node-label">{node.name}</span>
-        </span>
-      </div>,
-    );
-
-    if (node.directory) {
-      for (const child of node.children || []) {
-        walk(child, depth + 1);
-      }
-    }
-  };
-
-  walk(root, 0);
-  return <div className="tree-list">{rows}</div>;
-}
-
-function CwdNavigator({
-  cwd,
-  cwdError,
-  onNavigate,
-}: {
-  cwd: string;
-  cwdError: string | null;
-  onNavigate: (path: string) => Promise<void>;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [input, setInput] = useState("");
-  const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [highlighted, setHighlighted] = useState(-1);
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const inputRef = useRef<HTMLInputElement | null>(null);
-
-  useEffect(() => {
-    if (editing && inputRef.current) {
-      inputRef.current.select();
-    }
-  }, [editing]);
-
-  useEffect(() => {
-    if (!editing || !input) {
-      setSuggestions([]);
-      return;
-    }
-    const id = window.setTimeout(() => {
-      api<{ dirs: string[] }>(`/api/fs/dirs?path=${encodeURIComponent(input)}`)
-        .then((data) => setSuggestions(data.dirs || []))
-        .catch(() => setSuggestions([]));
-    }, 150);
-    return () => window.clearTimeout(id);
-  }, [input, editing]);
-
-  useEffect(() => {
-    if (!editing) return;
-    const handler = (e: MouseEvent) => {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(e.target as Node)
-      ) {
-        setEditing(false);
-        setSuggestions([]);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [editing]);
-
-  const commit = (path: string) => {
-    setEditing(false);
-    setSuggestions([]);
-    const trimmed = path.trim();
-    if (trimmed && trimmed !== cwd) {
-      onNavigate(trimmed).catch(() => {});
-    }
-  };
-
-  if (!editing) {
-    return (
-      <span
-        className="cwd-path cwd-path-clickable"
-        onClick={() => {
-          setInput(cwd);
-          setHighlighted(-1);
-          setEditing(true);
-        }}
-        title="Click to change working folder"
-      >
-        {cwdError || cwd || "Loading..."}
-      </span>
-    );
-  }
-
-  return (
-    <div ref={containerRef} className="cwd-editor">
-      <input
-        ref={inputRef}
-        className="cwd-input"
-        value={input}
-        onChange={(e) => {
-          setInput(e.target.value);
-          setHighlighted(-1);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            const target =
-              highlighted >= 0 && highlighted < suggestions.length
-                ? suggestions[highlighted]
-                : input;
-            commit(target);
-          } else if (e.key === "Escape") {
-            setEditing(false);
-            setSuggestions([]);
-          } else if (e.key === "ArrowDown") {
-            e.preventDefault();
-            setHighlighted((h) => Math.min(h + 1, suggestions.length - 1));
-          } else if (e.key === "ArrowUp") {
-            e.preventDefault();
-            setHighlighted((h) => Math.max(h - 1, -1));
-          } else if (e.key === "Tab") {
-            e.preventDefault();
-            const pick =
-              highlighted >= 0 && highlighted < suggestions.length
-                ? suggestions[highlighted]
-                : suggestions.length > 0
-                  ? suggestions[0]
-                  : null;
-            if (pick) {
-              setInput(pick + "/");
-              setHighlighted(-1);
-            }
-          }
-        }}
-      />
-      {suggestions.length > 0 && (
-        <ul className="cwd-suggestions">
-          {suggestions.map((s, i) => (
-            <li
-              key={s}
-              className={`cwd-suggestion${i === highlighted ? " active" : ""}`}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                commit(s);
-              }}
-              onMouseEnter={() => setHighlighted(i)}
-            >
-              {s}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-async function api<T>(url: string): Promise<T> {
-  return await fetchJson<T>(url, { method: "GET" });
-}
-
-async function apiPost<TReq, TRes>(url: string, body: TReq): Promise<TRes> {
-  const response = await fetchWithTimeout(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-  if (!response.ok) {
-    throw new Error(`${response.status} ${response.statusText}`);
-  }
-  if (response.status === 204) {
-    return {} as TRes;
-  }
-  return (await response.json()) as TRes;
-}
-
-async function fetchJson<T>(url: string, init: RequestInit): Promise<T> {
-  const response = await fetchWithTimeout(url, init);
-  if (!response.ok) {
-    throw new Error(`${response.status} ${response.statusText}`);
-  }
-  return (await response.json()) as T;
-}
-
-async function fetchWithTimeout(
-  url: string,
-  init: RequestInit,
-): Promise<Response> {
-  const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), API_TIMEOUT_MS);
-
-  try {
-    return await fetch(url, {
-      ...init,
-      signal: controller.signal,
-    });
-  } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") {
-      throw new Error(`Request timed out after ${API_TIMEOUT_MS}ms`);
-    }
-    throw error;
-  } finally {
-    window.clearTimeout(timeoutId);
-  }
-}
-
-function normalize(path: string): string {
-  return path.replace(/\\/g, "/").replace(/^\/+/, "").toLowerCase();
-}
-
-function isImagePath(path: string): boolean {
-  return /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(path);
-}
-
-function rawImageUrl(projectId: number, relativePath: string): string {
-  return `/api/projects/${projectId}/file/raw?path=${encodeURIComponent(relativePath)}`;
 }

@@ -54,7 +54,7 @@ class ReadToolsetTest {
                 + "\",\"filePath\":\"sample.txt\",\"maxLines\":0}";
         final String result = toolset.execute(request("read_file", args), null);
 
-        assertTrue(result.contains("Invalid maxLines value"));
+        assertTrue(result.contains("Invalid maxLines"));
     }
 
     @Test

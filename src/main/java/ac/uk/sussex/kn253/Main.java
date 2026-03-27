@@ -13,6 +13,14 @@ import io.quarkus.runtime.annotations.QuarkusMain;
 import jakarta.inject.Inject;
 import picocli.CommandLine;
 
+/**
+ * Quarkus application entry-point for PDHD.
+ *
+ * <p>
+ * When launched without arguments the application presents an interactive
+ * JLine main menu. When CLI arguments are provided they are dispatched to
+ * {@link PdhdCliCommand} instead, enabling headless/scripted usage.
+ */
 @QuarkusMain
 public class Main implements QuarkusApplication {
 

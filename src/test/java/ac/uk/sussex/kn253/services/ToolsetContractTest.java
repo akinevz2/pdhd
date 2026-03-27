@@ -18,6 +18,7 @@ class ToolsetContractTest {
         toolService.exploreToolset = new ExploreToolset();
         toolService.readToolset = new ReadToolset();
         toolService.writeToolset = new WriteToolset();
+        toolService.introspectToolset = new IntrospectToolset();
 
         final Set<String> names = toolService.toolSpecifications().stream()
                 .map(ToolSpecification::name)
@@ -28,6 +29,7 @@ class ToolsetContractTest {
         assertTrue(names.contains("change_working_directory"));
         assertTrue(names.contains("analyze_path_detailed"));
         assertTrue(names.contains("summarize_path"));
+        assertTrue(names.contains("search_paths"));
         assertTrue(names.contains("get_current_working_directory"));
         assertTrue(names.contains("resolve_path"));
         assertTrue(names.contains("get_path_info"));
@@ -40,7 +42,13 @@ class ToolsetContractTest {
         assertTrue(names.contains("create_timeline"));
         assertTrue(names.contains("create_plan"));
         assertTrue(names.contains("append_project_todo"));
+        assertTrue(names.contains("cache_project_knowledge"));
+        assertTrue(names.contains("read_folder_manifest"));
+        assertTrue(names.contains("read_project_manifest"));
+        assertTrue(names.contains("read_project_knowledge"));
+        assertTrue(names.contains("get_session_context"));
+        assertTrue(names.contains("open_workspace_canvas"));
 
-        assertTrue(names.size() >= 17, "Expected at least 17 tool specifications");
+        assertTrue(names.size() >= 24, "Expected at least 24 tool specifications");
     }
 }

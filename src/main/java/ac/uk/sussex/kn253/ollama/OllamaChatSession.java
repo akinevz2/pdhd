@@ -2,23 +2,16 @@ package ac.uk.sussex.kn253.ollama;
 
 import java.time.Duration;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.function.Supplier;
 
 import org.jboss.logging.Logger;
-
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import ac.uk.sussex.kn253.services.ToolActivityService;
 import ac.uk.sussex.kn253.services.ToolService;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
-import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.data.message.*;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
-import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
-import dev.langchain4j.model.chat.request.json.JsonStringSchema;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.ollama.OllamaChatModel;
 import jakarta.enterprise.context.Dependent;
@@ -29,18 +22,22 @@ import jakarta.inject.Inject;
  *
  * <p>
  * Each instance maintains its own conversation history so that the model
- * receives the full context on every turn. Use {@link #reset()} to start a
- * fresh conversation without creating a new bean.
+ * receives full context on every turn. Call {@link #reset()} to start a fresh
+ * conversation without creating a new bean.
  *
  * <p>
- * This bean is {@link Dependent}-scoped so that each injection point gets its
- * own independent session. If you need a shared session, change the scope to
- * {@link jakarta.enterprise.context.ApplicationScoped} or manage the lifecycle
- * yourself.
+ * This bean is {@link Dependent}-scoped so that each injection point
+ * receives its own independent session. Change the scope to
+ * {@link jakarta.enterprise.context.ApplicationScoped} if a shared session is
+ * required.
+ *
+ * <p>
+ * System-prompt construction is delegated to {@link SystemPromptBuilder};
+ * text-based tool-call parsing is delegated to {@link ToolCallParser}.
  *
  * <p>
  * Example usage:
- *
+ * 
  * <pre>{@code
  * @Inject
  * OllamaChatSession session;
@@ -55,13 +52,9 @@ public class OllamaChatSession {
 
     private static final Logger LOG = Logger.getLogger(OllamaChatSession.class);
     private static final int MAX_TOOL_ROUNDS = 8;
-    private static final ObjectMapper TOOL_MAPPER = new ObjectMapper();
-    private static final Pattern CONTROL_TOKEN_PATTERN = Pattern.compile("<\\|[^|>]+\\|>");
-    // Matches tool calls wrapped in <tool_call>…</tool_call> or ```json…``` fences
-    private static final Pattern TOOL_CALL_PATTERN = Pattern.compile(
-            "<tool_call>\\s*(\\{[\\s\\S]*?\\})\\s*</tool_call>" +
-                    "|```(?:json)?\\s*(\\{[\\s\\S]*?\\})\\s*```",
-            Pattern.CASE_INSENSITIVE);
+    private static final int MAX_IDENTICAL_TOOL_CALLS_DEFAULT = 4;
+    private static final int MAX_IDENTICAL_TOOL_CALLS_SUMMARIZE = 3;
+    private static final int MAX_IDENTICAL_TOOL_CALLS_EXPLORATION = 7;
 
     private final ChatModel chatModel;
     private final String configuredModelName;
@@ -69,38 +62,36 @@ public class OllamaChatSession {
     private final ToolActivityService toolActivityService;
     private final List<ChatMessage> history = new ArrayList<>();
     private String systemPrompt = "You are a helpful assistant.";
+    private String toolSystemPrompt = "Use tools only when necessary.";
+    private Supplier<String> cwdSupplier = null;
+    private Supplier<String> requestMetadataSupplier = null;
 
     // -------------------------------------------------------------------------
-    // Construction
+    // Constructors
     // -------------------------------------------------------------------------
 
     /**
-     * CDI constructor – the model is built from {@link OllamaConfig}.
+     * CDI constructor – the model is built from the injected {@link OllamaConfig}.
+     *
+     * @param config Ollama model configuration.
      */
     @Inject
     public OllamaChatSession(final OllamaConfig config) {
-        this.chatModel = OllamaChatModel.builder()
-                .baseUrl(config.baseUrl())
-                .modelName(config.modelName())
-                .temperature(config.temperature())
-                .numPredict(config.numPredict() > 0 ? config.numPredict() : null)
-                .numCtx(config.numCtx() > 0 ? config.numCtx() : null)
-                .timeout(Duration.ofSeconds(config.timeoutSeconds()))
-                .build();
+        this.chatModel = buildModel(config.baseUrl(), config.modelName(),
+                config.temperature(), config.numPredict(), config.numCtx(), config.timeoutSeconds());
         this.configuredModelName = config.modelName();
         this.toolService = null;
         this.toolActivityService = null;
     }
 
+    /**
+     * Programmatic constructor used by {@link OllamaChatSessionBuilder}.
+     *
+     * @param builder the fully configured builder.
+     */
     public OllamaChatSession(final OllamaChatSessionBuilder builder) {
-        this.chatModel = OllamaChatModel.builder()
-                .baseUrl(builder.baseUrl())
-                .modelName(builder.modelName())
-                .temperature(builder.temperature())
-                .numPredict(builder.numPredict() > 0 ? builder.numPredict() : null)
-                .numCtx(builder.numCtx() > 0 ? builder.numCtx() : null)
-                .timeout(Duration.ofSeconds(builder.timeoutSeconds()))
-                .build();
+        this.chatModel = buildModel(builder.baseUrl(), builder.modelName(),
+                builder.temperature(), builder.numPredict(), builder.numCtx(), builder.timeoutSeconds());
         this.configuredModelName = builder.modelName();
         this.toolService = builder.toolService();
         this.toolActivityService = builder.toolActivityService();
@@ -109,8 +100,8 @@ public class OllamaChatSession {
     /**
      * Programmatic constructor for use outside CDI (e.g. tests or scripts).
      *
-     * @param baseUrl   Ollama base URL, e.g. {@code http://localhost:11434}.
-     * @param modelName model to use, e.g. {@code llama3.2}.
+     * @param baseUrl   Ollama base URL (e.g. {@code http://localhost:11434}).
+     * @param modelName model identifier (e.g. {@code llama3.2}).
      */
     public OllamaChatSession(final String baseUrl, final String modelName) {
         this.chatModel = OllamaChatModel.builder()
@@ -140,7 +131,7 @@ public class OllamaChatSession {
     // -------------------------------------------------------------------------
 
     /**
-     * Sets the system prompt that will be prepended to every request.
+     * Sets the system prompt prepended to every request.
      * Calling this method does <em>not</em> reset the conversation history.
      *
      * @param systemPrompt the system instruction for the model.
@@ -151,29 +142,65 @@ public class OllamaChatSession {
         return this;
     }
 
-    // -------------------------------------------------------------------------
-    // Chat
-    // -------------------------------------------------------------------------
-
     /**
-     * Sends a user message and returns the model's reply, maintaining full
-     * conversation history across calls.
+     * Sets additional instructions used only for tool-enabled conversations.
      *
-     * @param userText the user's message.
-     * @return the model's text response.
+     * @param toolSystemPrompt system instruction for tool-using flows.
+     * @return {@code this} for fluent chaining.
      */
-    public String send(final String userText) {
-        history.add(UserMessage.from(userText));
-        return runConversationLoop(true);
+    public OllamaChatSession setToolSystemPrompt(final String toolSystemPrompt) {
+        this.toolSystemPrompt = toolSystemPrompt;
+        return this;
     }
 
     /**
-     * Sends a one-shot message <em>without</em> adding it to the conversation
-     * history. Useful for quick queries that should not affect the ongoing
-     * dialogue.
+     * Sets a supplier that is called on every conversation turn to inject the
+     * current working directory into the system prompt context.
+     *
+     * @param cwdSupplier supplier returning the current CWD path string.
+     * @return {@code this} for fluent chaining.
+     */
+    public OllamaChatSession setCwdSupplier(final Supplier<String> cwdSupplier) {
+        this.cwdSupplier = cwdSupplier;
+        return this;
+    }
+
+    /**
+     * Sets a supplier that is called on every conversation turn to inject
+     * lightweight metadata about the current folder or project into the system
+     * prompt context.
+     *
+     * @param requestMetadataSupplier supplier returning a formatted metadata block.
+     * @return {@code this} for fluent chaining.
+     */
+    public OllamaChatSession setRequestMetadataSupplier(final Supplier<String> requestMetadataSupplier) {
+        this.requestMetadataSupplier = requestMetadataSupplier;
+        return this;
+    }
+
+    // -------------------------------------------------------------------------
+    // Chat API
+    // -------------------------------------------------------------------------
+
+    /**
+     * Sends a user message and returns the model reply, maintaining full
+     * conversation history across calls.
      *
      * @param userText the user's message.
-     * @return the model's text response.
+     * @return the assistant's text response.
+     */
+    public String send(final String userText) {
+        history.add(UserMessage.from(userText));
+        return runConversationLoop(true, history);
+    }
+
+    /**
+     * Sends a one-shot message <em>without</em> persisting it to the
+     * conversation history. Useful for quick queries that should not affect
+     * the ongoing dialogue.
+     *
+     * @param userText the user's message.
+     * @return the assistant's text response.
      */
     public String sendOneShot(final String userText) {
         final List<ChatMessage> oneShot = new ArrayList<>();
@@ -187,7 +214,7 @@ public class OllamaChatSession {
 
     /**
      * Returns an unmodifiable view of the current conversation history.
-     * The list does <em>not</em> include the system message.
+     * The system message is not included.
      */
     public List<ChatMessage> getHistory() {
         return Collections.unmodifiableList(history);
@@ -206,21 +233,37 @@ public class OllamaChatSession {
     }
 
     /**
-     * Returns the number of turns (user + assistant messages) in the history.
+     * Returns the number of complete turns (user + assistant message pairs)
+     * currently in the history.
      */
     public int turnCount() {
-        // Each turn = 1 user message + 1 assistant message = 2 entries
         return history.size() / 2;
     }
 
-    private String runConversationLoop(final boolean persistentHistory) {
-        return runConversationLoop(persistentHistory, history);
-    }
+    // -------------------------------------------------------------------------
+    // Conversation loop
+    // -------------------------------------------------------------------------
 
-    private String runConversationLoop(final boolean persistentHistory, final List<ChatMessage> workingHistory) {
+    /**
+     * Drives the model interaction loop, executing tool calls until the model
+     * returns a plain text response or the maximum round limit is reached.
+     *
+     * @param persistentHistory ignored; retained for signature symmetry.
+     * @param workingHistory    the list of messages to send; mutated in place.
+     * @return the final assistant text response.
+     */
+    private String runConversationLoop(
+            final boolean persistentHistory,
+            final List<ChatMessage> workingHistory) {
+        String lastToolSignature = null;
+        int identicalToolCallCount = 0;
+
         for (int round = 0; round < MAX_TOOL_ROUNDS; round++) {
             final List<ChatMessage> messages = new ArrayList<>();
-            messages.add(SystemMessage.from(buildSystemPrompt()));
+            final String effectiveSystemPrompt = buildEffectiveSystemPrompt();
+            messages.add(SystemMessage.from(
+                    SystemPromptBuilder.build(effectiveSystemPrompt, toolSystemPrompt, configuredModelName,
+                            toolService)));
             messages.addAll(workingHistory);
 
             LOG.debugf("Sending %d messages to Ollama (system + %d history entries)",
@@ -237,17 +280,43 @@ public class OllamaChatSession {
 
             List<ToolExecutionRequest> toolRequests = aiMessage.toolExecutionRequests();
 
-            // Fallback: some models print tool calls as JSON text rather than using
-            // the structured tool-call response format – detect and parse them.
+            // Fallback: some models emit tool calls as JSON text rather than using
+            // the structured response format – delegate parsing to ToolCallParser.
             if ((toolRequests == null || toolRequests.isEmpty()) && toolService != null) {
-                toolRequests = parseTextToolCalls(aiMessage.text());
+                toolRequests = ToolCallParser.parse(aiMessage.text(), toolService);
             }
 
             if (toolRequests == null || toolRequests.isEmpty()) {
-                return aiMessage.text();
+                final String text = aiMessage.text();
+                if (text != null && !text.isBlank()) {
+                    return text;
+                } else {
+                    return "Assistant is thinking...";
+                }
             }
 
             for (final ToolExecutionRequest toolRequest : toolRequests) {
+                final String signature = toolRequest.name() + "|" + toolRequest.arguments();
+                if (signature.equals(lastToolSignature)) {
+                    identicalToolCallCount++;
+                } else {
+                    lastToolSignature = signature;
+                    identicalToolCallCount = 1;
+                }
+
+                if (identicalToolCallCount >= maxIdenticalToolCalls(toolRequest.name())) {
+                    final String loopGuardResult = "Tool loop guard triggered: repeated identical tool call ('"
+                            + toolRequest.name()
+                            + "'). Synthesize a final response from the current evidence instead of re-calling this tool.";
+                    if (toolActivityService != null) {
+                        toolActivityService.record(toolRequest.name(), toolRequest.arguments(), loopGuardResult);
+                    }
+                    workingHistory.add(ToolExecutionResultMessage.from(toolRequest, loopGuardResult));
+                    LOG.warnf("Stopped repeated identical tool call loop for tool '%s'", toolRequest.name());
+                    return "Stopped a repeated tool-call loop ('" + toolRequest.name()
+                            + "'). Please retry with a narrower request or explicit target path.";
+                }
+
                 final String result = toolService.execute(toolRequest, null);
                 if (toolActivityService != null) {
                     toolActivityService.record(toolRequest.name(), toolRequest.arguments(), result);
@@ -259,215 +328,79 @@ public class OllamaChatSession {
         return "Tool execution exceeded maximum rounds without a final response.";
     }
 
+    String buildEffectiveSystemPrompt() {
+        final StringBuilder prompt = new StringBuilder(systemPrompt);
+
+        if (cwdSupplier != null) {
+            final String cwd = cwdSupplier.get();
+            if (cwd != null && !cwd.isBlank()) {
+                prompt.append("\n\nCurrent working directory: ").append(cwd);
+            }
+        }
+
+        if (requestMetadataSupplier != null) {
+            final String metadata = requestMetadataSupplier.get();
+            if (metadata != null && !metadata.isBlank()) {
+                prompt.append("\n\n").append(metadata);
+            }
+        }
+
+        return prompt.toString();
+    }
+
+    private static int maxIdenticalToolCalls(final String toolName) {
+        if (toolName == null || toolName.isBlank()) {
+            return MAX_IDENTICAL_TOOL_CALLS_DEFAULT;
+        }
+        return switch (toolName) {
+            // Keep summarize loops strict; these were the problematic loops.
+            case "summarize_path" -> MAX_IDENTICAL_TOOL_CALLS_SUMMARIZE;
+
+            // Exploration workflows may legitimately repeat while traversing.
+            case "list_subdirectories",
+                    "list_files_recursive",
+                    "list_project_entries",
+                    "get_git_log",
+                    "get_path_info",
+                    "resolve_path",
+                    "get_current_working_directory" ->
+                MAX_IDENTICAL_TOOL_CALLS_EXPLORATION;
+
+            default -> MAX_IDENTICAL_TOOL_CALLS_DEFAULT;
+        };
+    }
+
     // -------------------------------------------------------------------------
-    // System-prompt construction
+    // Builder factory
+    // -------------------------------------------------------------------------
+
+    /** Returns a new {@link OllamaChatSessionBuilder}. */
+    public static OllamaChatSessionBuilder builder() {
+        return new OllamaChatSessionBuilder();
+    }
+
+    // -------------------------------------------------------------------------
+    // Private helpers
     // -------------------------------------------------------------------------
 
     /**
-     * Returns the effective system prompt: the user-configured prompt plus a
-     * hidden addendum that instructs models without native tool-calling support
-     * (e.g. qwen2.5-coder) to emit tool invocations as XML.
+     * Builds an {@link OllamaChatModel} using the supplied configuration values.
+     * Optional parameters (numPredict, numCtx) are omitted when {@code <= 0}.
      */
-    private String buildSystemPrompt() {
-        if (toolService == null || toolService.toolSpecifications().isEmpty()) {
-            return systemPrompt;
-        }
-        if (isLlama32FamilyModel()) {
-            return systemPrompt;
-        }
-        return systemPrompt + "\n\n" + buildToolCallingAddendum(toolService.toolSpecifications());
-    }
-
-    private boolean isLlama32FamilyModel() {
-        if (configuredModelName == null || configuredModelName.isBlank()) {
-            return false;
-        }
-        return configuredModelName.toLowerCase(Locale.ROOT).startsWith("llama3.2");
-    }
-
-    private static String buildToolCallingAddendum(final List<ToolSpecification> specs) {
-        final StringBuilder sb = new StringBuilder();
-        sb.append("<tool_instructions>\n");
-        sb.append("You have access to the following tools. ");
-        sb.append("When you need to call a tool, respond ONLY with a <tool_call> block and nothing else. ");
-        sb.append("After receiving the tool result, continue your response normally.\n\n");
-        sb.append("Available tools:\n");
-
-        for (final ToolSpecification spec : specs) {
-            sb.append("- name: ").append(spec.name()).append("\n");
-            if (spec.description() != null && !spec.description().isBlank()) {
-                sb.append("  description: ").append(spec.description()).append("\n");
-            }
-            final JsonObjectSchema schema = spec.parameters();
-            if (schema != null && schema.properties() != null) {
-                sb.append("  parameters:\n");
-                schema.properties().forEach((paramName, paramSchema) -> {
-                    sb.append("    - ").append(paramName);
-                    if (paramSchema instanceof final JsonStringSchema strSchema && strSchema.description() != null) {
-                        sb.append(": ").append(strSchema.description());
-                    }
-                    sb.append("\n");
-                });
-                if (schema.required() != null && !schema.required().isEmpty()) {
-                    sb.append("  required: ").append(String.join(", ", schema.required())).append("\n");
-                }
-            }
-        }
-
-        sb.append("\nTool call format (use this exact XML):\n");
-        sb.append("<tool_call>\n");
-        sb.append("{\"name\": \"tool_name\", \"arguments\": {\"param\": \"value\"}}\n");
-        sb.append("</tool_call>\n");
-        sb.append("</tool_instructions>");
-        return sb.toString();
-    }
-
-    // -------------------------------------------------------------------------
-    // Text tool-call fallback parser
-    // -------------------------------------------------------------------------
-
-    private List<ToolExecutionRequest> parseTextToolCalls(final String text) {
-        if (text == null || text.isBlank()) {
-            return List.of();
-        }
-
-        final String sanitized = sanitizeModelText(text);
-        final List<ToolExecutionRequest> results = new ArrayList<>();
-
-        // Try tagged / fenced blocks first
-        final Matcher m = TOOL_CALL_PATTERN.matcher(sanitized);
-        while (m.find()) {
-            final String json = m.group(1) != null ? m.group(1) : m.group(2);
-            results.addAll(parseToolCallsFromJson(json));
-        }
-        if (!results.isEmpty()) {
-            return results;
-        }
-
-        // Handle malformed outputs that start a <tool_call> block but never close it.
-        final Optional<String> embeddedJson = extractJsonAfterToolCallTag(sanitized);
-        if (embeddedJson.isPresent()) {
-            results.addAll(parseToolCallsFromJson(embeddedJson.get()));
-            if (!results.isEmpty()) {
-                return results;
-            }
-        }
-
-        // Fall back to treating the entire trimmed text as a bare JSON object
-        final String trimmed = sanitized.trim();
-        if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
-            results.addAll(parseToolCallsFromJson(trimmed));
-        }
-        return results;
-    }
-
-    private String sanitizeModelText(final String raw) {
-        return CONTROL_TOKEN_PATTERN.matcher(raw).replaceAll("").trim();
-    }
-
-    private Optional<String> extractJsonAfterToolCallTag(final String text) {
-        final String lower = text.toLowerCase(Locale.ROOT);
-        final int tagIdx = lower.indexOf("<tool_call>");
-        if (tagIdx < 0) {
-            return Optional.empty();
-        }
-        final int jsonStart = text.indexOf('{', tagIdx);
-        if (jsonStart < 0) {
-            return Optional.empty();
-        }
-
-        int depth = 0;
-        for (int i = jsonStart; i < text.length(); i++) {
-            final char ch = text.charAt(i);
-            if (ch == '{') {
-                depth++;
-            } else if (ch == '}') {
-                depth--;
-                if (depth == 0) {
-                    return Optional.of(text.substring(jsonStart, i + 1));
-                }
-            }
-        }
-        return Optional.empty();
-    }
-
-    private List<ToolExecutionRequest> parseToolCallsFromJson(final String json) {
-        try {
-            final JsonNode root = TOOL_MAPPER.readTree(json);
-            final List<ToolExecutionRequest> calls = new ArrayList<>();
-            if (root == null || root.isNull()) {
-                return calls;
-            }
-
-            if (root.isArray()) {
-                for (final JsonNode node : root) {
-                    parseOneToolCall(node).ifPresent(calls::add);
-                }
-                return calls;
-            }
-
-            // OpenAI-style wrapper: { "tool_calls": [ ... ] }
-            if (root.has("tool_calls") && root.get("tool_calls").isArray()) {
-                for (final JsonNode node : root.get("tool_calls")) {
-                    parseOneToolCall(node).ifPresent(calls::add);
-                }
-                if (!calls.isEmpty()) {
-                    return calls;
-                }
-            }
-
-            parseOneToolCall(root).ifPresent(calls::add);
-            return calls;
-        } catch (final Exception e) {
-            LOG.debugf("Could not parse text as tool call JSON payload: %s", e.getMessage());
-            return List.of();
-        }
-    }
-
-    private Optional<ToolExecutionRequest> parseOneToolCall(final String json) {
-        try {
-            final JsonNode node = TOOL_MAPPER.readTree(json);
-            return parseOneToolCall(node);
-        } catch (final Exception e) {
-            LOG.debugf("Could not parse text as tool call: %s", e.getMessage());
-            return Optional.empty();
-        }
-    }
-
-    private Optional<ToolExecutionRequest> parseOneToolCall(final JsonNode node) {
-        try {
-            String name = null;
-            String arguments = "{}";
-
-            if (node.has("name")) {
-                name = node.get("name").asText();
-                final JsonNode argsNode = node.has("arguments") ? node.get("arguments")
-                        : node.has("parameters") ? node.get("parameters") : null;
-                if (argsNode != null) {
-                    arguments = argsNode.isObject() ? TOOL_MAPPER.writeValueAsString(argsNode) : argsNode.asText();
-                }
-            } else if (node.has("function")) {
-                final JsonNode fn = node.get("function");
-                name = fn.has("name") ? fn.get("name").asText() : null;
-                final JsonNode argsNode = fn.has("arguments") ? fn.get("arguments") : null;
-                if (argsNode != null) {
-                    arguments = argsNode.isObject() ? TOOL_MAPPER.writeValueAsString(argsNode) : argsNode.asText();
-                }
-            }
-
-            final String resolvedName = name;
-            if (resolvedName != null
-                    && toolService.toolSpecifications().stream().anyMatch(s -> s.name().equals(resolvedName))) {
-                return Optional.of(ToolExecutionRequest.builder().name(name).arguments(arguments).build());
-            }
-            LOG.debugf("Text contained JSON but no matching tool found for name: %s", name);
-        } catch (final Exception e) {
-            LOG.debugf("Could not parse text as tool call: %s", e.getMessage());
-        }
-        return Optional.empty();
-    }
-
-    public static OllamaChatSessionBuilder builder() {
-        return new OllamaChatSessionBuilder();
+    private static ChatModel buildModel(
+            final String baseUrl,
+            final String modelName,
+            final Double temperature,
+            final int numPredict,
+            final int numCtx,
+            final long timeoutSeconds) {
+        return OllamaChatModel.builder()
+                .baseUrl(baseUrl)
+                .modelName(modelName)
+                .temperature(temperature)
+                .numPredict(numPredict > 0 ? numPredict : null)
+                .numCtx(numCtx > 0 ? numCtx : null)
+                .timeout(Duration.ofSeconds(timeoutSeconds))
+                .build();
     }
 }

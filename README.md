@@ -45,14 +45,18 @@ When started, the CLI shows:
 
 ## Web UI Notes
 
+See `docs/frontend.md` for detailed frontend architecture, API integration, state model, and development workflow.
+
 - The top bar shows the current working folder.
-- Clicking `Refresh` in the Projects panel calls `/api/projects`.
-- Refresh scans from the current working folder and discovers Git projects recursively.
-- Clicking a folder in the explorer runs a one-shot assistant query and shows a summary of files in that folder.
-- Clicking a file in the explorer shows the file contents.
-- Explorer icons are action-oriented:
-  - `▸` folder (runs folder summary)
-  - `●` file (opens file content)
+- The left-hand `File Browser` is a compact explorer-style list for the current working folder.
+- Clicking `Refresh` in the file browser calls `/api/fs/list` for the current folder.
+- Clicking `Up` changes the working folder to the parent directory.
+- Clicking a folder row in the file browser navigates into that folder.
+- Directory rows that resolve to a valid GitHub or browsable Git remote show a visible `↗` pop-out button that opens the repository in the browser.
+- The project explorer window remains action-oriented:
+  - `▸` folder runs a one-shot assistant summary for that folder
+  - `●` file opens file content
+- Project discovery still starts from the current working folder and discovers Git projects recursively via `/api/projects`.
 
 ## Screenshots
 
@@ -78,14 +82,16 @@ Add screenshots to `docs/screenshots/` and update the image links below.
 
 The assistant now includes additional exploration/navigation tools:
 
-- `list_folder`: recursively lists files in a folder.
-- `explain_tool`: detailed analysis of a file or directory.
-- `summarise_tool`: concise summary of a file or directory.
-- `navigate_tool`: changes the assistant working directory (absolute or relative path).
+- `list_files_recursive`: recursively lists files in a folder.
+- `analyze_path_detailed`: detailed analysis of a file or directory.
+- `summarize_path`: concise summary of a file or directory.
+- `change_working_directory`: changes the assistant working directory (absolute or relative path).
 
-After `navigate_tool` runs:
+Older alias names such as `list_folder`, `explain_tool`, `summarise_tool`, and `navigate_tool` remain supported for compatibility with earlier chat history.
 
-- `get_cwd` reflects the new working directory.
+After `change_working_directory` runs:
+
+- `get_current_working_directory` reflects the new working directory.
 - Path-based tools default to the new working directory when `path` is omitted.
 - The Web UI "Working Folder" display updates via `/api/cwd` polling.
 
@@ -105,6 +111,8 @@ Run a focused test class:
 
 ## Build Frontend Assets
 
+For full frontend setup and architecture notes, see `docs/frontend.md`.
+
 ```sh
 cd src/main/webui
 npm install
@@ -115,3 +123,4 @@ npm run build
 
 - If assistant model calls fail, verify Ollama endpoint/model settings in the configuration menu.
 - If no projects appear, click `Refresh`; the current working folder should be auto-added on first run.
+- If the repository pop-out button is not shown for a folder, verify that the directory is a Git repository with a browsable `http` or `https` remote.

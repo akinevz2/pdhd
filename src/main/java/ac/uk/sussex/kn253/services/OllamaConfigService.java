@@ -27,8 +27,18 @@ public class OllamaConfigService {
                 .findFirst()
                 .orElseGet(this::createDefaults);
 
+        boolean dirty = false;
         if (settings.getSystemPrompt() == null || settings.getSystemPrompt().isBlank()) {
             settings.setSystemPrompt(OllamaSettings.DEFAULT_SYSTEM_PROMPT);
+            dirty = true;
+        }
+
+        if (settings.getToolSystemPrompt() == null || settings.getToolSystemPrompt().isBlank()) {
+            settings.setToolSystemPrompt(OllamaSettings.DEFAULT_TOOL_SYSTEM_PROMPT);
+            dirty = true;
+        }
+
+        if (dirty) {
             settings.persistAndFlush();
         }
 

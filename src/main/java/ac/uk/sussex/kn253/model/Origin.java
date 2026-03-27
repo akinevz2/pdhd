@@ -6,6 +6,11 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
 import lombok.*;
 
+/**
+ * JPA embeddable representing a single git remote (fetch) entry.
+ * The URL is stored as a string; SCP-style SSH remotes are normalised to
+ * their {@code https://} equivalent when the entity is created.
+ */
 @Embeddable
 @NoArgsConstructor
 @AllArgsConstructor

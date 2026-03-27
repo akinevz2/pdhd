@@ -8,6 +8,15 @@ import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+/**
+ * Service that drives the interactive assistant REPL loop.
+ *
+ * <p>
+ * Calling {@link #launch()} starts a JLine-backed terminal loop where the
+ * user can type messages to the AI assistant. Entering {@code /operator}
+ * enters a sub-menu for low-level operator tool invocations (navigate, list
+ * files). Typing {@code back} or pressing Ctrl-C exits the loop.
+ */
 @ApplicationScoped
 public class AssistantService {
 

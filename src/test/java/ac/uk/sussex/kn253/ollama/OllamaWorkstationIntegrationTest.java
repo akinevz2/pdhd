@@ -1,7 +1,7 @@
 package ac.uk.sussex.kn253.ollama;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 
@@ -28,8 +28,8 @@ class OllamaWorkstationIntegrationTest {
                 .model(model)
                 .build();
 
-        final String response = session.sendOneShot("Reply with exactly one short line confirming connectivity.");
+        final String response = session.sendOneShot("Reply with \"pong\".");
         assertNotNull(response);
-        assertFalse(response.isBlank());
+        assertTrue(response.contains("pong"));
     }
 }

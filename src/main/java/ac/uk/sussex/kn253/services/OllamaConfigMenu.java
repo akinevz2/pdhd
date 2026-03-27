@@ -1,9 +1,7 @@
 package ac.uk.sussex.kn253.services;
 
 import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
+import java.net.http.*;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,14 +18,14 @@ import jakarta.inject.Inject;
 /**
  * Interactive JLine terminal menu for configuring the Ollama connection.
  *
- * <p>Call {@link #run(LineReader)} from the main menu to enter the sub-menu.
+ * <p>
+ * Call {@link #run(LineReader)} from the main menu to enter the sub-menu.
  * Changes are only written to the database when the user chooses "Save".
  */
 @ApplicationScoped
 public class OllamaConfigMenu {
 
-    private static final Pattern MODEL_NAME_PATTERN =
-            Pattern.compile("\"name\"\\s*:\\s*\"([^\"]+)\"");
+    private static final Pattern MODEL_NAME_PATTERN = Pattern.compile("\"name\"\\s*:\\s*\"([^\"]+)\"");
 
     @Inject
     OllamaConfigService ollamaConfigService;
@@ -133,7 +131,10 @@ public class OllamaConfigMenu {
         System.out.println("  9) Discard and return");
     }
 
-    /** Prompts for a string, returning {@code null} if the input is blank (keep current). */
+    /**
+     * Prompts for a string, returning {@code null} if the input is blank (keep
+     * current).
+     */
     private String prompt(final LineReader reader, final String label, final String current) {
         try {
             final String val = reader.readLine(label + " [" + current + "]: ").trim();
@@ -175,37 +176,38 @@ public class OllamaConfigMenu {
     }
 
     /**
-     * Shows models available on the server (using the current baseUrl being edited),
+     * Shows models available on the server (using the current baseUrl being
+     * edited),
      * then lets the user pick by number or type a name manually.
      */
     private String pickModel(final LineReader reader, final String baseUrl, final String current) {
         final List<String> models = fetchModelNames(baseUrl);
-        if (!models.isEmpty()) {
-            System.out.println("\nAvailable models on " + baseUrl + ":");
-            for (int i = 0; i < models.size(); i++) {
-                System.out.printf("  %d) %s%n", i + 1, models.get(i));
-            }
-            try {
-                final String input = reader.readLine(
-                        "Pick number or type model name [" + current + "]: ").trim();
-                if (input.isEmpty()) {
-                    return null;
-                }
-                try {
-                    final int idx = Integer.parseInt(input) - 1;
-                    if (idx >= 0 && idx < models.size()) {
-                        return models.get(idx);
-                    }
-                } catch (final NumberFormatException ignored) {
-                    // treat as a literal model name
-                }
-                return input;
-            } catch (final UserInterruptException e) {
-                return null;
-            }
-        } else {
+        if (models.isEmpty()) {
             System.out.println("(Could not reach Ollama server – enter model name manually)");
             return prompt(reader, "Model name", current);
+        }
+
+        System.out.println("\nAvailable models on " + baseUrl + ":");
+        for (int i = 0; i < models.size(); i++) {
+            System.out.printf("  %d) %s%n", i + 1, models.get(i));
+        }
+        try {
+            final String input = reader.readLine(
+                    "Pick number or type model name [" + current + "]: ").trim();
+            if (input.isEmpty()) {
+                return null;
+            }
+            try {
+                final int idx = Integer.parseInt(input) - 1;
+                if (idx >= 0 && idx < models.size()) {
+                    return models.get(idx);
+                }
+            } catch (final NumberFormatException ignored) {
+                // treat as a literal model name
+            }
+            return input;
+        } catch (final UserInterruptException e) {
+            return null;
         }
     }
 
@@ -235,8 +237,7 @@ public class OllamaConfigMenu {
                     .timeout(Duration.ofSeconds(10))
                     .GET()
                     .build();
-            final HttpResponse<String> response =
-                    httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            final HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200) {
                 return List.of();
             }

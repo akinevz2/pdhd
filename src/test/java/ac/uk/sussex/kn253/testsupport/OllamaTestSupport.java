@@ -20,7 +20,7 @@ public final class OllamaTestSupport {
     }
 
     public static String toolModelPreference() {
-        return System.getenv().getOrDefault("OLLAMA_TEST_TOOL_MODEL", "qwen2.5-coder:latest");
+        return System.getenv().getOrDefault("OLLAMA_TEST_TOOL_MODEL", "llama3.2:latest");
     }
 
     public static List<String> toolModelMatrix() {

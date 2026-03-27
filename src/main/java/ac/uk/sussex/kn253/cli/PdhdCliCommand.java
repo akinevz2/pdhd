@@ -14,6 +14,19 @@ import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.ParentCommand;
 
+/**
+ * Top-level Picocli command for the {@code pdhd} CLI.
+ *
+ * <p>
+ * Each sub-command delegates to the corresponding service or menu bean
+ * injected into the parent {@link PdhdCliCommand} instance. A new JLine
+ * {@link org.jline.reader.LineReader} is built on demand (via
+ * {@link #newReader()}) for sub-commands that require interactive terminal
+ * input.
+ *
+ * <p>
+ * Running {@code pdhd} without a sub-command prints usage help.
+ */
 @TopCommand
 @ApplicationScoped
 @Command(name = "pdhd", description = "PDHD command entry point", mixinStandardHelpOptions = true, subcommands = {

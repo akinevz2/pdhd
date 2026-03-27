@@ -10,6 +10,15 @@ import ac.uk.sussex.kn253.model.OllamaSettings;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+/**
+ * Interactive JLine terminal menu for editing the AI system prompt.
+ *
+ * <p>
+ * Call {@link #run(LineReader)} from the main loop to enter the sub-menu.
+ * The user can view the current prompt, apply the recommended default, or
+ * edit it in single-line or multi-line mode. Changes are only persisted when
+ * the user chooses the "Save" option.
+ */
 @ApplicationScoped
 public class SystemPromptMenu {
 
@@ -24,18 +33,22 @@ public class SystemPromptMenu {
         if (settings.getSystemPrompt() == null || settings.getSystemPrompt().isBlank()) {
             settings.setSystemPrompt(OllamaSettings.DEFAULT_SYSTEM_PROMPT);
         }
+        if (settings.getToolSystemPrompt() == null || settings.getToolSystemPrompt().isBlank()) {
+            settings.setToolSystemPrompt(OllamaSettings.DEFAULT_TOOL_SYSTEM_PROMPT);
+        }
 
         boolean modified = false;
         while (true) {
-            printMenu(settings.getSystemPrompt());
+            printMenu(settings.getSystemPrompt(), settings.getToolSystemPrompt());
             try {
                 final String input = reader.readLine("> ").trim();
                 switch (input) {
-                    case "1" -> printCurrentPrompt(settings.getSystemPrompt());
+                    case "1" -> printCurrentPrompts(settings.getSystemPrompt(), settings.getToolSystemPrompt());
                     case "2" -> {
                         settings.setSystemPrompt(OllamaSettings.DEFAULT_SYSTEM_PROMPT);
+                        settings.setToolSystemPrompt(OllamaSettings.DEFAULT_TOOL_SYSTEM_PROMPT);
                         modified = true;
-                        System.out.println("Applied recommended prompt.");
+                        System.out.println("Applied recommended prompts.");
                     }
                     case "3" -> {
                         final String newPrompt = promptSingleLine(reader, settings.getSystemPrompt());
@@ -52,21 +65,38 @@ public class SystemPromptMenu {
                         }
                     }
                     case "5" -> {
+                        final String newPrompt = promptSingleLine(reader, settings.getToolSystemPrompt());
+                        if (newPrompt != null) {
+                            settings.setToolSystemPrompt(newPrompt);
+                            modified = true;
+                        }
+                    }
+                    case "6" -> {
+                        final String newPrompt = promptMultiLine(reader, settings.getToolSystemPrompt());
+                        if (newPrompt != null) {
+                            settings.setToolSystemPrompt(newPrompt);
+                            modified = true;
+                        }
+                    }
+                    case "7" -> {
                         if (settings.getSystemPrompt() == null || settings.getSystemPrompt().isBlank()) {
                             settings.setSystemPrompt(OllamaSettings.DEFAULT_SYSTEM_PROMPT);
                         }
+                        if (settings.getToolSystemPrompt() == null || settings.getToolSystemPrompt().isBlank()) {
+                            settings.setToolSystemPrompt(OllamaSettings.DEFAULT_TOOL_SYSTEM_PROMPT);
+                        }
                         ollamaConfigService.save(settings);
                         chatService.reconfigure(settings);
-                        System.out.println("System prompt saved.");
+                        System.out.println("System prompts saved.");
                         return;
                     }
-                    case "6" -> {
+                    case "8" -> {
                         if (modified) {
                             System.out.println("Changes discarded.");
                         }
                         return;
                     }
-                    default -> System.out.println("Please choose 1-6.");
+                    default -> System.out.println("Please choose 1-8.");
                 }
             } catch (final UserInterruptException e) {
                 if (modified) {
@@ -77,23 +107,31 @@ public class SystemPromptMenu {
         }
     }
 
-    private void printMenu(final String currentPrompt) {
+    private void printMenu(final String currentPrompt, final String currentToolPrompt) {
         System.out.println("\n=== Configure System Prompt ===");
-        final String singleLine = currentPrompt.replaceAll("\\s+", " ").trim();
-        final String preview = singleLine.length() > 120 ? singleLine.substring(0, 120) + "..." : singleLine;
-        System.out.println("Current prompt preview: " + preview);
-        System.out.println("  1) View full current prompt");
-        System.out.println("  2) Use recommended prompt");
-        System.out.println("  3) Edit prompt (single line)");
-        System.out.println("  4) Edit prompt (multi-line, finish with a single '.')");
-        System.out.println("  5) Save and return");
-        System.out.println("  6) Discard and return");
+        System.out.println("Main prompt preview: " + preview(currentPrompt));
+        System.out.println("Tool prompt preview: " + preview(currentToolPrompt));
+        System.out.println("  1) View full current prompts");
+        System.out.println("  2) Use recommended prompts");
+        System.out.println("  3) Edit main prompt (single line)");
+        System.out.println("  4) Edit main prompt (multi-line, finish with a single '.')");
+        System.out.println("  5) Edit tool prompt (single line)");
+        System.out.println("  6) Edit tool prompt (multi-line, finish with a single '.')");
+        System.out.println("  7) Save and return");
+        System.out.println("  8) Discard and return");
     }
 
-    private void printCurrentPrompt(final String currentPrompt) {
-        System.out.println("\n--- Current System Prompt ---");
+    private void printCurrentPrompts(final String currentPrompt, final String currentToolPrompt) {
+        System.out.println("\n--- Main Assistant Prompt ---");
         System.out.println(currentPrompt);
-        System.out.println("--- End Prompt ---");
+        System.out.println("--- Tool Agent Prompt ---");
+        System.out.println(currentToolPrompt);
+        System.out.println("--- End Prompts ---");
+    }
+
+    private String preview(final String prompt) {
+        final String singleLine = prompt.replaceAll("\\s+", " ").trim();
+        return singleLine.length() > 120 ? singleLine.substring(0, 120) + "..." : singleLine;
     }
 
     private String promptSingleLine(final LineReader reader, final String current) {

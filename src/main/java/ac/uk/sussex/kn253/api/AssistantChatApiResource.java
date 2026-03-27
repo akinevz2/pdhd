@@ -39,9 +39,15 @@ public class AssistantChatApiResource {
         }
         try {
             final String reply = chatService.sendOneShotMessage(request.message().trim());
+            // If the reply is a known tool loop or max rounds error, surface it in the
+            // response
+            if (reply != null && (reply.startsWith("Tool execution exceeded maximum rounds")
+                    || reply.startsWith("Stopped a repeated tool-call loop"))) {
+                return new AssistantChatResponse("[Agent Error] " + reply);
+            }
             return new AssistantChatResponse(reply == null ? "" : reply);
         } catch (final Exception e) {
-            throw new WebApplicationException("Failed to run one-shot assistant query", Response.Status.BAD_GATEWAY);
+            return new AssistantChatResponse("[Backend Exception] " + e.getMessage());
         }
     }
 

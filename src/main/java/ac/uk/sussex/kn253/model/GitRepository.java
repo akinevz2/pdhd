@@ -6,6 +6,10 @@ import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 import jakarta.persistence.*;
 import lombok.*;
 
+/**
+ * JPA entity that stores the set of fetch remotes (origins) for a local Git
+ * repository.
+ */
 @Entity
 @Getter
 @Setter

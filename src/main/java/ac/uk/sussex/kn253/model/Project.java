@@ -4,6 +4,14 @@ import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 import jakarta.persistence.*;
 import lombok.*;
 
+/**
+ * JPA entity representing a discovered software project.
+ *
+ * <p>
+ * Each {@code Project} stores the absolute path to its root directory and
+ * optional references to its {@link GitRepository} and
+ * {@link GithubRepository} metadata.
+ */
 @Entity
 @Getter
 @Setter

@@ -1,16 +1,14 @@
 package ac.uk.sussex.kn253.services.tools;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import ac.uk.sussex.kn253.model.Project;
+import ac.uk.sussex.kn253.services.ProjectDiscoveryService;
 import ac.uk.sussex.kn253.services.WorkingDirectoryService;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolSpecification;
@@ -19,74 +17,144 @@ import dev.langchain4j.model.chat.request.json.JsonStringSchema;
 import dev.langchain4j.service.tool.*;
 import io.quarkus.arc.Arc;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 
+/**
+ * Toolset that gives the AI assistant the ability to explore the file system
+ * and interact with the working-directory state.
+ *
+ * <p>
+ * Provides thirteen tools:
+ * <ul>
+ * <li>{@code get_current_working_directory} – returns the assistant CWD</li>
+ * <li>{@code change_working_directory} – navigates to a new directory</li>
+ * <li>{@code resolve_path} – normalises an absolute or relative path</li>
+ * <li>{@code search_paths} – bounded search for likely file or directory
+ * targets when the user gives a vague filesystem reference</li>
+ * <li>{@code get_path_info} – basic metadata (type, readable, writable)</li>
+ * <li>{@code list_subdirectories} – immediate sub-folders</li>
+ * <li>{@code list_files_recursive} – all files under a folder</li>
+ * <li>{@code analyze_path_detailed} – detailed file/directory analysis</li>
+ * <li>{@code summarize_path} – concise file/directory summary</li>
+ * <li>{@code list_git_projects} – projects with git repositories</li>
+ * <li>{@code list_github_projects} – projects with GitHub metadata</li>
+ * <li>{@code list_project_entries} – files in a specific project directory</li>
+ * <li>{@code get_git_log} – recent git commit log</li>
+ * </ul>
+ *
+ * <p>
+ * Legacy tool names are mapped to their canonical equivalents via
+ * {@link #LEGACY_ALIASES} so that older conversation histories remain
+ * compatible.
+ * Path analysis is delegated to {@link PathAnalyzer}; argument parsing is
+ * handled by {@link ToolArguments}.
+ */
 @ApplicationScoped
 public class ExploreToolset implements ToolProvider, ToolExecutor {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
-    private static final String GET_CWD = "get_current_working_directory";
-    private static final String CHANGE_CWD = "change_working_directory";
-    private static final String RESOLVE_PATH = "resolve_path";
-    private static final String GET_PATH_INFO = "get_path_info";
-    private static final String LIST_SUBDIRECTORIES = "list_subdirectories";
-    private static final String LIST_FILES_RECURSIVE = "list_files_recursive";
-    private static final String ANALYZE_PATH_DETAILED = "analyze_path_detailed";
-    private static final String SUMMARIZE_PATH = "summarize_path";
-    private static final String LIST_GIT_PROJECTS = "list_git_projects";
-    private static final String LIST_GITHUB_PROJECTS = "list_github_projects";
-    private static final String LIST_PROJECT_ENTRIES = "list_project_entries";
-    private static final String GET_GIT_LOG = "get_git_log";
+    // -------------------------------------------------------------------------
+    // Tool name constants
+    // -------------------------------------------------------------------------
+
+    static final String GET_CWD = "get_current_working_directory";
+    static final String CHANGE_CWD = "change_working_directory";
+    static final String RESOLVE_PATH = "resolve_path";
+    static final String SEARCH_PATHS = "search_paths";
+    static final String GET_PATH_INFO = "get_path_info";
+    static final String LIST_SUBDIRECTORIES = "list_subdirectories";
+    static final String LIST_FILES_RECURSIVE = "list_files_recursive";
+    static final String ANALYZE_PATH = "analyze_path_detailed";
+    static final String SUMMARIZE_PATH = "summarize_path";
+    static final String LIST_GIT_PROJECTS = "list_git_projects";
+    static final String LIST_GITHUB_PROJECTS = "list_github_projects";
+    static final String LIST_PROJECT_ENTRIES = "list_project_entries";
+    static final String GET_GIT_LOG = "get_git_log";
+
     private static final int DEFAULT_GIT_LOG_COUNT = 20;
     private static final int MAX_GIT_LOG_COUNT = 200;
+    private static final int GIT_SCAN_DEPTH = 4;
+    private static final int DEFAULT_SEARCH_DEPTH = 4;
+    private static final int MAX_SEARCH_DEPTH = 8;
+    private static final int DEFAULT_SEARCH_LIMIT = 12;
+    private static final int MAX_SEARCH_LIMIT = 50;
 
-    private static final Map<String, String> LEGACY_TOOL_NAME_ALIASES = Map.ofEntries(
+    // -------------------------------------------------------------------------
+    // Legacy name aliases (backwards-compatibility with old conversation history)
+    // -------------------------------------------------------------------------
+
+    private static final Map<String, String> LEGACY_ALIASES = Map.ofEntries(
             Map.entry("get_cwd", GET_CWD),
             Map.entry("navigate_tool", CHANGE_CWD),
+            Map.entry("find_paths", SEARCH_PATHS),
             Map.entry("path_info", GET_PATH_INFO),
             Map.entry("list_folders", LIST_SUBDIRECTORIES),
             Map.entry("list_folder", LIST_FILES_RECURSIVE),
-            Map.entry("explain_tool", ANALYZE_PATH_DETAILED),
+            Map.entry("explain_tool", ANALYZE_PATH),
             Map.entry("summarise_tool", SUMMARIZE_PATH),
             Map.entry("list_files_in_project", LIST_PROJECT_ENTRIES),
             Map.entry("show_git_log", GET_GIT_LOG));
 
+    // -------------------------------------------------------------------------
+    // Fields
+    // -------------------------------------------------------------------------
+
     private final WorkingDirectoryService workingDirectoryService;
     private final List<ToolSpecification> toolSpecifications;
 
+    @Inject
+    Instance<PathSummaryLlmService> pathSummaryLlmService;
+
+    @Inject
+    Instance<ProjectDiscoveryService> projectDiscoveryService;
+
+    // -------------------------------------------------------------------------
+    // Constructors
+    // -------------------------------------------------------------------------
+
+    /**
+     * No-arg CDI constructor. Uses {@link Arc} to lazily resolve the
+     * {@link WorkingDirectoryService} bean, falling back to a plain instance for
+     * unit-test environments where CDI is not running.
+     */
     public ExploreToolset() {
         this(resolveWorkingDirectoryService());
     }
 
+    /**
+     * Primary constructor – injected by CDI.
+     *
+     * @param workingDirectoryService the service managing the assistant CWD.
+     */
     @Inject
     public ExploreToolset(final WorkingDirectoryService workingDirectoryService) {
         this.workingDirectoryService = workingDirectoryService;
-        this.toolSpecifications = List.of(
-                getCwdSpec(),
-                navigateToolSpec(),
-                resolvePathSpec(),
-                pathInfoSpec(),
-                listFoldersSpec(),
-                listFolderSpec(),
-                explainToolSpec(),
-                summariseToolSpec(),
-                listGitProjectsSpec(),
-                listGithubProjectsSpec(),
-                listFilesInProjectSpec(),
-                getGitLogSpec());
+        this.toolSpecifications = buildSpecifications();
     }
 
+    // -------------------------------------------------------------------------
+    // ToolProvider / ToolExecutor API
+    // -------------------------------------------------------------------------
+
+    /** Returns all tool specifications exposed by this toolset. */
     public List<ToolSpecification> toolSpecifications() {
         return toolSpecifications;
     }
 
+    /**
+     * Returns {@code true} if this toolset can handle a tool with the given name,
+     * including legacy aliases.
+     *
+     * @param toolName the raw tool name from the model response.
+     */
     public boolean canHandle(final String toolName) {
-        final String canonicalToolName = canonicalToolName(toolName);
-        return toolSpecifications.stream().anyMatch(spec -> spec.name().equals(canonicalToolName));
+        final String canonical = canonical(toolName);
+        return toolSpecifications.stream().anyMatch(spec -> spec.name().equals(canonical));
     }
 
+    /** {@inheritDoc} */
     @Override
-    public ToolProviderResult provideTools(final ToolProviderRequest arg0) {
+    public ToolProviderResult provideTools(final ToolProviderRequest request) {
         final ToolProviderResult.Builder builder = ToolProviderResult.builder();
         for (final ToolSpecification spec : toolSpecifications) {
             builder.add(spec, this);
@@ -94,26 +162,12 @@ public class ExploreToolset implements ToolProvider, ToolExecutor {
         return builder.build();
     }
 
+    /** {@inheritDoc} */
     @Override
     public String execute(final ToolExecutionRequest request, final Object memoryId) {
         try {
-            final Map<String, Object> args = parseArgs(request.arguments());
-            final String toolName = canonicalToolName(request.name());
-            return switch (toolName) {
-                case GET_CWD -> getCwd();
-                case CHANGE_CWD -> changeWorkingDirectory(args);
-                case RESOLVE_PATH -> resolvePath(args);
-                case GET_PATH_INFO -> pathInfo(args);
-                case LIST_SUBDIRECTORIES -> listFolders(args);
-                case LIST_FILES_RECURSIVE -> listFolder(args);
-                case ANALYZE_PATH_DETAILED -> explainPath(args, true);
-                case SUMMARIZE_PATH -> explainPath(args, false);
-                case LIST_GIT_PROJECTS -> listGitProjects();
-                case LIST_GITHUB_PROJECTS -> listGithubProjects();
-                case LIST_PROJECT_ENTRIES -> listFilesInProject(args);
-                case GET_GIT_LOG -> getGitLog(args);
-                default -> "Unknown tool: " + request.name();
-            };
+            final Map<String, Object> args = ToolArguments.parse(request.arguments());
+            return dispatch(canonical(request.name()), args);
         } catch (final IllegalArgumentException e) {
             return "Invalid tool arguments: " + e.getMessage();
         } catch (final Exception e) {
@@ -121,173 +175,142 @@ public class ExploreToolset implements ToolProvider, ToolExecutor {
         }
     }
 
-    private String canonicalToolName(final String toolName) {
-        if (toolName == null || toolName.isBlank()) {
-            return "";
+    // -------------------------------------------------------------------------
+    // Dispatch
+    // -------------------------------------------------------------------------
+
+    private String dispatch(final String toolName, final Map<String, Object> args) {
+        return switch (toolName) {
+            case GET_CWD -> getCwd();
+            case CHANGE_CWD -> changeCwd(args);
+            case RESOLVE_PATH -> resolvePath(args);
+            case SEARCH_PATHS -> searchPaths(args);
+            case GET_PATH_INFO -> PathAnalyzer.pathInfo(resolveArg(args, "path"));
+            case LIST_SUBDIRECTORIES -> listSubdirectories(args);
+            case LIST_FILES_RECURSIVE -> listFilesRecursive(args);
+            case ANALYZE_PATH -> PathAnalyzer.analyze(resolveArg(args, "path"), true);
+            case SUMMARIZE_PATH -> summarizePath(args);
+            case LIST_GIT_PROJECTS -> listGitProjects();
+            case LIST_GITHUB_PROJECTS -> listGithubProjects();
+            case LIST_PROJECT_ENTRIES -> listProjectEntries(args);
+            case GET_GIT_LOG -> getGitLog(args);
+            default -> "Unknown tool: " + toolName;
+        };
+    }
+
+    // -------------------------------------------------------------------------
+    // Tool implementations
+    // -------------------------------------------------------------------------
+
+    private String getCwd() {
+        return workingDirectoryService.getCurrentWorkingDirectory().toString();
+    }
+
+    private String changeCwd(final Map<String, Object> args) {
+        final Path newCwd = workingDirectoryService.navigateTo(ToolArguments.require(args, "path"));
+        return "cwd=" + newCwd;
+    }
+
+    private String resolvePath(final Map<String, Object> args) {
+        return resolveArg(args, "path").toString();
+    }
+
+    private String searchPaths(final Map<String, Object> args) {
+        final String query = ToolArguments.require(args, "query").trim();
+        if (query.isBlank()) {
+            return "Invalid query: expected a non-blank search term.";
         }
-        return LEGACY_TOOL_NAME_ALIASES.getOrDefault(toolName, toolName);
-    }
 
-    private ToolSpecification getCwdSpec() {
-        return ToolSpecification.builder()
-                .name(GET_CWD)
-                .description("Return the current working directory as an absolute path.")
-                .parameters(JsonObjectSchema.builder().build())
-                .build();
-    }
-
-    private ToolSpecification navigateToolSpec() {
-        return ToolSpecification.builder()
-                .name(CHANGE_CWD)
-                .description(
-                        "Change the assistant working directory. Supports absolute paths or paths relative to current working directory.")
-                .parameters(JsonObjectSchema.builder()
-                        .addProperty("path",
-                                JsonStringSchema.builder().description("Directory path to navigate to").build())
-                        .required("path")
-                        .build())
-                .build();
-    }
-
-    private ToolSpecification resolvePathSpec() {
-        return ToolSpecification.builder()
-                .name(RESOLVE_PATH)
-                .description(
-                        "Resolve an absolute or relative path against cwd and return the normalized absolute path.")
-                .parameters(JsonObjectSchema.builder()
-                        .addProperty("path",
-                                JsonStringSchema.builder().description("Absolute or relative path").build())
-                        .required("path")
-                        .build())
-                .build();
-    }
-
-    private ToolSpecification pathInfoSpec() {
-        return ToolSpecification.builder()
-                .name(GET_PATH_INFO)
-                .description(
-                        "Return basic metadata for a path (exists, type, readability, writability, absolute path).")
-                .parameters(JsonObjectSchema.builder()
-                        .addProperty("path",
-                                JsonStringSchema.builder().description("Absolute or relative path").build())
-                        .required("path")
-                        .build())
-                .build();
-    }
-
-    private ToolSpecification listFoldersSpec() {
-        return ToolSpecification.builder()
-                .name(LIST_SUBDIRECTORIES)
-                .description("List immediate sub-folders for a given absolute or relative path.")
-                .parameters(JsonObjectSchema.builder()
-                        .addProperty("path",
-                                JsonStringSchema.builder().description("Directory path to inspect").build())
-                        .required("path")
-                        .build())
-                .build();
-    }
-
-    private ToolSpecification listFolderSpec() {
-        return ToolSpecification.builder()
-                .name(LIST_FILES_RECURSIVE)
-                .description("List all files under a given folder recursively using paths relative to that folder.")
-                .parameters(JsonObjectSchema.builder()
-                        .addProperty("path",
-                                JsonStringSchema.builder().description("Directory path to inspect").build())
-                        .required("path")
-                        .build())
-                .build();
-    }
-
-    private ToolSpecification explainToolSpec() {
-        return ToolSpecification.builder()
-                .name(ANALYZE_PATH_DETAILED)
-                .description(
-                        "Provide a detailed analysis of a file or directory path to help understand its contents and structure.")
-                .parameters(JsonObjectSchema.builder()
-                        .addProperty("path",
-                                JsonStringSchema.builder().description("File or directory path to analyze").build())
-                        .required("path")
-                        .build())
-                .build();
-    }
-
-    private ToolSpecification summariseToolSpec() {
-        return ToolSpecification.builder()
-                .name(SUMMARIZE_PATH)
-                .description(
-                        "Provide a concise summary of a file or directory path so the model can quickly understand what it contains.")
-                .parameters(JsonObjectSchema.builder()
-                        .addProperty("path",
-                                JsonStringSchema.builder().description("File or directory path to summarize").build())
-                        .required("path")
-                        .build())
-                .build();
-    }
-
-    private ToolSpecification listGitProjectsSpec() {
-        return ToolSpecification.builder()
-                .name(LIST_GIT_PROJECTS)
-                .description("List known projects in the database that have a Git repository attached.")
-                .parameters(JsonObjectSchema.builder().build())
-                .build();
-    }
-
-    private ToolSpecification listGithubProjectsSpec() {
-        return ToolSpecification.builder()
-                .name(LIST_GITHUB_PROJECTS)
-                .description("List known projects in the database that have GitHub repository metadata attached.")
-                .parameters(JsonObjectSchema.builder().build())
-                .build();
-    }
-
-    private ToolSpecification listFilesInProjectSpec() {
-        return ToolSpecification.builder()
-                .name(LIST_PROJECT_ENTRIES)
-                .description("List files and folders in a project's directory, optionally under a relative subpath.")
-                .parameters(JsonObjectSchema.builder()
-                        .addProperty("projectDirectory",
-                                JsonStringSchema.builder().description("Absolute path to the project root directory")
-                                        .build())
-                        .addProperty("relativePath",
-                                JsonStringSchema.builder().description("Optional sub-directory inside the project")
-                                        .build())
-                        .required("projectDirectory")
-                        .build())
-                .build();
-    }
-
-    private ToolSpecification getGitLogSpec() {
-        return ToolSpecification.builder()
-                .name(GET_GIT_LOG)
-                .description("Return recent git commits (one line per commit) for a repository.")
-                .parameters(JsonObjectSchema.builder()
-                        .addProperty("path",
-                                JsonStringSchema.builder()
-                                        .description("Optional repository path. Defaults to current working directory.")
-                                        .build())
-                        .addProperty("maxCount",
-                                JsonStringSchema.builder()
-                                        .description("Optional number of commits to return (1-200, default 20).")
-                                        .build())
-                        .build())
-                .build();
-    }
-
-    private Map<String, Object> parseArgs(final String json) {
-        if (json == null || json.isBlank()) {
-            return Map.of();
+        final Path root = resolveArg(args, "path");
+        if (!Files.isDirectory(root)) {
+            return "Not a directory: " + root;
         }
+
+        final int requestedDepth = ToolArguments.getInt(args, "maxDepth", DEFAULT_SEARCH_DEPTH);
+        if (requestedDepth < 0 || requestedDepth > MAX_SEARCH_DEPTH) {
+            return "Invalid maxDepth: expected a value between 0 and " + MAX_SEARCH_DEPTH + ".";
+        }
+
+        final int requestedLimit = ToolArguments.getInt(args, "limit", DEFAULT_SEARCH_LIMIT);
+        if (requestedLimit < 1 || requestedLimit > MAX_SEARCH_LIMIT) {
+            return "Invalid limit: expected a value between 1 and " + MAX_SEARCH_LIMIT + ".";
+        }
+
+        final boolean includeFiles = ToolArguments.getBoolean(args, "includeFiles", true);
+        final boolean includeDirectories = ToolArguments.getBoolean(args, "includeDirectories", true);
+        if (!includeFiles && !includeDirectories) {
+            return "Invalid search options: at least one of includeFiles or includeDirectories must be true.";
+        }
+
+        final List<PathSearchMatch> matches = new ArrayList<>();
+        final String queryLower = query.toLowerCase(Locale.ROOT);
+
         try {
-            return MAPPER.readValue(json, new TypeReference<Map<String, Object>>() {
-            });
-        } catch (final Exception e) {
-            return Map.of();
+            Files.walkFileTree(root, EnumSet.noneOf(java.nio.file.FileVisitOption.class), requestedDepth,
+                    new SimpleFileVisitor<>() {
+                        @Override
+                        public FileVisitResult preVisitDirectory(final Path dir, final BasicFileAttributes attrs) {
+                            if (!dir.equals(root) && isIgnoredDirectory(dir)) {
+                                return FileVisitResult.SKIP_SUBTREE;
+                            }
+                            if (!dir.equals(root) && includeDirectories) {
+                                addMatch(root, dir, true, queryLower, matches);
+                            }
+                            return FileVisitResult.CONTINUE;
+                        }
+
+                        @Override
+                        public FileVisitResult visitFile(final Path file, final BasicFileAttributes attrs) {
+                            if (includeFiles) {
+                                addMatch(root, file, false, queryLower, matches);
+                            }
+                            return FileVisitResult.CONTINUE;
+                        }
+                    });
+        } catch (final IOException e) {
+            return "Failed to search paths under " + root + ": " + e.getMessage();
         }
+
+        matches.sort(Comparator
+                .comparingInt(PathSearchMatch::matchRank)
+                .thenComparing((final PathSearchMatch match) -> match.directory() ? 0 : 1)
+                .thenComparingInt(match -> match.relativePath().length())
+                .thenComparing(PathSearchMatch::relativePath, String.CASE_INSENSITIVE_ORDER));
+
+        final List<PathSearchMatch> limited = matches.stream().limit(requestedLimit).toList();
+        final StringBuilder sb = new StringBuilder();
+        sb.append("searchRoot=").append(root.toAbsolutePath().normalize()).append("\n");
+        sb.append("query=").append(query).append("\n");
+        sb.append("maxDepth=").append(requestedDepth).append("\n");
+        sb.append("includeFiles=").append(includeFiles).append("\n");
+        sb.append("includeDirectories=").append(includeDirectories).append("\n");
+
+        if (limited.isEmpty()) {
+            sb.append("matches=0\n");
+            sb.append("No matching paths found.");
+            return sb.toString();
+        }
+
+        sb.append("matches=").append(limited.size());
+        if (matches.size() > limited.size()) {
+            sb.append(" (truncated from ").append(matches.size()).append(")");
+        }
+        sb.append("\n\n");
+        sb.append("Candidate paths:\n");
+        for (final PathSearchMatch match : limited) {
+            sb.append("- type=").append(match.directory() ? "directory" : "file")
+                    .append(" match=").append(match.matchKind())
+                    .append(" relative=").append(match.relativePath())
+                    .append(" path=").append(match.absolutePath())
+                    .append("\n");
+        }
+        sb.append(
+                "\nUse these candidates to ask the user which target they mean before navigating when multiple plausible matches exist.");
+        return sb.toString();
     }
 
-    private String listFolders(final Map<String, Object> args) {
-        final Path path = resolvePathOrDefault(args, "path");
+    private String listSubdirectories(final Map<String, Object> args) {
+        final Path path = resolveArg(args, "path");
         if (!Files.isDirectory(path)) {
             return "Not a directory: " + path;
         }
@@ -306,8 +329,8 @@ public class ExploreToolset implements ToolProvider, ToolExecutor {
         }
     }
 
-    private String listFolder(final Map<String, Object> args) {
-        final Path path = resolvePathOrDefault(args, "path");
+    private String listFilesRecursive(final Map<String, Object> args) {
+        final Path path = resolveArg(args, "path");
         if (!Files.isDirectory(path)) {
             return "Not a directory: " + path;
         }
@@ -326,163 +349,37 @@ public class ExploreToolset implements ToolProvider, ToolExecutor {
         }
     }
 
-    private String explainPath(final Map<String, Object> args, final boolean detailed) {
-        final Path target = resolvePathOrDefault(args, "path");
-        if (!Files.exists(target)) {
-            return "Path does not exist: " + target;
-        }
-        if (Files.isDirectory(target)) {
-            return analyzeDirectory(target, detailed);
-        }
-        if (Files.isRegularFile(target)) {
-            return analyzeFile(target, detailed);
-        }
-        return "Unsupported path type: " + target;
-    }
-
-    private String analyzeDirectory(final Path dir, final boolean detailed) {
-        try (Stream<Path> stream = Files.walk(dir)) {
-            final List<Path> all = stream.toList();
-            final List<Path> files = all.stream().filter(Files::isRegularFile).toList();
-            final List<Path> directories = all.stream().filter(Files::isDirectory).toList();
-
-            final Map<String, Long> byExtension = files.stream()
-                    .collect(Collectors.groupingBy(this::extensionOf, Collectors.counting()));
-            final String extensionSummary = byExtension.entrySet().stream()
-                    .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
-                    .limit(detailed ? 10 : 5)
-                    .map(e -> e.getKey() + "=" + e.getValue())
-                    .collect(Collectors.joining(", "));
-
-            final List<String> sampleFiles = files.stream()
-                    .map(path -> dir.relativize(path).toString().replace('\\', '/'))
-                    .sorted()
-                    .limit(detailed ? 25 : 8)
-                    .toList();
-
-            final StringBuilder sb = new StringBuilder();
-            sb.append(detailed ? "Detailed directory analysis\n" : "Directory summary\n");
-            sb.append("path=").append(dir).append("\n");
-            sb.append("directories=").append(Math.max(0, directories.size() - 1)).append("\n");
-            sb.append("files=").append(files.size()).append("\n");
-            sb.append("extensions=").append(extensionSummary.isBlank() ? "none" : extensionSummary).append("\n");
-            if (!sampleFiles.isEmpty()) {
-                sb.append(detailed ? "sampleFiles=\n" : "topFiles=\n");
-                for (final String sample : sampleFiles) {
-                    sb.append("- ").append(sample).append("\n");
-                }
+    private String summarizePath(final Map<String, Object> args) {
+        final Path path = resolveArg(args, "path");
+        if (pathSummaryLlmService != null && pathSummaryLlmService.isResolvable()) {
+            try {
+                return pathSummaryLlmService.get().summarizePath(path);
+            } catch (final Exception e) {
+                return "Failed to summarize path via LLM for " + path + ": " + e.getMessage();
             }
-            return sb.toString().trim();
-        } catch (final IOException e) {
-            return "Failed to analyze directory " + dir + ": " + e.getMessage();
         }
-    }
-
-    private String analyzeFile(final Path file, final boolean detailed) {
-        try {
-            final long size = Files.size(file);
-            final List<String> lines = Files.readAllLines(file);
-            final String content = String.join("\n", lines);
-            final int charCount = content.length();
-            final int lineCount = lines.size();
-            final long nonEmptyLines = lines.stream().filter(line -> !line.isBlank()).count();
-            final long wordCount = Arrays.stream(content.split("\\s+"))
-                    .filter(token -> !token.isBlank())
-                    .count();
-
-            final List<String> preview = lines.stream()
-                    .filter(line -> !line.isBlank())
-                    .limit(detailed ? 12 : 4)
-                    .toList();
-
-            final StringBuilder sb = new StringBuilder();
-            sb.append(detailed ? "Detailed file analysis\n" : "File summary\n");
-            sb.append("path=").append(file).append("\n");
-            sb.append("extension=").append(extensionOf(file)).append("\n");
-            sb.append("bytes=").append(size).append("\n");
-            sb.append("lines=").append(lineCount).append("\n");
-            sb.append("nonEmptyLines=").append(nonEmptyLines).append("\n");
-            sb.append("words=").append(wordCount).append("\n");
-            sb.append("characters=").append(charCount).append("\n");
-            if (!preview.isEmpty()) {
-                sb.append(detailed ? "contentPreview=\n" : "preview=\n");
-                for (final String line : preview) {
-                    sb.append("- ").append(trimToLength(line, detailed ? 180 : 120)).append("\n");
-                }
-            }
-            return sb.toString().trim();
-        } catch (final IOException e) {
-            return "Failed to analyze file " + file + ": " + e.getMessage();
-        }
-    }
-
-    private String extensionOf(final Path path) {
-        final String fileName = path.getFileName() == null ? "" : path.getFileName().toString();
-        final int dot = fileName.lastIndexOf('.');
-        if (dot <= 0 || dot == fileName.length() - 1) {
-            return "none";
-        }
-        return fileName.substring(dot + 1).toLowerCase(Locale.ROOT);
-    }
-
-    private String trimToLength(final String text, final int maxLength) {
-        if (text.length() <= maxLength) {
-            return text;
-        }
-        return text.substring(0, maxLength - 3) + "...";
-    }
-
-    private String getCwd() {
-        return workingDirectoryService.getCurrentWorkingDirectory().toString();
-    }
-
-    private String changeWorkingDirectory(final Map<String, Object> args) {
-        final Path newCwd = workingDirectoryService.navigateTo(require(args, "path"));
-        return "cwd=" + newCwd;
-    }
-
-    private String resolvePath(final Map<String, Object> args) {
-        final Path resolved = Path.of(require(args, "path")).toAbsolutePath().normalize();
-        return resolved.toString();
-    }
-
-    private String pathInfo(final Map<String, Object> args) {
-        final Path target = resolvePathOrDefault(args, "path");
-        final boolean exists = Files.exists(target);
-        final String type;
-        if (!exists) {
-            type = "missing";
-        } else if (Files.isDirectory(target)) {
-            type = "directory";
-        } else if (Files.isRegularFile(target)) {
-            type = "file";
-        } else {
-            type = "other";
-        }
-
-        return "path=" + target + "\n"
-                + "exists=" + exists + "\n"
-                + "type=" + type + "\n"
-                + "readable=" + Files.isReadable(target) + "\n"
-                + "writable=" + Files.isWritable(target);
+        // Fallback for non-CDI/unit-test environments.
+        return PathAnalyzer.analyze(path, false);
     }
 
     private String listGitProjects() {
-        final List<Project> projects = listGitProjectsFromDatabase();
-        if (projects.isEmpty()) {
-            final List<String> filesystemProjects = listGitProjectsFromFilesystem();
-            if (filesystemProjects.isEmpty()) {
-                return "No git projects found.";
-            }
-            return filesystemProjects.stream().map(p -> "- " + p).collect(Collectors.joining("\n"));
+        discoverProjectsFromCwdSafely();
+        final List<Project> dbProjects = gitProjectsFromDb();
+        if (!dbProjects.isEmpty()) {
+            return dbProjects.stream()
+                    .map(p -> "- " + p.getDirectory())
+                    .collect(Collectors.joining("\n"));
         }
-        return projects.stream()
-                .map(p -> "- " + p.getDirectory())
-                .collect(Collectors.joining("\n"));
+        final List<String> fsProjects = gitProjectsFromFilesystem();
+        if (fsProjects.isEmpty()) {
+            return "No git projects found.";
+        }
+        return fsProjects.stream().map(p -> "- " + p).collect(Collectors.joining("\n"));
     }
 
     private String listGithubProjects() {
-        final List<Project> projects = listGithubProjectsFromDatabase();
+        discoverProjectsFromCwdSafely();
+        final List<Project> projects = githubProjectsFromDb();
         if (projects.isEmpty()) {
             return "No GitHub projects found in database.";
         }
@@ -491,65 +388,24 @@ public class ExploreToolset implements ToolProvider, ToolExecutor {
                 .collect(Collectors.joining("\n"));
     }
 
-    private List<Project> listGitProjectsFromDatabase() {
-        if (Arc.container() == null || !Arc.container().isRunning()) {
-            return List.of();
+    private void discoverProjectsFromCwdSafely() {
+        if (projectDiscoveryService == null || !projectDiscoveryService.isResolvable()) {
+            return;
         }
         try {
-            return Project.<Project>listAll().stream()
-                    .filter(p -> p.getGitRepository() != null)
-                    .sorted(Comparator.comparing(Project::getDirectory, Comparator.nullsLast(String::compareTo)))
-                    .toList();
-        } catch (final RuntimeException ignored) {
-            return List.of();
+            projectDiscoveryService.get().discoverFromCwd();
+        } catch (final Exception ignored) {
+            // Discovery is best-effort; listing still falls back to filesystem scan.
         }
     }
 
-    private List<Project> listGithubProjectsFromDatabase() {
-        if (Arc.container() == null || !Arc.container().isRunning()) {
-            return List.of();
-        }
-        try {
-            return Project.<Project>listAll().stream()
-                    .filter(p -> p.getGithubRepository() != null)
-                    .sorted(Comparator.comparing(Project::getDirectory, Comparator.nullsLast(String::compareTo)))
-                    .toList();
-        } catch (final RuntimeException ignored) {
-            return List.of();
-        }
-    }
+    private String listProjectEntries(final Map<String, Object> args) {
+        final Path project = Path.of(ToolArguments.require(args, "projectDirectory")).normalize();
+        final String relativePath = ToolArguments.getString(args, "relativePath", "");
+        final Path target = relativePath.isBlank()
+                ? project
+                : project.resolve(relativePath).normalize();
 
-    private List<String> listGitProjectsFromFilesystem() {
-        final Path cwd = workingDirectoryService.getCurrentWorkingDirectory();
-        final int maxDepth = 4;
-        try (Stream<Path> stream = Files.walk(cwd, maxDepth)) {
-            return stream
-                    .filter(Files::isDirectory)
-                    .filter(path -> path.getFileName() != null)
-                    .filter(path -> !isIgnoredDirectory(path))
-                    .filter(path -> Files.isDirectory(path.resolve(".git")))
-                    .map(path -> path.toAbsolutePath().normalize().toString())
-                    .sorted()
-                    .toList();
-        } catch (final IOException ignored) {
-            return List.of();
-        }
-    }
-
-    private boolean isIgnoredDirectory(final Path path) {
-        final String name = path.getFileName().toString();
-        return name.equals(".git")
-                || name.equals("node_modules")
-                || name.equals("target")
-                || name.equals("build")
-                || name.equals(".idea")
-                || name.equals(".vscode");
-    }
-
-    private String listFilesInProject(final Map<String, Object> args) {
-        final Path project = Path.of(require(args, "projectDirectory")).normalize();
-        final String relativePath = getString(args, "relativePath", "");
-        final Path target = relativePath.isBlank() ? project : project.resolve(relativePath).normalize();
         if (!target.startsWith(project)) {
             return "Invalid relativePath: outside project directory.";
         }
@@ -574,30 +430,22 @@ public class ExploreToolset implements ToolProvider, ToolExecutor {
     }
 
     private String getGitLog(final Map<String, Object> args) {
-        final Path repoPath = resolvePathOrDefault(args, "path");
-        final int maxCount = getInt(args, "maxCount", DEFAULT_GIT_LOG_COUNT);
+        final Path repoPath = resolveArg(args, "path");
+        final int maxCount = ToolArguments.getInt(args, "maxCount", DEFAULT_GIT_LOG_COUNT);
         if (maxCount < 1 || maxCount > MAX_GIT_LOG_COUNT) {
             return "Invalid maxCount: expected a value between 1 and " + MAX_GIT_LOG_COUNT + ".";
         }
-
-        final ProcessBuilder pb = new ProcessBuilder(
-                "git",
-                "-C",
-                repoPath.toString(),
-                "log",
-                "--oneline",
-                "-n",
-                String.valueOf(maxCount));
-
         try {
-            final Process process = pb.start();
+            final Process process = new ProcessBuilder(
+                    "git", "-C", repoPath.toString(), "log", "--oneline", "-n", String.valueOf(maxCount))
+                    .start();
             final String stdout = new String(process.getInputStream().readAllBytes()).trim();
             final String stderr = new String(process.getErrorStream().readAllBytes()).trim();
             final int exitCode = process.waitFor();
 
             if (exitCode != 0) {
-                final String error = stderr.isBlank() ? "Unknown git error." : stderr;
-                return "Failed to get git log for " + repoPath + ": " + error;
+                return "Failed to get git log for " + repoPath + ": "
+                        + (stderr.isBlank() ? "Unknown git error." : stderr);
             }
             if (stdout.isBlank()) {
                 return "No commits found in " + repoPath;
@@ -608,59 +456,318 @@ public class ExploreToolset implements ToolProvider, ToolExecutor {
         }
     }
 
-    private String require(final Map<String, Object> args, final String key) {
-        final String val = getString(args, key, "");
-        if (val.isBlank()) {
-            throw new IllegalArgumentException("Missing required argument: " + key);
-        }
-        return val;
-    }
+    // -------------------------------------------------------------------------
+    // Database / filesystem project helpers
+    // -------------------------------------------------------------------------
 
-    private String getString(final Map<String, Object> args, final String key, final String defaultValue) {
-        final Object val = args.get(key);
-        return val == null ? defaultValue : String.valueOf(val);
-    }
-
-    private int getInt(final Map<String, Object> args, final String key, final int defaultValue) {
-        final Object value = args.get(key);
-        if (value == null) {
-            return defaultValue;
-        }
-        if (value instanceof final Number number) {
-            return number.intValue();
+    private List<Project> gitProjectsFromDb() {
+        if (!isCdiAvailable()) {
+            return List.of();
         }
         try {
-            return Integer.parseInt(String.valueOf(value));
-        } catch (final NumberFormatException e) {
-            return -1;
+            return Project.<Project>listAll().stream()
+                    .filter(p -> p.getGitRepository() != null)
+                    .sorted(Comparator.comparing(Project::getDirectory, Comparator.nullsLast(String::compareTo)))
+                    .toList();
+        } catch (final RuntimeException ignored) {
+            return List.of();
         }
     }
 
-    private Path resolvePathOrDefault(final Map<String, Object> args, final String key) {
-        final String raw = getString(args, key, "").trim();
-        final Path base = defaultAnalysisRoot();
+    private List<Project> githubProjectsFromDb() {
+        if (!isCdiAvailable()) {
+            return List.of();
+        }
+        try {
+            return Project.<Project>listAll().stream()
+                    .filter(p -> p.getGithubRepository() != null)
+                    .sorted(Comparator.comparing(Project::getDirectory, Comparator.nullsLast(String::compareTo)))
+                    .toList();
+        } catch (final RuntimeException ignored) {
+            return List.of();
+        }
+    }
+
+    private List<String> gitProjectsFromFilesystem() {
+        final Path cwd = workingDirectoryService.getCurrentWorkingDirectory();
+        try (Stream<Path> stream = Files.walk(cwd, GIT_SCAN_DEPTH)) {
+            return stream
+                    .filter(Files::isDirectory)
+                    .filter(path -> path.getFileName() != null)
+                    .filter(path -> !isIgnoredDirectory(path))
+                    .filter(path -> Files.isDirectory(path.resolve(".git")))
+                    .map(path -> path.toAbsolutePath().normalize().toString())
+                    .sorted()
+                    .toList();
+        } catch (final IOException ignored) {
+            return List.of();
+        }
+    }
+
+    private static boolean isIgnoredDirectory(final Path path) {
+        final String name = path.getFileName().toString();
+        return name.equals(".git")
+                || name.equals("node_modules")
+                || name.equals("target")
+                || name.equals("build")
+                || name.equals(".idea")
+                || name.equals(".vscode");
+    }
+
+    private static void addMatch(
+            final Path root,
+            final Path candidate,
+            final boolean directory,
+            final String queryLower,
+            final List<PathSearchMatch> matches) {
+        final Path fileNamePath = candidate.getFileName();
+        if (fileNamePath == null) {
+            return;
+        }
+        final String fileName = fileNamePath.toString();
+        final String fileNameLower = fileName.toLowerCase(Locale.ROOT);
+        final String matchKind = classifyMatch(fileNameLower, queryLower);
+        if (matchKind == null) {
+            return;
+        }
+        final String relative = root.relativize(candidate).toString().replace('\\', '/');
+        matches.add(new PathSearchMatch(
+                candidate.toAbsolutePath().normalize().toString(),
+                relative.isBlank() ? "." : relative,
+                directory,
+                matchKind,
+                matchRank(matchKind)));
+    }
+
+    private static String classifyMatch(final String candidateNameLower, final String queryLower) {
+        if (candidateNameLower.equals(queryLower)) {
+            return "exact";
+        }
+        if (candidateNameLower.startsWith(queryLower)) {
+            return "prefix";
+        }
+        if (candidateNameLower.contains(queryLower)) {
+            return "substring";
+        }
+        return null;
+    }
+
+    private static int matchRank(final String matchKind) {
+        return switch (matchKind) {
+            case "exact" -> 0;
+            case "prefix" -> 1;
+            default -> 2;
+        };
+    }
+
+    // -------------------------------------------------------------------------
+    // Path resolution helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Resolves the {@code key} argument from {@code args} against the current CWD.
+     * Falls back to the CWD itself when the argument is absent or blank.
+     *
+     * @param args the parsed argument map.
+     * @param key  the argument name to look up.
+     * @return an absolute, normalised path.
+     */
+    private Path resolveArg(final Map<String, Object> args, final String key) {
+        final String raw = ToolArguments.getString(args, key, "").trim();
+        final Path base = workingDirectoryService.getCurrentWorkingDirectory();
         if (raw.isBlank()) {
             return base;
         }
-        final Path maybeRelative = Path.of(raw);
-        return (maybeRelative.isAbsolute() ? maybeRelative : base.resolve(maybeRelative))
+        final Path candidate = Path.of(raw);
+        return (candidate.isAbsolute() ? candidate : base.resolve(candidate))
                 .normalize()
                 .toAbsolutePath();
     }
 
-    private Path defaultAnalysisRoot() {
-        return workingDirectoryService.getCurrentWorkingDirectory();
+    // -------------------------------------------------------------------------
+    // Utility helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Returns the canonical tool name for {@code toolName}, applying legacy
+     * aliases where appropriate.
+     *
+     * @param toolName the raw name from the model response; may be {@code null}.
+     * @return the canonical name, or an empty string for null/blank input.
+     */
+    private static String canonical(final String toolName) {
+        if (toolName == null || toolName.isBlank()) {
+            return "";
+        }
+        return LEGACY_ALIASES.getOrDefault(toolName, toolName);
     }
 
+    private static boolean isCdiAvailable() {
+        return Arc.container() != null && Arc.container().isRunning();
+    }
+
+    /**
+     * Resolves the {@link WorkingDirectoryService} from CDI when available,
+     * or creates a plain instance for unit-test environments where CDI is absent.
+     */
     private static WorkingDirectoryService resolveWorkingDirectoryService() {
-        if (Arc.container() != null && Arc.container().isRunning()) {
+        if (isCdiAvailable()) {
             final var instance = Arc.container().instance(WorkingDirectoryService.class);
             if (instance != null && instance.isAvailable()) {
                 return instance.get();
             }
         }
-        // Non-CDI fallback for plain unit tests.
         return new WorkingDirectoryService();
     }
 
+    // -------------------------------------------------------------------------
+    // Tool specification builders
+    // -------------------------------------------------------------------------
+
+    private static List<ToolSpecification> buildSpecifications() {
+        return List.of(
+                spec(GET_CWD, "Return the current working directory as an absolute path.", null, null),
+                spec(CHANGE_CWD,
+                        "Change the assistant working directory only when the user explicitly asks to navigate or switch folders. Supports absolute paths or paths relative to cwd.",
+                        new String[] { "path" }, new String[] { "Directory path to navigate to" }),
+                spec(RESOLVE_PATH,
+                        "Resolve an absolute or relative path against cwd and return the normalized absolute path.",
+                        new String[] { "path" }, new String[] { "Absolute or relative path" }),
+                specSearchPaths(),
+                spec(GET_PATH_INFO,
+                        "Return basic metadata for a path (exists, type, readability, writability, absolute path).",
+                        new String[] { "path" }, new String[] { "Absolute or relative path" }),
+                spec(LIST_SUBDIRECTORIES,
+                        "List immediate sub-folders for a given absolute or relative path.",
+                        new String[] { "path" }, new String[] { "Directory path to inspect" }),
+                spec(LIST_FILES_RECURSIVE,
+                        "List all files under a given folder recursively using paths relative to that folder.",
+                        new String[] { "path" }, new String[] { "Directory path to inspect" }),
+                spec(ANALYZE_PATH,
+                        "Provide a detailed analysis of a file or directory path.",
+                        new String[] { "path" }, new String[] { "File or directory path to analyze" }),
+                spec(SUMMARIZE_PATH,
+                        "Provide a concise summary of a file or directory path.",
+                        new String[] { "path" }, new String[] { "File or directory path to summarize" }),
+                spec(LIST_GIT_PROJECTS,
+                        "List known projects in the database that have a Git repository attached.", null, null),
+                spec(LIST_GITHUB_PROJECTS,
+                        "List known projects in the database that have GitHub repository metadata attached.", null,
+                        null),
+                specProjectEntries(),
+                specGitLog());
+    }
+
+    /**
+     * Builds a tool specification with optional string parameters.
+     *
+     * @param name              canonical tool name.
+     * @param description       tool description.
+     * @param paramNames        parameter names; {@code null} means no parameters.
+     * @param paramDescriptions parameter descriptions aligned with
+     *                          {@code paramNames}.
+     */
+    private static ToolSpecification spec(
+            final String name,
+            final String description,
+            final String[] paramNames,
+            final String[] paramDescriptions) {
+        final JsonObjectSchema.Builder schemaBuilder = JsonObjectSchema.builder();
+        if (paramNames != null) {
+            for (int i = 0; i < paramNames.length; i++) {
+                schemaBuilder.addProperty(paramNames[i],
+                        JsonStringSchema.builder().description(paramDescriptions[i]).build());
+            }
+            schemaBuilder.required(paramNames);
+        }
+        return ToolSpecification.builder()
+                .name(name)
+                .description(description)
+                .parameters(schemaBuilder.build())
+                .build();
+    }
+
+    /** Builds the {@code list_project_entries} tool specification. */
+    private static ToolSpecification specSearchPaths() {
+        return ToolSpecification.builder()
+                .name(SEARCH_PATHS)
+                .description(
+                        "Search from a directory for likely file or folder candidates matching a partial name. " +
+                                "Use this first when the user refers to a vague filesystem target such as frontend, webui, tests, config, or main entry point and you do not yet know the exact path. "
+                                +
+                                "Do not navigate automatically when multiple plausible matches are returned; summarize the candidates and ask the user to choose.")
+                .parameters(JsonObjectSchema.builder()
+                        .addProperty("query",
+                                JsonStringSchema.builder()
+                                        .description("Required partial file or directory name to search for.")
+                                        .build())
+                        .addProperty("path",
+                                JsonStringSchema.builder()
+                                        .description(
+                                                "Optional search root directory. Defaults to the current working directory.")
+                                        .build())
+                        .addProperty("maxDepth",
+                                JsonStringSchema.builder()
+                                        .description("Optional maximum search depth from the root (0-8, default 4).")
+                                        .build())
+                        .addProperty("limit",
+                                JsonStringSchema.builder()
+                                        .description("Optional maximum number of matches to return (1-50, default 12).")
+                                        .build())
+                        .addProperty("includeFiles",
+                                JsonStringSchema.builder()
+                                        .description("Optional boolean flag to include file matches. Defaults to true.")
+                                        .build())
+                        .addProperty("includeDirectories",
+                                JsonStringSchema.builder()
+                                        .description(
+                                                "Optional boolean flag to include directory matches. Defaults to true.")
+                                        .build())
+                        .required("query")
+                        .build())
+                .build();
+    }
+
+    /** Builds the {@code list_project_entries} tool specification. */
+    private static ToolSpecification specProjectEntries() {
+        return ToolSpecification.builder()
+                .name(LIST_PROJECT_ENTRIES)
+                .description("List files and folders in a project's directory, optionally under a relative subpath.")
+                .parameters(JsonObjectSchema.builder()
+                        .addProperty("projectDirectory",
+                                JsonStringSchema.builder()
+                                        .description("Absolute path to the project root directory").build())
+                        .addProperty("relativePath",
+                                JsonStringSchema.builder()
+                                        .description("Optional sub-directory inside the project").build())
+                        .required("projectDirectory")
+                        .build())
+                .build();
+    }
+
+    /** Builds the {@code get_git_log} tool specification. */
+    private static ToolSpecification specGitLog() {
+        return ToolSpecification.builder()
+                .name(GET_GIT_LOG)
+                .description("Return recent git commits (one line per commit) for a repository.")
+                .parameters(JsonObjectSchema.builder()
+                        .addProperty("path",
+                                JsonStringSchema.builder()
+                                        .description("Optional repository path. Defaults to current working directory.")
+                                        .build())
+                        .addProperty("maxCount",
+                                JsonStringSchema.builder()
+                                        .description("Optional number of commits to return (1-200, default 20).")
+                                        .build())
+                        .build())
+                .build();
+    }
+
+    private record PathSearchMatch(
+            String absolutePath,
+            String relativePath,
+            boolean directory,
+            String matchKind,
+            int matchRank) {
+    }
 }

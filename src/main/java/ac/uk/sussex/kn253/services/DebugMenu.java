@@ -10,6 +10,14 @@ import org.jline.reader.UserInterruptException;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+/**
+ * Interactive JLine terminal debug menu.
+ *
+ * <p>
+ * Call {@link #run(LineReader)} to enter the sub-menu. Provides quick
+ * access to the current working directory and a view of recent AI tool traces
+ * from {@link ToolActivityService}.
+ */
 @ApplicationScoped
 public class DebugMenu {
 

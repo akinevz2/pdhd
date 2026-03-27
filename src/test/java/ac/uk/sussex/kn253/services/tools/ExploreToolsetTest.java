@@ -2,7 +2,7 @@ package ac.uk.sussex.kn253.services.tools;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import java.net.URL;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -11,12 +11,20 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import ac.uk.sussex.kn253.model.*;
+import ac.uk.sussex.kn253.services.WorkingDirectoryService;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import io.quarkus.test.junit.QuarkusTest;
+import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 
 @QuarkusTest
 class ExploreToolsetTest {
+
+    @Inject
+    ExploreToolset cdiToolset;
+
+    @Inject
+    WorkingDirectoryService workingDirectoryService;
 
     private ExploreToolset toolset;
 
@@ -24,6 +32,7 @@ class ExploreToolsetTest {
     @Transactional
     void clearDatabase() {
         toolset = new ExploreToolset();
+        ac.uk.sussex.kn253.model.ProjectKnowledge.deleteAll();
         Project.deleteAll();
         GitRepository.deleteAll();
         GithubRepository.deleteAll();
@@ -37,8 +46,87 @@ class ExploreToolsetTest {
 
     @Test
     void resolvePathReturnsNormalizedAbsolutePath() {
+        final String cwd = toolset.execute(request("get_current_working_directory", "{}"), null);
         final String result = toolset.execute(request("resolve_path", "{\"path\":\".\"}"), null);
-        assertEquals(Path.of(".").toAbsolutePath().normalize().toString(), result);
+        assertEquals(Path.of(cwd).toAbsolutePath().normalize().toString(), result);
+    }
+
+    @Test
+    void searchPathsFindsExactPrefixAndSubstringMatches(@TempDir final Path tempDir) throws Exception {
+        final Path workspace = tempDir.resolve("workspace");
+        Files.createDirectories(workspace.resolve("src/main/webui"));
+        Files.createDirectories(workspace.resolve("src/frontend-tests"));
+        Files.writeString(workspace.resolve("src/main/webui/config.json"), "{}\n");
+        Files.writeString(workspace.resolve("src/main/webui/WebView.tsx"), "export const WebView = () => null;\n");
+
+        final WorkingDirectoryService cwd = new WorkingDirectoryService();
+        cwd.navigateTo(workspace.toString());
+        final ExploreToolset searchToolset = new ExploreToolset(cwd);
+
+        final String webuiResult = searchToolset.execute(
+                request("search_paths", "{\"query\":\"webui\"}"),
+                null);
+        assertTrue(webuiResult.contains("match=exact relative=src/main/webui"));
+        assertTrue(webuiResult.contains("type=directory"));
+
+        final String frontResult = searchToolset.execute(
+                request("search_paths", "{\"query\":\"front\"}"),
+                null);
+        assertTrue(frontResult.contains("match=prefix relative=src/frontend-tests"));
+
+        final String viewResult = searchToolset.execute(
+                request("search_paths", "{\"query\":\"view\"}"),
+                null);
+        assertTrue(viewResult.contains("match=substring relative=src/main/webui/WebView.tsx"));
+    }
+
+    @Test
+    void searchPathsCanRestrictToDirectoriesAndReportNoMatches(@TempDir final Path tempDir) throws Exception {
+        final Path workspace = tempDir.resolve("workspace");
+        Files.createDirectories(workspace.resolve("config"));
+        Files.writeString(workspace.resolve("config/app-config.yaml"), "name: demo\n");
+
+        final WorkingDirectoryService cwd = new WorkingDirectoryService();
+        cwd.navigateTo(workspace.toString());
+        final ExploreToolset searchToolset = new ExploreToolset(cwd);
+
+        final String directoriesOnly = searchToolset.execute(
+                request("search_paths", "{\"query\":\"config\",\"includeFiles\":false}"),
+                null);
+        assertTrue(directoriesOnly.contains("type=directory match=exact relative=config"));
+        assertFalse(directoriesOnly.contains("app-config.yaml"));
+
+        final String noMatch = searchToolset.execute(
+                request("search_paths", "{\"query\":\"missing-target\"}"),
+                null);
+        assertTrue(noMatch.contains("matches=0"));
+        assertTrue(noMatch.contains("No matching paths found."));
+    }
+
+    @Test
+    @Transactional
+    void listGitProjectsTriggersDiscoveryIndexingFromCurrentFolder(@TempDir final Path tempDir) throws Exception {
+        final Path workspace = tempDir.resolve("workspace");
+        final Path repo = workspace.resolve("demo-repo");
+        Files.createDirectories(repo);
+
+        runCommand(repo, "git", "init");
+        runCommand(repo, "git", "config", "user.name", "PDHD Test");
+        runCommand(repo, "git", "config", "user.email", "pdhd-test@example.com");
+        Files.writeString(repo.resolve("README.md"), "# Demo\n");
+        runCommand(repo, "git", "add", "README.md");
+        runCommand(repo, "git", "commit", "-m", "initial");
+
+        workingDirectoryService.navigateTo(workspace.toString());
+
+        assertNull(Project.find("directory", repo.toAbsolutePath().normalize().toString()).firstResult());
+
+        final String result = cdiToolset.execute(request("list_git_projects", "{}"), null);
+        assertTrue(result.contains(repo.toAbsolutePath().normalize().toString()));
+
+        final Project indexed = Project.find("directory", repo.toAbsolutePath().normalize().toString())
+                .firstResult();
+        assertNotNull(indexed, "Expected list_git_projects to trigger discovery indexing from cwd");
     }
 
     @Test
@@ -190,7 +278,7 @@ class ExploreToolsetTest {
     void listGitProjectsReturnsProjectsWithGitRepository() throws Exception {
         final GitRepository git = new GitRepository(
                 null,
-                java.util.List.of(new Origin("origin", new URL("https://example.com/r.git"))));
+                java.util.List.of(new Origin("origin", URI.create("https://example.com/r.git").toURL())));
         git.persist();
 
         final Project withGit = new Project(null, "/tmp/with-git", null, git);

@@ -10,6 +10,20 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jakarta.enterprise.context.ApplicationScoped;
 
+/**
+ * In-memory ring buffer that records recent AI tool-call activity.
+ *
+ * <p>
+ * Up to {@link #MAX_EVENTS} events are retained; older entries are evicted
+ * when the buffer is full. Both {@link #record} and {@link #recent} are
+ * {@code synchronized} so they are safe to call from concurrent request
+ * threads.
+ *
+ * <p>
+ * For each recorded event, file paths referenced in the tool arguments and
+ * result output are extracted and stored alongside the raw data so the UI can
+ * highlight active files.
+ */
 @ApplicationScoped
 public class ToolActivityService {
 
