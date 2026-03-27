@@ -2,33 +2,32 @@ package ac.uk.sussex.kn253.services;
 
 import java.util.List;
 
-import ac.uk.sussex.kn253.services.tools.*;
+import ac.uk.sussex.kn253.services.tools.ToolModule;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
+import jakarta.transaction.Transactional;
 
 @ApplicationScoped
 public class ToolService {
 
     @Inject
-    ExploreToolset exploreToolset;
+    Instance<ToolModule> toolModules;
 
-    @Inject
-    ReadToolset readToolset;
+    private List<ToolModule> testToolModules;
 
-    @Inject
-    WriteToolset writeToolset;
+    ToolService() {
+    }
 
-    @Inject
-    IntrospectToolset introspectToolset;
+    ToolService(final List<ToolModule> toolModules) {
+        this.testToolModules = List.copyOf(toolModules);
+    }
 
     public List<ToolSpecification> toolSpecifications() {
-        return java.util.stream.Stream.of(
-                exploreToolset == null ? List.<ToolSpecification>of() : exploreToolset.toolSpecifications(),
-                readToolset == null ? List.<ToolSpecification>of() : readToolset.toolSpecifications(),
-                writeToolset == null ? List.<ToolSpecification>of() : writeToolset.toolSpecifications(),
-                introspectToolset == null ? List.<ToolSpecification>of() : introspectToolset.toolSpecifications())
+        return toolModules().stream()
+                .map(ToolModule::toolSpecifications)
                 .flatMap(List::stream)
                 .toList();
     }
@@ -37,20 +36,21 @@ public class ToolService {
         return toolSpecifications();
     }
 
+    @Transactional
     public String execute(final ToolExecutionRequest request, final Object memoryId) {
-        if (exploreToolset != null && exploreToolset.canHandle(request.name())) {
-            return exploreToolset.execute(request, memoryId);
-        }
-        if (readToolset != null && readToolset.canHandle(request.name())) {
-            return readToolset.execute(request, memoryId);
-        }
-        if (writeToolset != null && writeToolset.canHandle(request.name())) {
-            return writeToolset.execute(request, memoryId);
-        }
-        if (introspectToolset != null && introspectToolset.canHandle(request.name())) {
-            return introspectToolset.execute(request, memoryId);
+        for (final ToolModule toolModule : toolModules()) {
+            if (toolModule.canHandle(request.name())) {
+                return toolModule.execute(request, memoryId);
+            }
         }
         return "Unknown tool: " + request.name();
+    }
+
+    private List<ToolModule> toolModules() {
+        if (testToolModules != null) {
+            return testToolModules;
+        }
+        return toolModules == null ? List.of() : toolModules.stream().toList();
     }
 
 }

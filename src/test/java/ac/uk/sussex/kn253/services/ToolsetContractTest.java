@@ -14,11 +14,12 @@ class ToolsetContractTest {
 
     @Test
     void requiredToolsAreExposed() {
-        final ToolService toolService = new ToolService();
-        toolService.exploreToolset = new ExploreToolset();
-        toolService.readToolset = new ReadToolset();
-        toolService.writeToolset = new WriteToolset();
-        toolService.introspectToolset = new IntrospectToolset();
+        final ToolService toolService = new ToolService(
+                java.util.List.of(
+                        new ExploreToolset(),
+                        new ReadToolset(),
+                        new WriteToolset(),
+                        new IntrospectToolset()));
 
         final Set<String> names = toolService.toolSpecifications().stream()
                 .map(ToolSpecification::name)

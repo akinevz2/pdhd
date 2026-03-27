@@ -2,6 +2,8 @@ package ac.uk.sussex.kn253.services;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
 
 import ac.uk.sussex.kn253.model.OllamaSettings;
@@ -12,11 +14,11 @@ class SystemPromptBuilderTest {
 
     @Test
     void buildIncludesProjectKnowledgeRecallAndCachingGuidance() {
-        final ToolService toolService = new ToolService();
-        toolService.exploreToolset = new ExploreToolset();
-        toolService.readToolset = new ReadToolset();
-        toolService.writeToolset = new WriteToolset();
-        toolService.introspectToolset = new IntrospectToolset();
+        final ToolService toolService = new ToolService(List.of(
+                new ExploreToolset(),
+                new ReadToolset(),
+                new WriteToolset(),
+                new IntrospectToolset()));
 
         final String prompt = SystemPromptBuilder.build(
                 OllamaSettings.DEFAULT_SYSTEM_PROMPT,

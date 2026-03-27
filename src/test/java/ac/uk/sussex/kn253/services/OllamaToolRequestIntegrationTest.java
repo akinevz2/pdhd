@@ -49,10 +49,10 @@ class OllamaToolRequestIntegrationTest {
                         final WorkingDirectoryService workingDirectoryService = new WorkingDirectoryService();
                         workingDirectoryService.navigateTo(level3.toString());
 
-                        final ToolService toolService = new ToolService();
-                        toolService.exploreToolset = new ExploreToolset(workingDirectoryService);
-                        toolService.readToolset = new ReadToolset();
-                        toolService.writeToolset = new WriteToolset();
+                        final ToolService toolService = new ToolService(List.of(
+                                        new ExploreToolset(workingDirectoryService),
+                                        new ReadToolset(),
+                                        new WriteToolset()));
 
                         final OllamaChatSession session = OllamaChatSession.builder()
                                         .baseUrl(baseUrl)
@@ -168,10 +168,10 @@ class OllamaToolRequestIntegrationTest {
                         final String actualModelName) {
                 assertNotNull(actualModelName, "Could not resolve model name for " + requestedModel);
 
-                final ToolService toolService = new ToolService();
-                toolService.exploreToolset = new ExploreToolset();
-                toolService.readToolset = new ReadToolset();
-                toolService.writeToolset = new WriteToolset();
+                final ToolService toolService = new ToolService(List.of(
+                                new ExploreToolset(),
+                                new ReadToolset(),
+                                new WriteToolset()));
 
                 final OllamaChatSession session = OllamaChatSession.builder()
                                 .baseUrl(baseUrl)
