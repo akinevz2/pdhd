@@ -13,7 +13,8 @@ import ac.uk.sussex.kn253.model.ProjectKnowledge;
 
 /**
  * Centralized support for caching read tool results to the project knowledge
- * database. Allows tools like read_file, summarize_path, and read_folder_manifest
+ * database. Allows tools like read_file, summarize_path, and
+ * read_folder_manifest
  * to accumulate context that can be referenced by other tools.
  */
 public class ReadToolSupport {
@@ -104,7 +105,8 @@ public class ReadToolSupport {
             final Instant now = Instant.now();
             final Project project = resolveOrCreateProject(projectDirectory);
 
-            // Use a composite key: "path:detailed:absolute/path" or "path:summary:absolute/path"
+            // Use a composite key: "path:detailed:absolute/path" or
+            // "path:summary:absolute/path"
             final String cacheKey = "path:" + (detailed ? "detailed" : "summary") + ":"
                     + targetPath.toAbsolutePath().normalize();
 
@@ -184,9 +186,10 @@ public class ReadToolSupport {
      * projectDirectory is provided, uses that. Otherwise, attempts to find a
      * project root by walking up from the target path.
      *
-     * @param targetPath           the path being read/analyzed.
-     * @param explicitProjectDir   optional explicit project directory from tool args.
-     * @return the project directory to use for caching, or null if unable to determine.
+     * @param targetPath         the path being read/analyzed.
+     * @param explicitProjectDir optional explicit project directory from tool args.
+     * @return the project directory to use for caching, or null if unable to
+     *         determine.
      */
     public Path resolveProjectDirectory(final Path targetPath, final Path explicitProjectDir) {
         if (explicitProjectDir != null && Files.isDirectory(explicitProjectDir)) {

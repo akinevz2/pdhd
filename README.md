@@ -46,6 +46,7 @@ When started, the CLI shows:
 ## Web UI Notes
 
 See `docs/frontend.md` for detailed frontend architecture, API integration, state model, and development workflow.
+For assistant tooling internals and report-ready architecture notes, see `docs/tool-calling-architecture.md`.
 
 - The top bar shows the current working folder.
 - The left-hand `File Browser` is a compact explorer-style list for the current working folder.

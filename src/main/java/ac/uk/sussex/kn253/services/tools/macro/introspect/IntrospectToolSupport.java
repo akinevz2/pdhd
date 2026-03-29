@@ -68,7 +68,6 @@ public class IntrospectToolSupport {
         this.readToolSupport = readToolSupport;
     }
 
-
     public String readFolderManifest(final Map<String, Object> args) {
         final Path dir = resolveDirectoryArg(args, "path");
         if (dir == null) {
