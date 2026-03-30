@@ -12,6 +12,7 @@ import ac.uk.sussex.kn253.model.EmbeddingMatch;
 import ac.uk.sussex.kn253.services.EmbeddingService;
 import ac.uk.sussex.kn253.services.tools.macro.ToolMacro;
 import ac.uk.sussex.kn253.services.tools.macro.ToolMacroDefinition;
+import ac.uk.sussex.kn253.services.tools.macro.ToolOperationType;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.model.chat.request.json.JsonIntegerSchema;
 import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
@@ -48,6 +49,7 @@ public class GetRecentEmbeddingsToolImpl implements ToolMacro {
         // Embedding tools are optional and dynamically loaded
         return new ToolMacroDefinition("get_recent_embeddings",
                 "Retrieve recently generated embeddings from the current conversation session.",
+                ToolOperationType.INTROSPECT,
                 Map.of(),
                 List.of("recent", "recall", "embeddings", "memory"));
     }

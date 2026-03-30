@@ -18,20 +18,20 @@ import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 
 @QuarkusTest
-class ExploreToolsetTest {
+class MacroToolModuleExploreTest {
 
     @Inject
-    ExploreToolset cdiToolset;
+    MacroToolModule cdiToolset;
 
     @Inject
     WorkingDirectoryService workingDirectoryService;
 
-    private ExploreToolset toolset;
+    private MacroToolModule toolset;
 
     @BeforeEach
     @Transactional
     void clearDatabase() {
-        toolset = new ExploreToolset();
+        toolset = new MacroToolModule();
         ac.uk.sussex.kn253.model.ProjectKnowledge.deleteAll();
         Project.deleteAll();
         GitRepository.deleteAll();
@@ -61,7 +61,7 @@ class ExploreToolsetTest {
 
         final WorkingDirectoryService cwd = new WorkingDirectoryService();
         cwd.navigateTo(workspace.toString());
-        final ExploreToolset searchToolset = new ExploreToolset(cwd);
+        final MacroToolModule searchToolset = new MacroToolModule(cwd);
 
         final String webuiResult = searchToolset.execute(
                 request("search_paths", "{\"query\":\"webui\"}"),
@@ -88,7 +88,7 @@ class ExploreToolsetTest {
 
         final WorkingDirectoryService cwd = new WorkingDirectoryService();
         cwd.navigateTo(workspace.toString());
-        final ExploreToolset searchToolset = new ExploreToolset(cwd);
+        final MacroToolModule searchToolset = new MacroToolModule(cwd);
 
         final String directoriesOnly = searchToolset.execute(
                 request("search_paths", "{\"query\":\"config\",\"includeFiles\":false}"),

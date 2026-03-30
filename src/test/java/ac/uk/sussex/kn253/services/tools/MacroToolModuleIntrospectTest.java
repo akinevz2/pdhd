@@ -12,7 +12,7 @@ import org.junit.jupiter.api.io.TempDir;
 import ac.uk.sussex.kn253.services.WorkingDirectoryService;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 
-class IntrospectToolsetTest {
+class MacroToolModuleIntrospectTest {
 
         @Test
         void readFolderManifestSummarizesOnlyTargetFolderTree(@TempDir final Path tempDir) throws Exception {
@@ -28,7 +28,7 @@ class IntrospectToolsetTest {
 
                 final WorkingDirectoryService cwd = new WorkingDirectoryService();
                 cwd.navigateTo(tempDir.resolve("workspace").toString());
-                final IntrospectToolset toolset = new IntrospectToolset(cwd, null);
+                final MacroToolModule toolset = new MacroToolModule(cwd);
 
                 final String result = toolset.execute(
                                 request("read_folder_manifest", "{\"path\":\"docs\"}"),
@@ -60,7 +60,7 @@ class IntrospectToolsetTest {
 
         final WorkingDirectoryService cwd = new WorkingDirectoryService();
         cwd.navigateTo(tempDir.toString());
-        final IntrospectToolset toolset = new IntrospectToolset(cwd, null);
+        final MacroToolModule toolset = new MacroToolModule(cwd);
 
         final String result = toolset.execute(
                 request("read_project_manifest", "{\"path\":\".\"}"),
@@ -81,7 +81,7 @@ class IntrospectToolsetTest {
 
         final WorkingDirectoryService cwd = new WorkingDirectoryService();
         cwd.navigateTo(tempDir.toString());
-        final IntrospectToolset toolset = new IntrospectToolset(cwd, null);
+        final MacroToolModule toolset = new MacroToolModule(cwd);
 
         final String result = toolset.execute(
                 request("read_project_manifest", "{\"path\":\".\"}"),
@@ -107,7 +107,7 @@ class IntrospectToolsetTest {
 
         final WorkingDirectoryService cwd = new WorkingDirectoryService();
         cwd.navigateTo(tempDir.toString());
-        final IntrospectToolset toolset = new IntrospectToolset(cwd, null);
+        final MacroToolModule toolset = new MacroToolModule(cwd);
 
         final String result = toolset.execute(
                 request("read_project_manifest", "{\"path\":\".\"}"),

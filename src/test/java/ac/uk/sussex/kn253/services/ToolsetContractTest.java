@@ -7,7 +7,7 @@ import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Test;
 
-import ac.uk.sussex.kn253.services.tools.*;
+import ac.uk.sussex.kn253.services.tools.MacroToolModule;
 import dev.langchain4j.agent.tool.ToolSpecification;
 
 class ToolsetContractTest {
@@ -15,11 +15,7 @@ class ToolsetContractTest {
     @Test
     void requiredToolsAreExposed() {
         final ToolService toolService = new ToolService(
-                java.util.List.of(
-                        new ExploreToolset(),
-                        new ReadToolset(),
-                        new WriteToolset(),
-                        new IntrospectToolset()));
+                java.util.List.of(new MacroToolModule()));
 
         final Set<String> names = toolService.toolSpecifications().stream()
                 .map(ToolSpecification::name)

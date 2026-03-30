@@ -35,6 +35,11 @@ public class ToolMacroRegistry {
         return tool.execute(args, memoryId);
     }
 
+    public String operationType(final String toolName) {
+        final ToolMacro tool = toolsByName.get(canonicalName(toolName));
+        return tool != null ? tool.definition().operationType().name() : "UNKNOWN";
+    }
+
     public String canonicalName(final String toolName) {
         if (toolName == null || toolName.isBlank()) {
             return "";

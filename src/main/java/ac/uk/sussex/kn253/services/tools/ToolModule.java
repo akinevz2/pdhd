@@ -12,4 +12,12 @@ public interface ToolModule {
     boolean canHandle(String toolName);
 
     String execute(ToolExecutionRequest request, Object memoryId);
+
+    /**
+     * Returns the operation category for a given tool name, used for telemetry
+     * grouping and analytics. Defaults to the simple class name of the module.
+     */
+    default String operationCategoryFor(final String toolName) {
+        return getClass().getSimpleName();
+    }
 }

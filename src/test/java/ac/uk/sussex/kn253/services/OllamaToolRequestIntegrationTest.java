@@ -10,7 +10,7 @@ import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
 
 import ac.uk.sussex.kn253.ollama.OllamaChatSession;
-import ac.uk.sussex.kn253.services.tools.*;
+import ac.uk.sussex.kn253.services.tools.MacroToolModule;
 import ac.uk.sussex.kn253.testsupport.OllamaTestSupport;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.ToolExecutionResultMessage;
@@ -50,9 +50,7 @@ class OllamaToolRequestIntegrationTest {
                         workingDirectoryService.navigateTo(level3.toString());
 
                         final ToolService toolService = new ToolService(List.of(
-                                        new ExploreToolset(workingDirectoryService),
-                                        new ReadToolset(),
-                                        new WriteToolset()));
+                                        new MacroToolModule(workingDirectoryService)));
 
                         final OllamaChatSession session = OllamaChatSession.builder()
                                         .baseUrl(baseUrl)
@@ -169,9 +167,7 @@ class OllamaToolRequestIntegrationTest {
                 assertNotNull(actualModelName, "Could not resolve model name for " + requestedModel);
 
                 final ToolService toolService = new ToolService(List.of(
-                                new ExploreToolset(),
-                                new ReadToolset(),
-                                new WriteToolset()));
+                                new MacroToolModule()));
 
                 final OllamaChatSession session = OllamaChatSession.builder()
                                 .baseUrl(baseUrl)
