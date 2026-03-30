@@ -7,6 +7,8 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Stream;
 
+import org.jboss.logging.Logger;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -19,6 +21,8 @@ import ac.uk.sussex.kn253.services.tools.ToolArguments;
 import ac.uk.sussex.kn253.services.tools.macro.read.ReadToolSupport;
 
 public class IntrospectToolSupport {
+
+    private static final Logger LOG = Logger.getLogger(IntrospectToolSupport.class);
 
     private static final int MAX_FILE_CHARS = 3000;
     private static final int MAX_FOLDER_PATHS = 600;
@@ -152,8 +156,10 @@ public class IntrospectToolSupport {
         try {
             final Path projectDir = readToolSupport.resolveProjectDirectory(dir, null);
             readToolSupport.cacheFolderManifest(projectDir, dir, result);
-        } catch (final Exception ignored) {
-            // Caching failure should not break the tool
+        } catch (final UnsupportedOperationException e) {
+            LOG.debugf("Skipping folder manifest cache: %s", e.getMessage());
+        } catch (final Exception e) {
+            LOG.warnf(e, "Failed to cache folder manifest for %s: %s", dir, e.getMessage());
         }
 
         return result;

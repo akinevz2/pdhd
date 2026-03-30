@@ -15,7 +15,7 @@ import dev.langchain4j.model.chat.request.json.JsonStringSchema;
  * <p>
  * For models that support the native tool-calling API (e.g. the llama3.2
  * family) the user-configured system prompt is returned unchanged. For models
- * that do not (e.g. qwen2.5-coder), a hidden tool-calling addendum is appended
+ * that do not, a hidden tool-calling addendum is appended
  * that instructs the model to emit tool invocations as XML
  * ({@code <tool_call>…</tool_call>}) so that {@link ToolCallParser} can
  * intercept and execute them.
@@ -93,9 +93,9 @@ public final class SystemPromptBuilder {
                 - Treat tool use as opt-in, not default. Use tools only when they are required to answer a concrete request about the project, codebase, filesystem, or repository.
                 - For greetings, pleasantries, acknowledgements, identity questions, and casual chat such as hello, hi, hey, thanks, who are you, or how are you, reply directly in plain language and do not call any tool.
                 - Treat current-folder metadata as authoritative context for whether prior work exists on the tagged folder.
-                - Interpret previouslyWorkedOnHere=true to mean this exact tagged folder already has cached project knowledge from earlier work.
-                - If previouslyWorkedOnHere=true and the task may overlap earlier work, prefer read_project_knowledge before re-investigating.
-                - If previouslyWorkedOnHere=false, do not assume cached prior work exists for this folder.
+                - Interpret hasHistory=true to mean this exact folder already has cached project knowledge from earlier work.
+                - If hasHistory=true and the task may overlap earlier work, prefer read_project_knowledge before re-investigating.
+                - If hasHistory=false, do not assume cached prior work exists for this folder.
                 - Never call change_working_directory unless the user explicitly asks to navigate, switch folders, move into a directory, or provides a specific target path that must be used for the task.
                 - Never invent placeholder paths, shell shortcuts, guessed directories, or synthetic values such as ~, ., /home, or example paths when calling tools.
                 - If a filesystem request names a vague target such as frontend, webui, config, tests, entry point, or a partial filename, use search_paths first to gather concrete candidates before asking the user to clarify.

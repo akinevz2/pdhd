@@ -5,8 +5,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -15,6 +14,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import ac.uk.sussex.kn253.model.Project;
 import ac.uk.sussex.kn253.model.ProjectKnowledge;
+import ac.uk.sussex.kn253.schema.SchemaKeys;
+import ac.uk.sussex.kn253.schema.ToolSupport;
 
 public class WriteToolSupport {
 
@@ -51,7 +52,7 @@ public class WriteToolSupport {
     }
 
     private long invalidateReadCaches(final Path projectDirectory) {
-        final Project project = Project.find("directory", projectDirectory.toString()).firstResult();
+        final Project project = Project.find(SchemaKeys.DIRECTORY, projectDirectory.toString()).firstResult();
         if (project == null) {
             return 0L;
         }
@@ -90,7 +91,7 @@ public class WriteToolSupport {
 
     public Project resolveOrCreateProject(final Path projectDirectory) {
         final String directory = projectDirectory.toString();
-        final Project existing = Project.find("directory", directory).firstResult();
+        final Project existing = Project.find(SchemaKeys.DIRECTORY, directory).firstResult();
         if (existing != null) {
             return existing;
         }
@@ -113,9 +114,9 @@ public class WriteToolSupport {
         }
 
         final ObjectNode root = OBJECT_MAPPER.createObjectNode();
-        root.put("tag", tag);
-        root.put("projectDirectory", projectDirectory.toString());
-        root.putArray("entries");
+        root.put(SchemaKeys.TAG, tag);
+        root.put(SchemaKeys.PROJECT_DIRECTORY, projectDirectory.toString());
+        root.putArray(SchemaKeys.ENTRIES);
         return root;
     }
 
@@ -133,26 +134,24 @@ public class WriteToolSupport {
         final ArrayNode entries;
         if (knowledge == null || knowledge.getJsonContent() == null || knowledge.getJsonContent().isBlank()) {
             root = OBJECT_MAPPER.createObjectNode();
-            root.put("tag", tag);
-            root.put("projectDirectory", projectDirectory.toString());
-            entries = root.putArray("entries");
+            root.put(SchemaKeys.TAG, tag);
+            root.put(SchemaKeys.PROJECT_DIRECTORY, projectDirectory.toString());
+            entries = root.putArray(SchemaKeys.ENTRIES);
         } else {
             root = parseKnowledgeObject(knowledge.getJsonContent(), tag, projectDirectory);
-            final JsonNode existingEntries = root.get("entries");
+            final JsonNode existingEntries = root.get(SchemaKeys.ENTRIES);
             if (existingEntries instanceof final ArrayNode arrayNode) {
                 entries = arrayNode;
             } else {
-                entries = root.putArray("entries");
+                entries = root.putArray(SchemaKeys.ENTRIES);
             }
         }
 
         final ObjectNode entryNode = entries.addObject();
-        entryNode.put("timestamp", now.toString());
-        entryNode.put("source", source.isBlank() ? "user_query" : source);
-        if (!query.isBlank()) {
-            entryNode.put("query", query);
-        }
-        entryNode.put("note", note);
+        entryNode.put(SchemaKeys.TIMESTAMP, now.toString());
+        entryNode.put(SchemaKeys.SOURCE, source.isBlank() ? ToolSupport.VALUE_USER_QUERY : source);
+        entryNode.put(SchemaKeys.QUERY, Objects.requireNonNull(query));
+        entryNode.put(SchemaKeys.NOTE, Objects.requireNonNull(note));
 
         final String jsonContent;
         try {

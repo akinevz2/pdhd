@@ -20,13 +20,13 @@ public final class OllamaTestSupport {
     }
 
     public static String toolModelPreference() {
-        return System.getenv().getOrDefault("OLLAMA_TEST_TOOL_MODEL", "llama3.2:latest");
+        return System.getenv().getOrDefault("OLLAMA_TEST_TOOL_MODEL", "glm-4.7-flash:latest");
     }
 
     public static List<String> toolModelMatrix() {
         final String raw = System.getenv().getOrDefault(
                 "OLLAMA_TEST_TOOL_MODELS",
-                "qwen2.5-coder:latest,llama3.2:latest");
+            "glm-4.7-flash:latest,llama3.2:latest");
         return Arrays.stream(raw.split(","))
                 .map(String::trim)
                 .filter(s -> !s.isBlank())

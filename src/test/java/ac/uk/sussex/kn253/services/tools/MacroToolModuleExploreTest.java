@@ -66,18 +66,21 @@ class MacroToolModuleExploreTest {
         final String webuiResult = searchToolset.execute(
                 request("search_paths", "{\"query\":\"webui\"}"),
                 null);
-        assertTrue(webuiResult.contains("match=exact relative=src/main/webui"));
-        assertTrue(webuiResult.contains("type=directory"));
+        assertTrue(webuiResult.contains("\"match\":\"exact\""));
+        assertTrue(webuiResult.contains("\"rel\":\"src/main/webui\""));
+        assertTrue(webuiResult.contains("\"type\":\"dir\""));
 
         final String frontResult = searchToolset.execute(
                 request("search_paths", "{\"query\":\"front\"}"),
                 null);
-        assertTrue(frontResult.contains("match=prefix relative=src/frontend-tests"));
+        assertTrue(frontResult.contains("\"match\":\"prefix\""));
+        assertTrue(frontResult.contains("\"rel\":\"src/frontend-tests\""));
 
         final String viewResult = searchToolset.execute(
                 request("search_paths", "{\"query\":\"view\"}"),
                 null);
-        assertTrue(viewResult.contains("match=substring relative=src/main/webui/WebView.tsx"));
+        assertTrue(viewResult.contains("\"match\":\"substring\""));
+        assertTrue(viewResult.contains("\"rel\":\"src/main/webui/WebView.tsx\""));
     }
 
     @Test
@@ -93,13 +96,15 @@ class MacroToolModuleExploreTest {
         final String directoriesOnly = searchToolset.execute(
                 request("search_paths", "{\"query\":\"config\",\"includeFiles\":false}"),
                 null);
-        assertTrue(directoriesOnly.contains("type=directory match=exact relative=config"));
+        assertTrue(directoriesOnly.contains("\"type\":\"dir\""));
+        assertTrue(directoriesOnly.contains("\"match\":\"exact\""));
+        assertTrue(directoriesOnly.contains("\"rel\":\"config\""));
         assertFalse(directoriesOnly.contains("app-config.yaml"));
 
         final String noMatch = searchToolset.execute(
                 request("search_paths", "{\"query\":\"missing-target\"}"),
                 null);
-        assertTrue(noMatch.contains("matches=0"));
+        assertTrue(noMatch.contains("\"count\":0"));
         assertTrue(noMatch.contains("No matching paths found."));
     }
 

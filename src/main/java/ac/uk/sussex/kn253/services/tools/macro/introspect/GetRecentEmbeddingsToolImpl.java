@@ -10,9 +10,7 @@ import org.jboss.logging.Logger;
 
 import ac.uk.sussex.kn253.model.EmbeddingMatch;
 import ac.uk.sussex.kn253.services.EmbeddingService;
-import ac.uk.sussex.kn253.services.tools.macro.ToolMacro;
-import ac.uk.sussex.kn253.services.tools.macro.ToolMacroDefinition;
-import ac.uk.sussex.kn253.services.tools.macro.ToolOperationType;
+import ac.uk.sussex.kn253.services.tools.macro.*;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.model.chat.request.json.JsonIntegerSchema;
 import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
@@ -51,7 +49,7 @@ public class GetRecentEmbeddingsToolImpl implements ToolMacro {
                 "Retrieve recently generated embeddings from the current conversation session.",
                 ToolOperationType.INTROSPECT,
                 Map.of(),
-                List.of("recent", "recall", "embeddings", "memory"));
+                List.of("recent embeddings", "embedding history", "embedding recall"));
     }
 
     @Override
@@ -61,6 +59,9 @@ public class GetRecentEmbeddingsToolImpl implements ToolMacro {
 
     @Override
     public String execute(final Map<String, Object> args, final Object memoryId) {
+        if (args == null) {
+            return "Error: arguments are required";
+        }
         if (embeddingService == null || !embeddingService.isEnabled()) {
             return "Embeddings are not enabled in this session.";
         }

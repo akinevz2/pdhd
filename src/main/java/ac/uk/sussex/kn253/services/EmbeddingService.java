@@ -1,17 +1,21 @@
 package ac.uk.sussex.kn253.services;
 
 import java.io.*;
-import java.util.*;
+import java.util.List;
+import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import org.jboss.logging.Logger;
 
 import ac.uk.sussex.kn253.model.*;
 import ac.uk.sussex.kn253.repository.EmbeddingRepository;
+import ac.uk.sussex.kn253.schema.ToolSupport;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.ollama.OllamaEmbeddingModel;
 import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.ResolutionException;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 
@@ -86,36 +90,35 @@ public class EmbeddingService {
 
     /**
      * Generate an embedding for text.
-     * Returns null if generation fails or service is disabled.
+     * Throws when embeddings are unavailable or cannot be generated.
      */
     public EmbeddingVector generateEmbedding(final String text, final String memoryId) {
-        if (!isEnabled() || text == null || text.isBlank()) {
-            return null;
+        if (!isEnabled()) {
+            throw new IllegalStateException("Embedding service is not enabled");
+        }
+        if (text == null || text.isBlank()) {
+            throw new IllegalArgumentException("Embedding text must not be blank");
         }
 
         try {
             LOG.debugf("Generating embedding for text (length=%d)", text.length());
 
             final var response = embeddingModel.embed(text);
-            if (response == null || response.content() == null) {
-                LOG.warn("Embedding model returned null response");
-                return null;
+            if (response == null || response.content() == null || response.content().vector() == null
+                    || response.content().vector().length == 0) {
+                throw new IllegalStateException("Embedding model returned an empty response");
             }
 
             final float[] vector = response.content().vector();
             final String embeddingId = UUID.randomUUID().toString();
 
             return new EmbeddingVector(
-                    embeddingId,
-                    vector,
-                    text,
+                    embeddingId, text,
                     System.currentTimeMillis(),
-                    "user_input",
-                    embeddingId,
-                    memoryId);
+                    ToolSupport.VALUE_USER_INPUT,
+                    embeddingId, memoryId, vector);
         } catch (final Exception e) {
-            LOG.warnf(e, "Failed to generate embedding: %s", e.getMessage());
-            return null;
+            throw new IllegalStateException("Failed to generate embedding", e);
         }
     }
 
@@ -127,7 +130,7 @@ public class EmbeddingService {
             final EmbeddingVector embedding,
             final String sourceId,
             final String sourceType,
-            final String sessionId) {
+            final String sessionId) throws ResolutionException {
         if (embedding == null) {
             return;
         }
@@ -143,19 +146,18 @@ public class EmbeddingService {
             final EmbeddingEntity entity = new EmbeddingEntity(
                     embedding.id(),
                     sessionId,
-                    vectorData,
                     textSnippet,
                     embedding.text(),
                     sourceType,
                     sourceId,
                     embedding.timestamp(),
                     embedding.memoryId(),
-                    embedding.dimension());
+                    embedding.dimension(), vectorData);
 
             embeddingRepository.persist(entity);
             LOG.debugf("Stored embedding: id=%s, source=%s", embedding.id(), sourceId);
-        } catch (final Exception e) {
-            LOG.warnf(e, "Failed to store embedding: %s", e.getMessage());
+        } catch (final IOException e) {
+            throw new ResolutionException(e);
         }
     }
 
@@ -170,10 +172,7 @@ public class EmbeddingService {
 
         try {
             // Generate embedding for query
-            final EmbeddingVector queryEmbedding = generateEmbedding(query, sessionId);
-            if (queryEmbedding == null) {
-                return List.of();
-            }
+            final EmbeddingVector queryVector = generateEmbedding(query, sessionId);
 
             // Retrieve all embeddings for the session
             final List<EmbeddingEntity> stored = embeddingRepository.findBySession(sessionId);
@@ -183,32 +182,7 @@ public class EmbeddingService {
 
             // Compute similarities
             final List<EmbeddingMatch> results = stored.stream()
-                    .map(entity -> {
-                        try {
-                            final float[] vector = bytesToFloatArray(entity.getVectorData());
-                            final EmbeddingVector storedVector = new EmbeddingVector(
-                                    entity.getId(),
-                                    vector,
-                                    entity.getTextSnippet(),
-                                    entity.getTimestamp(),
-                                    entity.getSourceType(),
-                                    entity.getSourceId(),
-                                    entity.getMemoryId());
-
-                            final float similarity = queryEmbedding.cosineSimilarity(storedVector);
-                            return new EmbeddingMatch(
-                                    entity.getId(),
-                                    entity.getTextSnippet(),
-                                    similarity,
-                                    entity.getSourceType(),
-                                    entity.getSourceId(),
-                                    entity.getTimestamp());
-                        } catch (final Exception e) {
-                            LOG.warnf(e, "Failed to compute similarity for embedding %s", entity.getId());
-                            return null;
-                        }
-                    })
-                    .filter(Objects::nonNull)
+                    .<EmbeddingMatch>mapMulti((entity, consumer) -> addSimilarityMatch(queryVector, entity, consumer))
                     .sorted((a, b) -> Float.compare(b.similarity(), a.similarity()))
                     .limit(limit)
                     .collect(Collectors.toList());
@@ -234,13 +208,7 @@ public class EmbeddingService {
         try {
             final List<EmbeddingEntity> entities = embeddingRepository.findRecentBySession(sessionId, limit);
             return entities.stream()
-                    .map(entity -> new EmbeddingMatch(
-                            entity.getId(),
-                            entity.getTextSnippet(),
-                            0f, // Similarity not computed for recent embeddings
-                            entity.getSourceType(),
-                            entity.getSourceId(),
-                            entity.getTimestamp()))
+                    .map(this::toRecentEmbeddingMatch)
                     .collect(Collectors.toList());
         } catch (final Exception e) {
             LOG.warnf(e, "Failed to retrieve recent embeddings: %s", e.getMessage());
@@ -283,6 +251,24 @@ public class EmbeddingService {
     }
 
     // Helper methods for vector serialization
+
+    private void addSimilarityMatch(
+            final EmbeddingVector queryVector,
+            final EmbeddingEntity entity,
+            final Consumer<EmbeddingMatch> consumer) {
+        try {
+            final float[] vector = bytesToFloatArray(entity.getVectorData());
+            final EmbeddingVector storedVector = new EmbeddingVector(entity, vector);
+            final float similarity = queryVector.cosineSimilarity(storedVector);
+            consumer.accept(new EmbeddingMatch(entity, similarity));
+        } catch (final Exception e) {
+            LOG.warnf(e, "Failed to compute similarity for embedding %s", entity.getId());
+        }
+    }
+
+    private EmbeddingMatch toRecentEmbeddingMatch(final EmbeddingEntity entity) {
+        return new EmbeddingMatch(entity);
+    }
 
     private byte[] floatArrayToBytes(final float[] floats) throws IOException {
         final ByteArrayOutputStream baos = new ByteArrayOutputStream(floats.length * 4);

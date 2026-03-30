@@ -3,6 +3,7 @@ package ac.uk.sussex.kn253.ollama;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Locale;
 import java.util.List;
 
 import org.junit.jupiter.api.*;
@@ -22,7 +23,13 @@ class OllamaWorkstationIntegrationTest {
         final List<String> models = OllamaTestSupport.modelNames(baseUrl);
         Assumptions.assumeTrue(!models.isEmpty(), "Skipping: no models available on workstation Ollama");
 
-        final String model = models.get(0);
+        final String preferredModel = OllamaTestSupport.toolModelPreference();
+        final String model = OllamaTestSupport.resolveAvailableModelName(models, preferredModel);
+        Assumptions.assumeTrue(
+                model != null,
+                () -> "Skipping: preferred chat model not available: " + preferredModel + ". Available models: "
+                        + models);
+
         final OllamaChatSession session = OllamaChatSession.builder()
                 .baseUrl(baseUrl)
                 .model(model)
@@ -30,6 +37,6 @@ class OllamaWorkstationIntegrationTest {
 
         final String response = session.sendOneShot("Reply with \"pong\".");
         assertNotNull(response);
-        assertTrue(response.contains("pong"));
+                assertTrue(response.toLowerCase(Locale.ROOT).contains("pong"));
     }
 }

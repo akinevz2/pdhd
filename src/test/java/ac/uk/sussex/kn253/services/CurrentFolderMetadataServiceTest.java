@@ -54,11 +54,11 @@ class CurrentFolderMetadataServiceTest {
 
         final String context = currentFolderMetadataService.buildPromptContext();
 
-        assertTrue(context.contains("cwd: " + tempDir.toAbsolutePath().normalize()));
-        assertTrue(context.contains("cachedKnowledgeTagCount: 1"));
-        assertTrue(context.contains("cachedKnowledgeTags: requirements(1)"));
-        assertTrue(context.contains("previouslyWorkedOnHere: true"));
-        assertTrue(context.contains("prefer read_project_knowledge"));
+        assertTrue(context.contains("\"cwd\":\"" + tempDir.toAbsolutePath().normalize()));
+        assertTrue(context.contains("\"tagCount\":1"));
+        assertTrue(context.contains("\"tags\":\"requirements(1)\""));
+        assertTrue(context.contains("\"hasHistory\":true"));
+        assertTrue(context.contains("\"next\":\"read_project_knowledge\""));
     }
 
     @Test
@@ -68,9 +68,8 @@ class CurrentFolderMetadataServiceTest {
 
         final String context = currentFolderMetadataService.buildPromptContext();
 
-        assertTrue(context.contains("cachedKnowledgeTagCount: 0"));
-        assertTrue(context.contains("previouslyWorkedOnHere: false"));
-        assertTrue(context.contains(
-                "meaning: previouslyWorkedOnHere is true only when this tagged folder has one or more cached project knowledge records."));
+        assertTrue(context.contains("\"tagCount\":0"));
+        assertTrue(context.contains("\"hasHistory\":false"));
+        assertTrue(context.contains("\"tags\":\"(none)\""));
     }
 }

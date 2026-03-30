@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import ac.uk.sussex.kn253.model.Project;
 import ac.uk.sussex.kn253.model.ProjectKnowledge;
+import ac.uk.sussex.kn253.schema.SchemaKeys;
 
 /**
  * Centralized support for caching read tool results to the project knowledge
@@ -24,6 +25,30 @@ public class ReadToolSupport {
     private static final long PATH_ANALYSIS_TTL_SECONDS = 300L;
     private static final long FOLDER_MANIFEST_TTL_SECONDS = 300L;
 
+    public static final String PROJECT_QUERY_FIELD_DIRECTORY = SchemaKeys.DIRECTORY;
+
+    public static final String CACHE_KEY_PREFIX_FILE = "file:";
+    public static final String CACHE_KEY_PREFIX_PATH = "path:";
+    public static final String CACHE_KEY_PREFIX_FOLDER = "folder:";
+    public static final String ANALYSIS_TYPE_DETAILED = "detailed";
+    public static final String ANALYSIS_TYPE_SUMMARY = "summary";
+
+    public static final String CACHE_TYPE_FILE_CONTENT = "file_content";
+    public static final String CACHE_TYPE_PATH_ANALYSIS = "path_analysis";
+    public static final String CACHE_TYPE_FOLDER_MANIFEST = "folder_manifest";
+
+    public static final String ERROR_SERIALIZE_FILE_CONTENT = "Failed to serialize cached file content for ";
+    public static final String ERROR_SERIALIZE_PATH_ANALYSIS = "Failed to serialize cached path analysis for ";
+    public static final String ERROR_SERIALIZE_FOLDER_MANIFEST = "Failed to serialize cached folder manifest for ";
+    public static final String ERROR_PERSISTENCE_UNAVAILABLE_MARKER = "did you forget to annotate your entity with @Entity?";
+
+    public static final String PROJECT_MARKER_POM = "pom.xml";
+    public static final String PROJECT_MARKER_GRADLE = "build.gradle";
+    public static final String PROJECT_MARKER_PACKAGE = "package.json";
+    public static final String PROJECT_MARKER_GIT = ".git";
+    public static final String PROJECT_MARKER_SRC = "src";
+    public static final String PROJECT_MARKER_README = "README.md";
+
     /**
      * Resolves or creates a Project entity for a given directory.
      *
@@ -32,7 +57,7 @@ public class ReadToolSupport {
      */
     public Project resolveOrCreateProject(final Path projectDirectory) {
         final String directory = projectDirectory.toString();
-        final Project existing = Project.find("directory", directory).firstResult();
+        final Project existing = Project.find(PROJECT_QUERY_FIELD_DIRECTORY, directory).firstResult();
         if (existing != null) {
             return existing;
         }
@@ -49,9 +74,8 @@ public class ReadToolSupport {
      * @param projectDirectory the project root directory.
      * @param relativePath     the path relative to the project directory.
      * @param content          the file content that was read.
-     * @return a success or error message.
      */
-    public String cacheFileContent(
+    public void cacheFileContent(
             final Path projectDirectory,
             final String relativePath,
             final String content) {
@@ -60,17 +84,17 @@ public class ReadToolSupport {
             final Project project = resolveOrCreateProject(projectDirectory);
 
             // Use a composite key: "file:relative/path"
-            final String cacheKey = "file:" + relativePath;
+            final String cacheKey = CACHE_KEY_PREFIX_FILE + relativePath;
 
             // Store the file content as a JSON blob with metadata
             final ObjectNode root = OBJECT_MAPPER.createObjectNode();
-            root.put("filePath", relativePath);
-            root.put("projectDirectory", projectDirectory.toString());
-            root.put("contentLength", content.length());
-            root.put("content", content);
-            root.put("type", "file_content");
-            root.put("cachedAt", now.toString());
-            root.put("ttlSeconds", FILE_CONTENT_TTL_SECONDS);
+            root.put(SchemaKeys.FILE_PATH, relativePath);
+            root.put(SchemaKeys.PROJECT_DIRECTORY, projectDirectory.toString());
+            root.put(SchemaKeys.CONTENT_LENGTH, content.length());
+            root.put(SchemaKeys.CONTENT, content);
+            root.put(SchemaKeys.TYPE, CACHE_TYPE_FILE_CONTENT);
+            root.put(SchemaKeys.CACHED_AT, now.toString());
+            root.put(SchemaKeys.TTL_SECONDS, FILE_CONTENT_TTL_SECONDS);
 
             final String jsonContent = OBJECT_MAPPER.writerWithDefaultPrettyPrinter()
                     .writeValueAsString(root);
@@ -83,11 +107,10 @@ public class ReadToolSupport {
                 knowledge.setJsonContent(jsonContent);
                 knowledge.setUpdatedAt(now);
             }
-
-            return "Cached file content: " + projectDirectory + "/" + relativePath;
         } catch (final IOException e) {
-            // Fail silently - don't break tool execution if caching fails
-            return null;
+            throw new IllegalStateException(ERROR_SERIALIZE_FILE_CONTENT + relativePath, e);
+        } catch (final RuntimeException e) {
+            throw translateCachingRuntimeException("cache file content", e);
         }
     }
 
@@ -99,9 +122,8 @@ public class ReadToolSupport {
      * @param targetPath       the path that was analyzed.
      * @param analysis         the analysis result from PathAnalyzer.
      * @param detailed         whether this was a detailed analysis.
-     * @return a success or error message, or null if caching failed silently.
      */
-    public String cachePathAnalysis(
+    public void cachePathAnalysis(
             final Path projectDirectory,
             final Path targetPath,
             final String analysis,
@@ -112,17 +134,18 @@ public class ReadToolSupport {
 
             // Use a composite key: "path:detailed:absolute/path" or
             // "path:summary:absolute/path"
-            final String cacheKey = "path:" + (detailed ? "detailed" : "summary") + ":"
+            final String cacheKey = CACHE_KEY_PREFIX_PATH + (detailed ? ANALYSIS_TYPE_DETAILED : ANALYSIS_TYPE_SUMMARY)
+                    + ":"
                     + targetPath.toAbsolutePath().normalize();
 
             final ObjectNode root = OBJECT_MAPPER.createObjectNode();
-            root.put("targetPath", targetPath.toAbsolutePath().normalize().toString());
-            root.put("projectDirectory", projectDirectory.toString());
-            root.put("analysisType", detailed ? "detailed" : "summary");
-            root.put("analysisResult", analysis);
-            root.put("type", "path_analysis");
-            root.put("cachedAt", now.toString());
-            root.put("ttlSeconds", PATH_ANALYSIS_TTL_SECONDS);
+            root.put(SchemaKeys.TARGET_PATH, targetPath.toAbsolutePath().normalize().toString());
+            root.put(SchemaKeys.PROJECT_DIRECTORY, projectDirectory.toString());
+            root.put(SchemaKeys.ANALYSIS_TYPE, detailed ? ANALYSIS_TYPE_DETAILED : ANALYSIS_TYPE_SUMMARY);
+            root.put(SchemaKeys.ANALYSIS_RESULT, analysis);
+            root.put(SchemaKeys.TYPE, CACHE_TYPE_PATH_ANALYSIS);
+            root.put(SchemaKeys.CACHED_AT, now.toString());
+            root.put(SchemaKeys.TTL_SECONDS, PATH_ANALYSIS_TTL_SECONDS);
 
             final String jsonContent = OBJECT_MAPPER.writerWithDefaultPrettyPrinter()
                     .writeValueAsString(root);
@@ -135,11 +158,10 @@ public class ReadToolSupport {
                 knowledge.setJsonContent(jsonContent);
                 knowledge.setUpdatedAt(now);
             }
-
-            return "Cached path analysis: " + targetPath;
         } catch (final IOException e) {
-            // Fail silently - don't break tool execution if caching fails
-            return null;
+            throw new IllegalStateException(ERROR_SERIALIZE_PATH_ANALYSIS + targetPath, e);
+        } catch (final RuntimeException e) {
+            throw translateCachingRuntimeException("cache path analysis", e);
         }
     }
 
@@ -150,9 +172,8 @@ public class ReadToolSupport {
      * @param projectDirectory the project root directory.
      * @param folderPath       the folder that was analyzed.
      * @param manifest         the manifest result from readFolderManifest.
-     * @return a success or error message, or null if caching failed silently.
      */
-    public String cacheFolderManifest(
+    public void cacheFolderManifest(
             final Path projectDirectory,
             final Path folderPath,
             final String manifest) {
@@ -161,15 +182,15 @@ public class ReadToolSupport {
             final Project project = resolveOrCreateProject(projectDirectory);
 
             // Use a composite key: "folder:absolute/path"
-            final String cacheKey = "folder:" + folderPath.toAbsolutePath().normalize();
+            final String cacheKey = CACHE_KEY_PREFIX_FOLDER + folderPath.toAbsolutePath().normalize();
 
             final ObjectNode root = OBJECT_MAPPER.createObjectNode();
-            root.put("folderPath", folderPath.toAbsolutePath().normalize().toString());
-            root.put("projectDirectory", projectDirectory.toString());
-            root.put("manifestContent", manifest);
-            root.put("type", "folder_manifest");
-            root.put("cachedAt", now.toString());
-            root.put("ttlSeconds", FOLDER_MANIFEST_TTL_SECONDS);
+            root.put(SchemaKeys.FOLDER_PATH, folderPath.toAbsolutePath().normalize().toString());
+            root.put(SchemaKeys.PROJECT_DIRECTORY, projectDirectory.toString());
+            root.put(SchemaKeys.MANIFEST_CONTENT, manifest);
+            root.put(SchemaKeys.TYPE, CACHE_TYPE_FOLDER_MANIFEST);
+            root.put(SchemaKeys.CACHED_AT, now.toString());
+            root.put(SchemaKeys.TTL_SECONDS, FOLDER_MANIFEST_TTL_SECONDS);
 
             final String jsonContent = OBJECT_MAPPER.writerWithDefaultPrettyPrinter()
                     .writeValueAsString(root);
@@ -182,11 +203,10 @@ public class ReadToolSupport {
                 knowledge.setJsonContent(jsonContent);
                 knowledge.setUpdatedAt(now);
             }
-
-            return "Cached folder manifest: " + folderPath;
         } catch (final IOException e) {
-            // Fail silently - don't break tool execution if caching fails
-            return null;
+            throw new IllegalStateException(ERROR_SERIALIZE_FOLDER_MANIFEST + folderPath, e);
+        } catch (final RuntimeException e) {
+            throw translateCachingRuntimeException("cache folder manifest", e);
         }
     }
 
@@ -227,11 +247,27 @@ public class ReadToolSupport {
      */
     private boolean hasProjectMarkers(final Path path) {
         // Common project root markers
-        return Files.exists(path.resolve("pom.xml")) ||
-                Files.exists(path.resolve("build.gradle")) ||
-                Files.exists(path.resolve("package.json")) ||
-                Files.exists(path.resolve(".git")) ||
-                Files.exists(path.resolve("src")) ||
-                Files.exists(path.resolve("README.md"));
+        return Files.exists(path.resolve(PROJECT_MARKER_POM)) ||
+                Files.exists(path.resolve(PROJECT_MARKER_GRADLE)) ||
+                Files.exists(path.resolve(PROJECT_MARKER_PACKAGE)) ||
+                Files.exists(path.resolve(PROJECT_MARKER_GIT)) ||
+                Files.exists(path.resolve(PROJECT_MARKER_SRC)) ||
+                Files.exists(path.resolve(PROJECT_MARKER_README));
+    }
+
+    private RuntimeException translateCachingRuntimeException(final String operation, final RuntimeException e) {
+        if (isPersistenceUnavailable(e)) {
+            return new UnsupportedOperationException(
+                    "Cannot " + operation + " without an active persistence context.",
+                    e);
+        }
+        return e;
+    }
+
+    private boolean isPersistenceUnavailable(final RuntimeException e) {
+        final String message = e.getMessage();
+        return e instanceof IllegalStateException
+                && message != null
+                && message.contains(ERROR_PERSISTENCE_UNAVAILABLE_MARKER);
     }
 }

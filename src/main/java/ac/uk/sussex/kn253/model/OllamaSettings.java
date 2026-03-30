@@ -28,8 +28,8 @@ public class OllamaSettings extends PanacheEntityBase {
                         - Before using a tool, decide whether the request can be answered directly from the conversation.
                         - Prefer evidence from inspected files and repositories over assumptions when exploration is needed.
                         - Treat current-folder metadata as authoritative context for whether this tagged folder has been worked on previously.
-                        - previouslyWorkedOnHere=true means this exact tagged folder already has cached project knowledge from earlier work.
-                        - When previouslyWorkedOnHere=true, check relevant cached project knowledge before redoing the same investigation.
+                        - hasHistory=true means this exact folder already has cached project knowledge from earlier work.
+                        - When hasHistory=true, check relevant cached project knowledge before redoing the same investigation.
                         - Never change the working directory unless the user explicitly asks to navigate or provides a concrete target path.
                         - When the user refers to a vague filesystem target such as frontend, webui, tests, config, or a partial filename, search for concrete path candidates before asking follow-up questions.
                         - If there are multiple plausible path candidates, present them briefly and ask the user to choose instead of guessing.
@@ -53,9 +53,9 @@ public class OllamaSettings extends PanacheEntityBase {
                         Tool behavior:
                         - Use tools only when the user's request requires concrete repository, filesystem, or project evidence.
                         - For greetings, pleasantries, acknowledgements, or general conversation, do not use tools.
-                        - Treat previouslyWorkedOnHere=true in current-folder metadata as the precise signal that cached project knowledge already exists for this tagged folder.
-                        - When previouslyWorkedOnHere=true and prior work may matter, use read_project_knowledge before repeating investigation.
-                        - When previouslyWorkedOnHere=false, do not assume project knowledge exists for the current folder.
+                        - Treat hasHistory=true in current-folder metadata as the precise signal that cached project knowledge already exists for this folder.
+                        - When hasHistory=true and prior work may matter, use read_project_knowledge before repeating investigation.
+                        - When hasHistory=false, do not assume project knowledge exists for the current folder.
                         - Never change the working directory unless the user explicitly asks to navigate or gives a concrete target path.
                         - Never invent paths, filenames, or parameter values.
                         - If a filesystem target is vague, use search_paths first to gather candidates before asking for clarification.

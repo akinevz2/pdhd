@@ -65,8 +65,9 @@ public class ProjectDiscoveryService {
     public void discoverFromCwd() throws IOException {
         final Path cwd = workingDirectoryService.getCurrentWorkingDirectory();
 
-        // Always ensure the CWD itself is registered.
-        ensureExists(cwd);
+        // Always ensure the CWD itself is registered; explicit failures should
+        // propagate.
+        ensureExists(cwd, false);
 
         // Walk the tree looking for .git directories.
         try (Stream<Path> stream = Files.walk(cwd, SCAN_DEPTH)) {
@@ -75,10 +76,8 @@ public class ProjectDiscoveryService {
                     .filter(path -> path.getFileName().toString().equals(".git"))
                     .map(Path::getParent)
                     .filter(Objects::nonNull)
-                    .forEach(this::ensureExists);
-        } catch (final IOException ignored) {
-            // Keep the API resilient; at least the CWD is guaranteed above.
-            throw ignored;
+                    // Per-folder discovery should remain best-effort and silent.
+                    .forEach(path -> ensureExists(path, true));
         }
     }
 
@@ -93,12 +92,18 @@ public class ProjectDiscoveryService {
      *
      * @param directoryPath the absolute project root directory.
      */
-    private void ensureExists(final Path directoryPath) {
+    private void ensureExists(final Path directoryPath, final boolean silentOnNotGit) {
         final String directory = directoryPath.toAbsolutePath().normalize().toString();
         final Project existing = Project.find("directory", directory).firstResult();
         if (existing == null) {
             try {
                 repoService.resolveProject(Path.of(directory));
+            } catch (final ac.uk.sussex.kn253.api.NotAGitRepositoryException e) {
+                if (silentOnNotGit) {
+                    Log.debugf("Skipping non-git directory during discovery: %s", directory);
+                    return;
+                }
+                throw e;
             } catch (final Exception e) {
                 Log.warnf("Skipping project discovery for %s: %s", directory, e.getMessage());
             }

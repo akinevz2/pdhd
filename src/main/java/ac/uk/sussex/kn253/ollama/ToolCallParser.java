@@ -18,7 +18,7 @@ import dev.langchain4j.agent.tool.ToolExecutionRequest;
  * Parses AI tool-call requests that arrive as raw text rather than through the
  * structured tool-call API.
  *
- * <p>Some Ollama models (notably qwen2.5-coder variants) do not support the
+ * <p>Some Ollama models do not support the
  * native tool-calling response format and instead emit tool invocations as JSON
  * embedded inside the assistant message text.  This parser handles several
  * output shapes:

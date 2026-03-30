@@ -53,14 +53,14 @@ public class EmbeddingEntity {
     public EmbeddingEntity(
             final String id,
             final String sessionId,
-            final byte[] vectorData,
             final String textSnippet,
             final String fullText,
             final String sourceType,
             final String sourceId,
             final long timestamp,
             final String memoryId,
-            final int dimension) {
+            final int dimension,
+            final byte[] vectorData) {
         this.id = id;
         this.sessionId = sessionId;
         this.vectorData = vectorData;

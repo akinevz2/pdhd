@@ -1,5 +1,6 @@
 package ac.uk.sussex.kn253;
 
+import org.jboss.logging.Logger;
 import org.jline.reader.*;
 import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
@@ -10,6 +11,7 @@ import io.quarkus.picocli.runtime.annotations.TopCommand;
 import io.quarkus.runtime.Quarkus;
 import io.quarkus.runtime.QuarkusApplication;
 import io.quarkus.runtime.annotations.QuarkusMain;
+import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import picocli.CommandLine;
 
@@ -22,10 +24,15 @@ import picocli.CommandLine;
  * {@link PdhdCliCommand} instead, enabling headless/scripted usage.
  */
 @QuarkusMain
+@ApplicationScoped
 public class Main implements QuarkusApplication {
 
-    boolean running = true;
+    private static final Logger LOG = Logger.getLogger(Main.class);
+
+    volatile boolean running = true;
     public static final String name = "Project Discovery in High Definition";
+    private volatile Terminal terminal;
+    private volatile Thread menuThread;
 
     @Inject
     ChatService chatService;
@@ -62,10 +69,13 @@ public class Main implements QuarkusApplication {
             return new CommandLine(pdhdCliCommand, commandFactory).execute(args);
         }
 
+        menuThread = Thread.currentThread();
+
         final Terminal terminal = TerminalBuilder.builder()
                 .provider("jna")
                 .system(true)
                 .build();
+        this.terminal = terminal;
 
         final LineReader reader = LineReaderBuilder.builder()
                 .terminal(terminal)
@@ -93,6 +103,10 @@ public class Main implements QuarkusApplication {
                 }
             } catch (final UserInterruptException e) {
                 exit();
+            } catch (final EndOfFileException e) {
+                if (running) {
+                    exit();
+                }
             }
         }
 
@@ -100,9 +114,21 @@ public class Main implements QuarkusApplication {
         return 0;
     }
 
-    void exit() {
+    public void exit() {
         System.out.println("\nExiting...");
         running = false;
+        final Thread currentMenuThread = menuThread;
+        if (currentMenuThread != null && currentMenuThread != Thread.currentThread()) {
+            currentMenuThread.interrupt();
+        }
+        final Terminal currentTerminal = terminal;
+        if (currentTerminal != null) {
+            try {
+                currentTerminal.close();
+            } catch (final Exception e) {
+                LOG.debugf("Exception while closing terminal: %s", e.getMessage());
+            }
+        }
         Quarkus.asyncExit();
     }
 }

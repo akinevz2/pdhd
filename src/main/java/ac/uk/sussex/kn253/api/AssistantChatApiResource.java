@@ -1,5 +1,7 @@
 package ac.uk.sussex.kn253.api;
 
+import org.jboss.logging.Logger;
+
 import ac.uk.sussex.kn253.api.model.AssistantChatRequest;
 import ac.uk.sussex.kn253.api.model.AssistantChatResponse;
 import ac.uk.sussex.kn253.services.ChatService;
@@ -15,6 +17,8 @@ import jakarta.ws.rs.core.Response;
 @Consumes(MediaType.APPLICATION_JSON)
 public class AssistantChatApiResource {
 
+    private static final Logger LOG = Logger.getLogger(AssistantChatApiResource.class);
+
     @Inject
     ChatService chatService;
 
@@ -27,7 +31,10 @@ public class AssistantChatApiResource {
             final String reply = chatService.sendMessage(request.message().trim());
             return new AssistantChatResponse(reply == null ? "" : reply);
         } catch (final Exception e) {
-            throw new WebApplicationException("Failed to chat with assistant", Response.Status.BAD_GATEWAY);
+            LOG.errorf(e, "Chat with assistant failed");
+            final String errorMessage = e.getMessage() == null ? "unknown error" : e.getMessage();
+            final String frontendMessage = "Failed to chat with assistant: " + errorMessage;
+            throw new WebApplicationException(frontendMessage, Response.Status.BAD_GATEWAY);
         }
     }
 
@@ -47,7 +54,10 @@ public class AssistantChatApiResource {
             }
             return new AssistantChatResponse(reply == null ? "" : reply);
         } catch (final Exception e) {
-            return new AssistantChatResponse("[Backend Exception] " + e.getMessage());
+            LOG.errorf(e, "One-shot message failed");
+            final String errorMessage = e.getMessage() == null ? "unknown error" : e.getMessage();
+            final String frontendMessage = "[Backend Exception] " + errorMessage;
+            return new AssistantChatResponse(frontendMessage);
         }
     }
 
