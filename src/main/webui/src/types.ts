@@ -81,6 +81,8 @@ export type AssistantChatResponse = {
 
 /** Persisted Ollama configuration used by the frontend menus. */
 export type OllamaSettings = {
+  settings: Record<string, string | number | boolean | null>;
+  settingFields: OllamaSettingField[];
   baseUrl: string;
   modelName: string;
   timeoutSeconds: number;
@@ -91,6 +93,17 @@ export type OllamaSettings = {
   defaultSystemPrompt: string;
   toolSystemPrompt: string;
   defaultToolSystemPrompt: string;
+};
+
+export type OllamaSettingField = {
+  key: string;
+  label: string;
+  inputType: "text" | "number" | "boolean";
+  hint: string;
+  min: number | null;
+  max: number | null;
+  step: number | null;
+  modelField: boolean;
 };
 
 /** Response body for listing models available from an Ollama endpoint. */

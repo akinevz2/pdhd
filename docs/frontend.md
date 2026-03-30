@@ -164,3 +164,41 @@ For backend-connected features, verify endpoint contracts and default timeouts b
 - Prefer explicit loading/error states over implicit assumptions
 - Keep long-running assistant requests on chat timeout, not generic API timeout
 - Avoid guessing paths in UI logic; use backend suggestions and explicit user actions
+
+## Known UI Gaps
+
+### File Browser: Parent Directory Navigation
+
+**Current Behavior**: The ".." (parent directory) button is rendered as a visually separate, dedicated button above the folder listing.
+
+**Expected Behavior**: The ".." entry should be integrated as part of the folder list, sorted naturally or placed at the top, consistent with standard file browser UX.
+
+**Location**: `App.tsx` around line 740+, the hardcoded `browser-row` for parent directory navigation.
+
+**Impact**: Minor UX friction and visual inconsistency.
+
+---
+
+### File Browser: Missing "Explore" Action
+
+**Current Behavior**: Users must click on files/folders in the explorer canvas or wait for activity-based auto-open. There is no quick-access button in the left-pane browser to open an item in a new explorer window.
+
+**Expected Behavior**: Folders and files should have inline action buttons (e.g., "→" or "explore" icon) to trigger `openInCanvas()` on demand, making the feature discoverable and reducing friction.
+
+**Location**: `App.tsx`, browser entry rendering (lines 740-830+).
+
+**Impact**: Reduced discoverability of the explorer canvas feature; users may not realize they can open multiple folders side-by-side.
+
+---
+
+### Folder Summaries: Tool Evidence Leakage
+
+**Current Behavior**: When `openFolderSummary()` calls the assistant with `read_folder_manifest` evidence, the LLM may reproduce or reference internal evidence markers (e.g., "=== sampled file contents (evidence only) ===") in its final response, which then displays in the canvas.
+
+**Expected Behavior**: Final folder summaries should contain only user-friendly description and analysis, with no evidence scaffolding or tool artifacts visible.
+
+**Location**: `App.tsx` `openFolderSummary()` function (lines 431-540), and backend `IntrospectToolSupport.readFolderManifest()`.
+
+**Impact**: Poor user experience; internal implementation details leak into rendered UI.
+
+**Upstream Fix Needed**: Post-process LLM response to strip evidence markers, or adjust backend to separate evidence from narrative summary.

@@ -5,16 +5,8 @@ import { api, apiPost } from "./api";
 import { CwdNavigator } from "./components/CwdNavigator";
 import { ProjectWindow } from "./components/ProjectWindow";
 import { TopMenuAndModals } from "./components/TopMenuAndModals";
-import { useMenuPanels } from "./hooks/useMenuPanels";
 import { useHighlightedFiles } from "./hooks/useHighlightedFiles";
-import {
-  CHAT_TIMEOUT_MS,
-  POLL_MS,
-  isBrowsableRepoUrl,
-  isImagePath,
-  openExternalUrl,
-} from "./utils";
-import type { ProjectSummary as ProjectSummaryType } from "./types";
+import { useMenuPanels } from "./hooks/useMenuPanels";
 import type {
   AssistantChatResponse,
   ChatMessage,
@@ -22,7 +14,7 @@ import type {
   FileContentResponse,
   FsBrowserEntry,
   FsListResponse,
-  ProjectSummary,
+  ProjectSummary as ProjectSummaryType,
   ToolActivityItem,
   ToolActivityResponse,
   ToolTelemetryItem,
@@ -30,6 +22,13 @@ import type {
   TreeNode,
   WindowState,
 } from "./types";
+import {
+  CHAT_TIMEOUT_MS,
+  POLL_MS,
+  isBrowsableRepoUrl,
+  isImagePath,
+  openExternalUrl,
+} from "./utils";
 
 const MARKDOWN_FILE_PATTERN = /\.(md|markdown|mdx)$/i;
 
@@ -629,6 +628,7 @@ export function App() {
           onExit={menuPanels.handleExit}
           ollamaOpen={menuPanels.ollamaOpen}
           ollamaForm={menuPanels.ollamaForm}
+          ollamaFields={menuPanels.ollamaFields}
           ollamaError={menuPanels.ollamaError}
           availableModels={menuPanels.availableModels}
           modelsLoading={menuPanels.modelsLoading}
@@ -673,102 +673,148 @@ export function App() {
         <section className="left-rail panel">
           <div className="toolbar">
             <strong>File Browser</strong>
-            <div style={{ display: "flex", gap: "4px" }}>
-              <button
-                onClick={() => {
-                  openInCanvas(browserPath || cwd).catch(() => {});
-                }}
-                disabled={!browserPath && !cwd}
-                title="Open folder in canvas"
-              >
-                Open
-              </button>
-              <button
-                onClick={() => {
-                  setWorkingFolder("..").catch(() => {
-                    // handled in cwd state
-                  });
-                }}
-                disabled={cwdUpdating}
-              >
-                Up
-              </button>
-            </div>
           </div>
 
-          <div id="projectList">
-            <div className="browser-location-row">
-              <div className="browser-location-copy">
-                <span className="browser-location-label">Current folder</span>
-                <p className="browser-location-path" title={browserPath || cwd}>
-                  {browserPath || cwd}
-                </p>
+          <div className="left-rail-scroll">
+            <div id="projectList">
+              <div className="browser-location-row">
+                <div className="browser-location-copy">
+                  <span className="browser-location-label">Current folder</span>
+                  <p
+                    className="browser-location-path"
+                    title={browserPath || cwd}
+                  >
+                    {browserPath || cwd}
+                  </p>
+                </div>
+                {isBrowsableRepoUrl(browserRepoUrl) && (
+                  <button
+                    className="repo-popout-button"
+                    onClick={() => openExternalUrl(browserRepoUrl!)}
+                    title="Open repository in browser"
+                    aria-label="Open repository in browser"
+                  >
+                    ↗
+                  </button>
+                )}
               </div>
-              {isBrowsableRepoUrl(browserRepoUrl) && (
-                <button
-                  className="repo-popout-button"
-                  onClick={() => openExternalUrl(browserRepoUrl!)}
-                  title="Open repository in browser"
-                  aria-label="Open repository in browser"
-                >
-                  ↗
-                </button>
-              )}
-            </div>
-            {browserLoading && <p>Loading files...</p>}
-            {!browserLoading && browserError && <p>{browserError}</p>}
-            {!browserLoading &&
-              !browserError &&
-              browserEntries.length === 0 && <p>Folder is empty.</p>}
-            {!browserLoading &&
-              !browserError &&
-              browserEntries.map((entry) => (
-                <div key={entry.path} className="browser-row">
-                  {entry.directory ? (
+              {browserLoading && <p>Loading files...</p>}
+              {!browserLoading && browserError && <p>{browserError}</p>}
+              {!browserLoading &&
+                !browserError &&
+                browserEntries.length === 0 && <p>Folder is empty.</p>}
+              {!browserLoading && !browserError && (
+                <>
+                  {/* Parent directory entry */}
+                  <div key=".." className="browser-row">
                     <button
                       className="browser-row-main"
                       onClick={() => {
-                        setWorkingFolder(entry.path).catch(() => {
-                          // handled in setWorkingFolder
-                        });
+                        setWorkingFolder("..").catch(() => {});
                       }}
-                      title={entry.path}
+                      disabled={cwdUpdating}
+                      title="Parent directory"
                     >
                       <span className="browser-row-icon" aria-hidden="true">
                         ▸
                       </span>
-                      <span className="browser-row-name">{entry.name}</span>
+                      <span className="browser-row-name">..</span>
                     </button>
-                  ) : (
-                    <button
-                      className="browser-row-main browser-row-main-static"
-                      title={entry.path}
-                      onClick={() => {
-                        openFileInCanvas(entry.path).catch(() => {});
-                      }}
-                    >
-                      <span
-                        className="browser-row-icon browser-row-icon-file"
-                        aria-hidden="true"
-                      >
-                        •
-                      </span>
-                      <span className="browser-row-name">{entry.name}</span>
-                    </button>
-                  )}
-                  {isBrowsableRepoUrl(entry.repoUrl) && (
-                    <button
-                      className="repo-popout-button browser-row-action"
-                      onClick={() => openExternalUrl(entry.repoUrl!)}
-                      title="Open repository in browser"
-                      aria-label={`Open repository for ${entry.name}`}
-                    >
-                      ↗
-                    </button>
-                  )}
-                </div>
-              ))}
+                  </div>
+
+                  {/* Filing system entries */}
+                  {browserEntries.map((entry) => (
+                    <div key={entry.path} className="browser-row">
+                      {entry.directory ? (
+                        <>
+                          <button
+                            className="browser-row-main"
+                            onClick={() => {
+                              setWorkingFolder(entry.path).catch(() => {
+                                // handled in setWorkingFolder
+                              });
+                            }}
+                            title={entry.path}
+                          >
+                            <span
+                              className="browser-row-icon"
+                              aria-hidden="true"
+                            >
+                              ▸
+                            </span>
+                            <span className="browser-row-name">
+                              {entry.name}
+                            </span>
+                          </button>
+                          <button
+                            className="browser-row-action explore-button"
+                            onClick={() => {
+                              openInCanvas(entry.path).catch(() => {});
+                            }}
+                            title={`Open ${entry.name} in explorer`}
+                            aria-label={`Open ${entry.name} in explorer`}
+                          >
+                            →
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            className="browser-row-main browser-row-main-static"
+                            title={entry.path}
+                            onClick={() => {
+                              openFileInCanvas(entry.path).catch(() => {});
+                            }}
+                          >
+                            <span
+                              className="browser-row-icon browser-row-icon-file"
+                              aria-hidden="true"
+                            >
+                              •
+                            </span>
+                            <span className="browser-row-name">
+                              {entry.name}
+                            </span>
+                          </button>
+                          <button
+                            className="browser-row-action explore-button"
+                            onClick={() => {
+                              openFileInCanvas(entry.path).catch(() => {});
+                            }}
+                            title={`Open ${entry.name} in explorer`}
+                            aria-label={`Open ${entry.name} in explorer`}
+                          >
+                            →
+                          </button>
+                        </>
+                      )}
+                      {isBrowsableRepoUrl(entry.repoUrl) && (
+                        <button
+                          className="repo-popout-button browser-row-action"
+                          onClick={() => openExternalUrl(entry.repoUrl!)}
+                          title="Open repository in browser"
+                          aria-label={`Open repository for ${entry.name}`}
+                        >
+                          ↗
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
           </div>
+
+          <button
+            className="left-rail-explore-btn"
+            onClick={() => {
+              openInCanvas(browserPath || cwd).catch(() => {});
+            }}
+            disabled={!browserPath && !cwd}
+            title="Open folder in canvas"
+          >
+            Explore Current
+          </button>
         </section>
 
         <section className="window-host panel">

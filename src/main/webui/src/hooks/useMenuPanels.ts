@@ -1,10 +1,18 @@
 import { useCallback, useState } from "react";
 import { api, apiPost } from "../api";
-import type { OllamaModelsResponse, OllamaSettings } from "../types";
+import type {
+    OllamaModelsResponse,
+    OllamaSettingField,
+    OllamaSettings,
+} from "../types";
 
 export function useMenuPanels() {
   const [ollamaOpen, setOllamaOpen] = useState(false);
-  const [ollamaForm, setOllamaForm] = useState<OllamaSettings | null>(null);
+  const [ollamaForm, setOllamaForm] = useState<Record<
+    string,
+    string | number | boolean | null
+  > | null>(null);
+  const [ollamaFields, setOllamaFields] = useState<OllamaSettingField[]>([]);
   const [ollamaLoading, setOllamaLoading] = useState(false);
   const [ollamaSaving, setOllamaSaving] = useState(false);
   const [ollamaError, setOllamaError] = useState<string | null>(null);
@@ -26,7 +34,8 @@ export function useMenuPanels() {
     setOllamaError(null);
     try {
       const data = await api<OllamaSettings>("/api/menu/ollama");
-      setOllamaForm(data);
+      setOllamaForm(data.settings || null);
+      setOllamaFields(data.settingFields || []);
       setAvailableModels([]);
       setOllamaOpen(true);
     } catch {
@@ -55,9 +64,9 @@ export function useMenuPanels() {
     setOllamaSaving(true);
     setOllamaError(null);
     try {
-      await apiPost<OllamaSettings, OllamaSettings>(
+      await apiPost<{ settings: Record<string, unknown> }, OllamaSettings>(
         "/api/menu/ollama",
-        ollamaForm,
+        { settings: ollamaForm },
       );
       setOllamaOpen(false);
     } catch {
@@ -86,11 +95,14 @@ export function useMenuPanels() {
     setPromptError(null);
     try {
       const current = await api<OllamaSettings>("/api/menu/ollama");
-      await apiPost<OllamaSettings, OllamaSettings>("/api/menu/ollama", {
-        ...current,
-        systemPrompt: promptDraft,
-        toolSystemPrompt: toolPromptDraft,
-      });
+      await apiPost<Record<string, unknown>, OllamaSettings>(
+        "/api/menu/ollama",
+        {
+          settings: current.settings,
+          systemPrompt: promptDraft,
+          toolSystemPrompt: toolPromptDraft,
+        },
+      );
       setPromptOpen(false);
     } catch {
       setPromptError("Failed to save system prompt.");
@@ -127,6 +139,7 @@ export function useMenuPanels() {
     ollamaOpen,
     setOllamaOpen,
     ollamaForm,
+    ollamaFields,
     setOllamaForm,
     ollamaLoading,
     ollamaSaving,
