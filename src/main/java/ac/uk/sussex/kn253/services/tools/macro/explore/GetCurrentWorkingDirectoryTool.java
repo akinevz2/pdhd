@@ -11,7 +11,7 @@ public class GetCurrentWorkingDirectoryTool implements ToolMacro {
     private final ExploreToolSupport support;
     private final ToolSpecification specification = ToolSpecification.builder()
             .name(ToolMacros.GET_CURRENT_WORKING_DIRECTORY.name())
-            .description("Return the current working directory as an absolute path.")
+            .description(definition().description())
             .parameters(JsonObjectSchema.builder().build())
             .build();
 

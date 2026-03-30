@@ -12,8 +12,7 @@ public class OpenWorkspaceCanvasTool implements ToolMacro {
     private final IntrospectToolSupport support;
     private final ToolSpecification specification = ToolSpecification.builder()
             .name(ToolMacros.OPEN_WORKSPACE_CANVAS.name())
-            .description(
-                    "Request opening a workspace project canvas in the web UI for a given path.\nUse only when the user explicitly asks to open a project/folder/file in canvas.\nParameter 'path' is required unless using the current working directory.")
+            .description(definition().description())
             .parameters(JsonObjectSchema.builder()
                     .addProperty("path",
                             JsonStringSchema.builder()

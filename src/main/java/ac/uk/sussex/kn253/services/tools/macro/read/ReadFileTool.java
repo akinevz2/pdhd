@@ -21,7 +21,7 @@ public class ReadFileTool implements ToolMacro {
     private final ReadToolSupport support;
     private final ToolSpecification specification = ToolSpecification.builder()
             .name(ToolMacros.READ_FILE.name())
-            .description("Read a UTF-8 text file from a project directory. Optionally limit output to max lines.")
+            .description(definition().description())
             .parameters(JsonObjectSchema.builder()
                     .addProperty("projectDirectory",
                             JsonStringSchema.builder()

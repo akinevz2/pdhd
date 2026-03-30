@@ -12,8 +12,7 @@ public class ReadProjectKnowledgeTool implements ToolMacro {
     private final IntrospectToolSupport support;
     private final ToolSpecification specification = ToolSpecification.builder()
             .name(ToolMacros.READ_PROJECT_KNOWLEDGE.name())
-            .description(
-                    "Read cached tagged project knowledge remembered from earlier user queries or prior analysis. Use this to recall stored constraints, decisions, requirements, or bug notes before repeating work.")
+            .description(definition().description())
             .parameters(JsonObjectSchema.builder()
                     .addProperty("projectDirectory",
                             JsonStringSchema.builder()

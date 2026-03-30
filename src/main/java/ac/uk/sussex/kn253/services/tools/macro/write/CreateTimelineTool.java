@@ -15,7 +15,7 @@ public class CreateTimelineTool implements ToolMacro {
     private final WriteToolSupport support;
     private final ToolSpecification specification = ToolSpecification.builder()
             .name(ToolMacros.CREATE_TIMELINE.name())
-            .description("Create a timeline markdown under <project>/.pdhd/timelines.")
+            .description(definition().description())
             .parameters(JsonObjectSchema.builder()
                     .addProperty("projectDirectory",
                             JsonStringSchema.builder().description("Absolute path to project root").build())

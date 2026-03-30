@@ -11,6 +11,7 @@ import ac.uk.sussex.kn253.model.Project;
 import ac.uk.sussex.kn253.services.ProjectDiscoveryService;
 import ac.uk.sussex.kn253.services.WorkingDirectoryService;
 import ac.uk.sussex.kn253.services.tools.*;
+import ac.uk.sussex.kn253.services.tools.macro.ToolMacros;
 import ac.uk.sussex.kn253.services.tools.macro.read.ReadToolSupport;
 import jakarta.enterprise.inject.Instance;
 
@@ -218,10 +219,20 @@ public class ExploreToolSupport {
         final String result;
 
         if (pathSummaryLlmService != null && pathSummaryLlmService.isResolvable()) {
+            String llmResult = null;
             try {
-                result = pathSummaryLlmService.get().summarizePath(path);
-            } catch (final Exception e) {
-                return "Failed to summarize path via LLM for " + path + ": " + e.getMessage();
+                llmResult = pathSummaryLlmService.get().summarizePath(path);
+            } catch (final Exception ignored) {
+                // fall through to static analysis
+            }
+            // The definition's signals map carries well-known output prefixes that
+            // indicate an inability to summarise; fall back to the static analyser so
+            // the tool always produces useful output (e.g. in tests without a live LLM).
+            final Collection<String> summarySignals = ToolMacros.SUMMARIZE_PATH.signals().values();
+            if (llmResult != null && summarySignals.stream().noneMatch(llmResult::startsWith)) {
+                result = llmResult;
+            } else {
+                result = PathAnalyzer.analyze(path, false);
             }
         } else {
             result = PathAnalyzer.analyze(path, false);

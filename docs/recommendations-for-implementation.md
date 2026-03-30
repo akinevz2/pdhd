@@ -75,3 +75,12 @@ For clarity, include a one-page implementation checklist in the appendix that ma
 - Validation method
 
 This gives assessors a clear line from research findings to actionable engineering decisions.
+
+### 8. Protect telemetry persistence as a hard operational constraint
+
+Telemetry must be treated as durable historical evidence, not disposable runtime state.
+
+- Never drop or truncate telemetry tables (currently `tool_telemetry`).
+- Keep schema evolution additive/backward-compatible.
+- Keep non-destructive ORM/migration behavior in all environments where telemetry history matters.
+- Any automation, migration, or refactor that would remove telemetry history should be treated as a blocking change request and rejected until replaced with a safe migration path.

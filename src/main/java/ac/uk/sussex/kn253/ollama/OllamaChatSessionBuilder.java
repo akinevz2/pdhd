@@ -5,15 +5,23 @@ import ac.uk.sussex.kn253.services.ToolService;
 
 public class OllamaChatSessionBuilder implements OllamaConfig {
 
+    // NB: this builder is always instantiated via `new` (not CDI) – never use
+    // @Inject here; field defaults must be plain literals.
+
     private String baseUrl;
     private String modelName;
+    private String embeddingModelName = "qwen3-embedding";
     private int timeoutSeconds = 120;
-    private boolean streaming = false;
     private double temperature = 0.7;
     private int numPredict = -1;
     private int numCtx = 0;
+
     private ToolService toolService;
     private ToolActivityService toolActivityService;
+
+    private boolean embeddingEnabled = true;
+    private int embeddingMaxResults = 5;
+    private int embeddingDimension = 384;
 
     public OllamaChatSessionBuilder baseUrl(final String baseUrl) {
         this.baseUrl = baseUrl;
@@ -25,13 +33,13 @@ public class OllamaChatSessionBuilder implements OllamaConfig {
         return this;
     }
 
-    public OllamaChatSessionBuilder timeoutSeconds(final int timeoutSeconds) {
-        this.timeoutSeconds = timeoutSeconds;
+    public OllamaChatSessionBuilder embeddingModel(final String embeddingModelName) {
+        this.embeddingModelName = embeddingModelName;
         return this;
     }
 
-    public OllamaChatSessionBuilder streaming(final boolean streaming) {
-        this.streaming = streaming;
+    public OllamaChatSessionBuilder timeoutSeconds(final int timeoutSeconds) {
+        this.timeoutSeconds = timeoutSeconds;
         return this;
     }
 
@@ -65,13 +73,13 @@ public class OllamaChatSessionBuilder implements OllamaConfig {
     }
 
     @Override
-    public int timeoutSeconds() {
-        return timeoutSeconds;
+    public String embeddingModelName() {
+        return embeddingModelName;
     }
 
     @Override
-    public boolean streaming() {
-        return streaming;
+    public int timeoutSeconds() {
+        return timeoutSeconds;
     }
 
     @Override
@@ -105,6 +113,36 @@ public class OllamaChatSessionBuilder implements OllamaConfig {
 
     public ToolActivityService toolActivityService() {
         return toolActivityService;
+    }
+
+    public OllamaChatSessionBuilder embeddingEnabled(final boolean embeddingEnabled) {
+        this.embeddingEnabled = embeddingEnabled;
+        return this;
+    }
+
+    public OllamaChatSessionBuilder embeddingMaxResults(final int embeddingMaxResults) {
+        this.embeddingMaxResults = embeddingMaxResults;
+        return this;
+    }
+
+    public OllamaChatSessionBuilder embeddingDimension(final int embeddingDimension) {
+        this.embeddingDimension = embeddingDimension;
+        return this;
+    }
+
+    @Override
+    public Boolean embeddingEnabled() {
+        return embeddingEnabled;
+    }
+
+    @Override
+    public Integer embeddingMaxResults() {
+        return embeddingMaxResults;
+    }
+
+    @Override
+    public Integer embeddingDimension() {
+        return embeddingDimension;
     }
 
 }

@@ -12,7 +12,7 @@ public class ListFilesRecursiveTool implements ToolMacro {
     private final ExploreToolSupport support;
     private final ToolSpecification specification = ToolSpecification.builder()
             .name(ToolMacros.LIST_FILES_RECURSIVE.name())
-            .description("List all files under a given folder recursively using paths relative to that folder.")
+            .description(definition().description())
             .parameters(JsonObjectSchema.builder()
                     .addProperty("path", JsonStringSchema.builder().description("Directory path to inspect").build())
                     .required("path")

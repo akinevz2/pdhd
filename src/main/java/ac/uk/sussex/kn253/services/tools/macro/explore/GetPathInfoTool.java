@@ -12,7 +12,7 @@ public class GetPathInfoTool implements ToolMacro {
     private final ExploreToolSupport support;
     private final ToolSpecification specification = ToolSpecification.builder()
             .name(ToolMacros.GET_PATH_INFO.name())
-            .description("Return basic metadata for a path (exists, type, readable, writability, absolute path).")
+            .description(definition().description())
             .parameters(JsonObjectSchema.builder()
                     .addProperty("path", JsonStringSchema.builder().description("Absolute or relative path").build())
                     .required("path")

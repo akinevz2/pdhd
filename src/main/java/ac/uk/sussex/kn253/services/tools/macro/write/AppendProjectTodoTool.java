@@ -14,7 +14,7 @@ public class AppendProjectTodoTool implements ToolMacro {
     private final WriteToolSupport support;
     private final ToolSpecification specification = ToolSpecification.builder()
             .name(ToolMacros.APPEND_PROJECT_TODO.name())
-            .description("Append a todo entry to <project>/TODO.md.")
+            .description(definition().description())
             .parameters(JsonObjectSchema.builder()
                     .addProperty("projectDirectory",
                             JsonStringSchema.builder().description("Absolute path to project root").build())

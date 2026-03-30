@@ -12,11 +12,7 @@ public class ReadFolderManifestTool implements ToolMacro {
     private final IntrospectToolSupport support;
     private final ToolSpecification specification = ToolSpecification.builder()
             .name(ToolMacros.READ_FOLDER_MANIFEST.name())
-            .description(
-                    "Read a specific folder recursively and return an evidence-based folder manifest (discovered files/folders + sampled exact contents from files in that folder tree).\n"
-                            + "Use this when the user asks to summarise a folder or subfolder.\n"
-                            + "Do NOT use this as a whole-project summary tool; use read_project_manifest for that.\n"
-                            + "Do not claim content for files not included in the sampled-content section.")
+            .description(definition().description())
             .parameters(JsonObjectSchema.builder()
                     .addProperty("path",
                             JsonStringSchema.builder()

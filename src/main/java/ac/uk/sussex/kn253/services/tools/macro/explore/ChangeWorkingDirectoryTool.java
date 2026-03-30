@@ -12,8 +12,7 @@ public class ChangeWorkingDirectoryTool implements ToolMacro {
     private final ExploreToolSupport support;
     private final ToolSpecification specification = ToolSpecification.builder()
             .name(ToolMacros.CHANGE_WORKING_DIRECTORY.name())
-            .description(
-                    "Change the assistant working directory only when the user explicitly asks to navigate or switch folders. Supports absolute paths or paths relative to cwd.")
+            .description(definition().description())
             .parameters(JsonObjectSchema.builder()
                     .addProperty("path",
                             JsonStringSchema.builder().description("Directory path to navigate to").build())

@@ -15,8 +15,7 @@ public class CacheProjectKnowledgeTool implements ToolMacro {
     private final WriteToolSupport support;
     private final ToolSpecification specification = ToolSpecification.builder()
             .name(ToolMacros.CACHE_PROJECT_KNOWLEDGE.name())
-            .description(
-                    "Append a tagged knowledge note to the persistent project cache. Use this to remember important user requests, constraints, or decisions for later recall.")
+            .description(definition().description())
             .parameters(JsonObjectSchema.builder()
                     .addProperty("projectDirectory",
                             JsonStringSchema.builder().description("Absolute path to project root").build())

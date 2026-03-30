@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 
 import ac.uk.sussex.kn253.api.model.*;
 import ac.uk.sussex.kn253.model.*;
+import ac.uk.sussex.kn253.repository.ToolTelemetryRepository;
 import ac.uk.sussex.kn253.services.*;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
@@ -32,6 +33,9 @@ class ProjectApiResourceTest {
     @Inject
     ToolTelemetryService toolTelemetryService;
 
+    @Inject
+    ToolTelemetryRepository toolTelemetryRepository;
+
     @BeforeEach
     @Transactional
     void clearDatabase() {
@@ -39,6 +43,7 @@ class ProjectApiResourceTest {
         Project.deleteAll();
         GitRepository.deleteAll();
         GithubRepository.deleteAll();
+        ToolTelemetryRecord.deleteAll();
     }
 
     @Test
