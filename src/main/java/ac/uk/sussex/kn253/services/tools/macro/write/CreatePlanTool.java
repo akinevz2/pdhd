@@ -60,7 +60,7 @@ public class CreatePlanTool implements ToolMacro {
         }
         if (!content.isBlank()) {
             final String body = content.endsWith("\n") ? content : content + "\n";
-            return support.writeFile(output, body, false, "Plan created");
+            return support.writeFile(project, output, body, false, "Plan created");
         }
 
         final StringBuilder body = new StringBuilder();
@@ -69,6 +69,6 @@ public class CreatePlanTool implements ToolMacro {
         for (int i = 0; i < steps.size(); i++) {
             body.append(i + 1).append(". ").append(steps.get(i)).append("\n");
         }
-        return support.writeFile(output, body.toString(), false, "Plan created");
+        return support.writeFile(project, output, body.toString(), false, "Plan created");
     }
 }

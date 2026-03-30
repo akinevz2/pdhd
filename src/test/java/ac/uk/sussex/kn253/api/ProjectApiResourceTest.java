@@ -10,9 +10,9 @@ import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import ac.uk.sussex.kn253.api.model.ProjectSummaryResponse;
+import ac.uk.sussex.kn253.api.model.*;
 import ac.uk.sussex.kn253.model.*;
-import ac.uk.sussex.kn253.services.WorkingDirectoryService;
+import ac.uk.sussex.kn253.services.*;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
@@ -25,6 +25,12 @@ class ProjectApiResourceTest {
 
     @Inject
     WorkingDirectoryService workingDirectoryService;
+
+    @Inject
+    ToolActivityService toolActivityService;
+
+    @Inject
+    ToolTelemetryService toolTelemetryService;
 
     @BeforeEach
     @Transactional
@@ -105,5 +111,31 @@ class ProjectApiResourceTest {
 
         resource.deleteKnowledge(id, "temp");
         assertEquals(0, resource.listKnowledge(id).size());
+    }
+
+    @Test
+    void toolActivityV2IncludesSchemaMetadataAndEvents() {
+        toolActivityService.record("read_file", "{\"filePath\":\"README.md\"}", "ok");
+
+        final VersionedToolActivityResponse response = resource.toolActivityV2(20);
+
+        assertEquals("tool-activity.v2", response.schemaVersion());
+        assertNotNull(response.generatedAt());
+        assertNotNull(response.summary());
+        assertFalse(response.items().isEmpty());
+    }
+
+    @Test
+    void toolTelemetryEndpointReturnsVersionedTypedPayload() {
+        toolTelemetryService.record("read_file", "ReadToolset", 2_000_000L, null, false);
+        toolTelemetryService.record("read_file", "ReadToolset", 3_000_000L, "ArgumentValidation", true);
+
+        final ToolTelemetryResponse response = resource.toolTelemetry();
+
+        assertEquals("tool-telemetry.v1", response.schemaVersion());
+        assertNotNull(response.generatedAt());
+        assertNotNull(response.summary());
+        assertFalse(response.items().isEmpty());
+        assertTrue(response.items().stream().anyMatch(item -> "read_file".equals(item.toolName())));
     }
 }

@@ -47,6 +47,6 @@ public class AppendProjectTodoTool implements ToolMacro {
         if (!output.startsWith(project)) {
             return "Invalid TODO path.";
         }
-        return support.writeFile(output, support.todoLine(todo), true, "TODO added");
+        return support.writeFile(project, output, support.todoLine(todo), true, "TODO added");
     }
 }

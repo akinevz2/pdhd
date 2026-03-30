@@ -25,6 +25,8 @@ import type {
   ProjectSummary,
   ToolActivityItem,
   ToolActivityResponse,
+  ToolTelemetryItem,
+  ToolTelemetryResponse,
   TreeNode,
   WindowState,
 } from "./types";
@@ -40,6 +42,13 @@ export function App() {
 
   const [activityItems, setActivityItems] = useState<ToolActivityItem[]>([]);
   const [activityError, setActivityError] = useState<string | null>(null);
+
+  const [telemetryOpen, setTelemetryOpen] = useState(false);
+  const [telemetryItems, setTelemetryItems] = useState<ToolTelemetryItem[]>([]);
+  const [telemetryLoading, setTelemetryLoading] = useState(false);
+  const [telemetryError, setTelemetryError] = useState<string | null>(null);
+  const [telemetrySummary, setTelemetrySummary] = useState<string>("");
+  const [telemetryGeneratedAt, setTelemetryGeneratedAt] = useState<string>("");
 
   const [cwd, setCwd] = useState<string>("");
   const [cwdError, setCwdError] = useState<string | null>(null);
@@ -75,6 +84,21 @@ export function App() {
       if (!quiet) {
         setActivityError("Failed to load tool activity.");
       }
+    }
+  }, []);
+
+  const loadTelemetry = useCallback(async () => {
+    setTelemetryLoading(true);
+    setTelemetryError(null);
+    try {
+      const data = await api<ToolTelemetryResponse>("/api/tool-telemetry");
+      setTelemetryItems(data.items || []);
+      setTelemetrySummary(data.summary || "");
+      setTelemetryGeneratedAt(data.generatedAt || "");
+    } catch {
+      setTelemetryError("Failed to load telemetry.");
+    } finally {
+      setTelemetryLoading(false);
     }
   }, []);
 
@@ -155,6 +179,15 @@ export function App() {
       // surfaced by browser state
     });
   }, [cwd, loadBrowser]);
+
+  useEffect(() => {
+    if (!telemetryOpen) {
+      return;
+    }
+    loadTelemetry().catch(() => {
+      // surfaced by telemetry state
+    });
+  }, [telemetryOpen, loadTelemetry]);
 
   const focusWindow = useCallback((id: number) => {
     setWindows((prev) =>
@@ -587,6 +620,12 @@ export function App() {
           onOpenOllamaConfig={menuPanels.openOllamaConfig}
           onOpenSystemPrompt={menuPanels.openSystemPrompt}
           onOpenDebug={() => menuPanels.setDebugOpen(true)}
+          onOpenTelemetry={() => {
+            setTelemetryOpen(true);
+            loadTelemetry().catch(() => {
+              // surfaced by telemetry state
+            });
+          }}
           onExit={menuPanels.handleExit}
           ollamaOpen={menuPanels.ollamaOpen}
           ollamaForm={menuPanels.ollamaForm}
@@ -613,6 +652,14 @@ export function App() {
           setDebugOpen={menuPanels.setDebugOpen}
           cwd={cwd}
           activityItems={activityItems}
+          telemetryOpen={telemetryOpen}
+          setTelemetryOpen={setTelemetryOpen}
+          telemetryItems={telemetryItems}
+          telemetryLoading={telemetryLoading}
+          telemetryError={telemetryError}
+          telemetrySummary={telemetrySummary}
+          telemetryGeneratedAt={telemetryGeneratedAt}
+          onRefreshTelemetry={loadTelemetry}
         />
         <header className="cwd-bar panel">
           <strong>Working Folder</strong>

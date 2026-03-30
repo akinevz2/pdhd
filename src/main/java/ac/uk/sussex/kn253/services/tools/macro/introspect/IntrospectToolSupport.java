@@ -12,9 +12,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import ac.uk.sussex.kn253.model.Project;
 import ac.uk.sussex.kn253.model.ProjectKnowledge;
-import ac.uk.sussex.kn253.services.ToolActivityService;
+import ac.uk.sussex.kn253.services.*;
 import ac.uk.sussex.kn253.services.ToolActivityService.ToolActivityEvent;
-import ac.uk.sussex.kn253.services.WorkingDirectoryService;
+import ac.uk.sussex.kn253.services.ToolTelemetryService.ToolTelemetrySnapshot;
 import ac.uk.sussex.kn253.services.tools.ToolArguments;
 import ac.uk.sussex.kn253.services.tools.macro.read.ReadToolSupport;
 
@@ -29,6 +29,10 @@ public class IntrospectToolSupport {
     private static final int MAX_SOURCE_FILE_CHARS = 2000;
     private static final int RECENT_TOOL_CALLS = 12;
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final Map<String, Long> CACHE_TTL_SECONDS = Map.of(
+            "file_content", 600L,
+            "path_analysis", 300L,
+            "folder_manifest", 300L);
 
     private static final List<String> MANIFEST_FILENAMES = List.of(
             "README.md", "README.txt", "README.rst", "README", "readme.md",
@@ -51,20 +55,30 @@ public class IntrospectToolSupport {
 
     private final WorkingDirectoryService workingDirectoryService;
     private final ToolActivityService toolActivityService;
+    private final ToolTelemetryService toolTelemetryService;
     private final ReadToolSupport readToolSupport;
 
     public IntrospectToolSupport(
             final WorkingDirectoryService workingDirectoryService,
             final ToolActivityService toolActivityService) {
-        this(workingDirectoryService, toolActivityService, new ReadToolSupport());
+        this(workingDirectoryService, toolActivityService, null, new ReadToolSupport());
+    }
+
+    public IntrospectToolSupport(
+            final WorkingDirectoryService workingDirectoryService,
+            final ToolActivityService toolActivityService,
+            final ToolTelemetryService toolTelemetryService) {
+        this(workingDirectoryService, toolActivityService, toolTelemetryService, new ReadToolSupport());
     }
 
     IntrospectToolSupport(
             final WorkingDirectoryService workingDirectoryService,
             final ToolActivityService toolActivityService,
+            final ToolTelemetryService toolTelemetryService,
             final ReadToolSupport readToolSupport) {
         this.workingDirectoryService = workingDirectoryService;
         this.toolActivityService = toolActivityService;
+        this.toolTelemetryService = toolTelemetryService;
         this.readToolSupport = readToolSupport;
     }
 
@@ -204,6 +218,7 @@ public class IntrospectToolSupport {
             }
             return "projectDirectory=" + projectDirectory + "\n"
                     + "tag=" + tag + "\n"
+                    + cacheFreshnessSummary(knowledge) + "\n"
                     + summarizeEntryCount(knowledge.getJsonContent()) + "\n\n"
                     + knowledge.getJsonContent();
         }
@@ -223,6 +238,8 @@ public class IntrospectToolSupport {
             sb.append("- tag=").append(entry.getKey())
                     .append(" ")
                     .append(summarizeEntryCount(entry.getJsonContent()))
+                    .append(" ")
+                    .append(cacheFreshnessSummary(entry))
                     .append(" updatedAt=")
                     .append(entry.getUpdatedAt())
                     .append("\n");
@@ -253,6 +270,39 @@ public class IntrospectToolSupport {
             }
         } else {
             sb.append("\n(Tool activity tracking not available)\n");
+        }
+
+        if (toolTelemetryService != null) {
+            final List<ToolTelemetrySnapshot> snapshots = toolTelemetryService.snapshot();
+            if (snapshots.isEmpty()) {
+                sb.append("\nNo telemetry recorded this session.\n");
+            } else {
+                sb.append("\nTool telemetry summary:\n");
+                for (final ToolTelemetrySnapshot snapshot : snapshots) {
+                    sb.append("- ")
+                            .append(snapshot.toolName())
+                            .append(" module=")
+                            .append(snapshot.moduleName())
+                            .append(" calls=")
+                            .append(snapshot.invocations())
+                            .append(" failures=")
+                            .append(snapshot.failures())
+                            .append(" validationFailures=")
+                            .append(snapshot.argumentValidationFailures())
+                            .append(" avgMs=")
+                            .append(formatMs(snapshot.averageDurationMs()))
+                            .append(" p50Ms=")
+                            .append(formatMs(snapshot.p50DurationMs()))
+                            .append(" p95Ms=")
+                            .append(formatMs(snapshot.p95DurationMs()));
+                    if (!snapshot.errorClasses().isEmpty()) {
+                        sb.append(" errorClasses=").append(snapshot.errorClasses());
+                    }
+                    sb.append("\n");
+                }
+            }
+        } else {
+            sb.append("\n(Tool telemetry not available)\n");
         }
 
         return sb.toString().trim();
@@ -465,5 +515,35 @@ public class IntrospectToolSupport {
         } catch (final IOException ignored) {
         }
         return "entries=unknown";
+    }
+
+    private String cacheFreshnessSummary(final ProjectKnowledge knowledge) {
+        try {
+            final JsonNode root = OBJECT_MAPPER.readTree(knowledge.getJsonContent());
+            final String type = root.path("type").asText("").trim();
+            if (type.isBlank() || !CACHE_TTL_SECONDS.containsKey(type)) {
+                return "cacheStatus=not_applicable";
+            }
+
+            final long ttlSeconds = CACHE_TTL_SECONDS.get(type);
+            final String cachedAtRaw = root.path("cachedAt").asText("").trim();
+            final java.time.Instant cachedAt = cachedAtRaw.isBlank()
+                    ? knowledge.getUpdatedAt()
+                    : java.time.Instant.parse(cachedAtRaw);
+            final long ageSeconds = Math.max(0L,
+                    java.time.Duration.between(cachedAt, java.time.Instant.now()).getSeconds());
+            final boolean stale = ageSeconds > ttlSeconds;
+
+            return "cacheStatus=" + (stale ? "stale" : "fresh")
+                    + " cacheType=" + type
+                    + " ageSeconds=" + ageSeconds
+                    + " ttlSeconds=" + ttlSeconds;
+        } catch (final Exception e) {
+            return "cacheStatus=unknown";
+        }
+    }
+
+    private String formatMs(final double millis) {
+        return String.format(Locale.ROOT, "%.2f", millis);
     }
 }

@@ -61,6 +61,6 @@ public class CreateTimelineTool implements ToolMacro {
         for (int i = 0; i < milestones.size(); i++) {
             body.append(i + 1).append(". ").append(milestones.get(i)).append("\n");
         }
-        return support.writeFile(output, body.toString(), false, "Timeline created");
+        return support.writeFile(project, output, body.toString(), false, "Timeline created");
     }
 }

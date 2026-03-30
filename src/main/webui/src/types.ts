@@ -27,6 +27,27 @@ export type ToolActivityResponse = {
   items: ToolActivityItem[];
 };
 
+/** A single row from the typed telemetry endpoint. */
+export type ToolTelemetryItem = {
+  toolName: string;
+  moduleName: string;
+  invocations: number;
+  failures: number;
+  argumentValidationFailures: number;
+  averageDurationMs: number;
+  p50DurationMs: number;
+  p95DurationMs: number;
+  errorClasses: Record<string, number>;
+};
+
+/** Wrapper returned by the typed telemetry endpoint. */
+export type ToolTelemetryResponse = {
+  schemaVersion: string;
+  generatedAt: string;
+  summary: string;
+  items: ToolTelemetryItem[];
+};
+
 /** Response from file-content API endpoint. */
 export type FileContentResponse = {
   filePath: string;

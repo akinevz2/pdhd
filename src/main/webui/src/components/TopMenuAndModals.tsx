@@ -1,11 +1,16 @@
 import type { Dispatch, SetStateAction } from "react";
-import type { OllamaSettings, ToolActivityItem } from "../types";
+import type {
+  OllamaSettings,
+  ToolActivityItem,
+  ToolTelemetryItem,
+} from "../types";
 
 type TopMenuAndModalsProps = {
   ollamaLoading: boolean;
   onOpenOllamaConfig: () => Promise<void>;
   onOpenSystemPrompt: () => Promise<void>;
   onOpenDebug: () => void;
+  onOpenTelemetry: () => void;
   onExit: () => Promise<void>;
 
   ollamaOpen: boolean;
@@ -35,6 +40,15 @@ type TopMenuAndModalsProps = {
   setDebugOpen: Dispatch<SetStateAction<boolean>>;
   cwd: string;
   activityItems: ToolActivityItem[];
+
+  telemetryOpen: boolean;
+  setTelemetryOpen: Dispatch<SetStateAction<boolean>>;
+  telemetryItems: ToolTelemetryItem[];
+  telemetryLoading: boolean;
+  telemetryError: string | null;
+  telemetrySummary: string;
+  telemetryGeneratedAt: string;
+  onRefreshTelemetry: () => Promise<void>;
 };
 
 export function TopMenuAndModals({
@@ -42,6 +56,7 @@ export function TopMenuAndModals({
   onOpenOllamaConfig,
   onOpenSystemPrompt,
   onOpenDebug,
+  onOpenTelemetry,
   onExit,
   ollamaOpen,
   ollamaForm,
@@ -68,6 +83,14 @@ export function TopMenuAndModals({
   setDebugOpen,
   cwd,
   activityItems,
+  telemetryOpen,
+  setTelemetryOpen,
+  telemetryItems,
+  telemetryLoading,
+  telemetryError,
+  telemetrySummary,
+  telemetryGeneratedAt,
+  onRefreshTelemetry,
 }: TopMenuAndModalsProps) {
   return (
     <>
@@ -92,6 +115,9 @@ export function TopMenuAndModals({
         </button>
         <button className="menu-btn" onClick={onOpenDebug}>
           Debug
+        </button>
+        <button className="menu-btn" onClick={onOpenTelemetry}>
+          Telemetry
         </button>
         <button
           className="menu-btn menu-btn-exit"
@@ -374,6 +400,102 @@ export function TopMenuAndModals({
             </div>
             <div className="modal-footer">
               <button onClick={() => setDebugOpen(false)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {telemetryOpen && (
+        <div
+          className="modal-overlay"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setTelemetryOpen(false);
+          }}
+        >
+          <div className="modal-panel modal-panel-telemetry">
+            <div className="modal-header">
+              <span className="modal-title">Telemetry Sheet</span>
+              <button
+                className="modal-close"
+                onClick={() => setTelemetryOpen(false)}
+              >
+                X
+              </button>
+            </div>
+            <div className="modal-body telemetry-modal-body">
+              <div className="telemetry-meta-row">
+                <span>{telemetrySummary || "No summary available"}</span>
+                <span>
+                  Snapshot:{" "}
+                  {telemetryGeneratedAt
+                    ? new Date(telemetryGeneratedAt).toLocaleString()
+                    : "-"}
+                </span>
+              </div>
+
+              {telemetryError && <p className="form-error">{telemetryError}</p>}
+
+              <div className="telemetry-sheet-wrap">
+                <table
+                  className="telemetry-sheet"
+                  aria-label="Tool telemetry sheet"
+                >
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Tool</th>
+                      <th>Module</th>
+                      <th>Calls</th>
+                      <th>Failures</th>
+                      <th>Arg Validation</th>
+                      <th>Avg (ms)</th>
+                      <th>P50 (ms)</th>
+                      <th>P95 (ms)</th>
+                      <th>Error Classes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {telemetryItems.length === 0 && !telemetryLoading && (
+                      <tr>
+                        <td colSpan={10} className="telemetry-empty-cell">
+                          No telemetry rows available.
+                        </td>
+                      </tr>
+                    )}
+                    {telemetryItems.map((row, index) => (
+                      <tr key={`${row.toolName}-${row.moduleName}-${index}`}>
+                        <td>{index + 1}</td>
+                        <td>{row.toolName}</td>
+                        <td>{row.moduleName}</td>
+                        <td>{row.invocations}</td>
+                        <td>{row.failures}</td>
+                        <td>{row.argumentValidationFailures}</td>
+                        <td>{row.averageDurationMs.toFixed(2)}</td>
+                        <td>{row.p50DurationMs.toFixed(2)}</td>
+                        <td>{row.p95DurationMs.toFixed(2)}</td>
+                        <td className="telemetry-error-classes">
+                          {Object.keys(row.errorClasses || {}).length > 0
+                            ? Object.entries(row.errorClasses)
+                                .map(([name, count]) => `${name}:${count}`)
+                                .join(", ")
+                            : "-"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button
+                onClick={() => {
+                  onRefreshTelemetry().catch(() => {});
+                }}
+                disabled={telemetryLoading}
+              >
+                {telemetryLoading ? "Refreshing..." : "Refresh"}
+              </button>
+              <button onClick={() => setTelemetryOpen(false)}>Close</button>
             </div>
           </div>
         </div>

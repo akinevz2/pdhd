@@ -2,8 +2,7 @@ package ac.uk.sussex.kn253.services.tools;
 
 import java.util.List;
 
-import ac.uk.sussex.kn253.services.ToolActivityService;
-import ac.uk.sussex.kn253.services.WorkingDirectoryService;
+import ac.uk.sussex.kn253.services.*;
 import ac.uk.sussex.kn253.services.tools.macro.ToolMacroToolset;
 import ac.uk.sussex.kn253.services.tools.macro.introspect.*;
 import io.quarkus.arc.Arc;
@@ -14,14 +13,21 @@ import jakarta.inject.Inject;
 public class IntrospectToolset extends ToolMacroToolset {
 
     public IntrospectToolset() {
-        this(resolveWorkingDirectoryService(), resolveToolActivityService());
+        this(resolveWorkingDirectoryService(), resolveToolActivityService(), resolveToolTelemetryService());
+    }
+
+    public IntrospectToolset(
+            final WorkingDirectoryService workingDirectoryService,
+            final ToolActivityService toolActivityService) {
+        this(workingDirectoryService, toolActivityService, null);
     }
 
     @Inject
     public IntrospectToolset(
             final WorkingDirectoryService workingDirectoryService,
-            final ToolActivityService toolActivityService) {
-        this(new IntrospectToolSupport(workingDirectoryService, toolActivityService));
+            final ToolActivityService toolActivityService,
+            final ToolTelemetryService toolTelemetryService) {
+        this(new IntrospectToolSupport(workingDirectoryService, toolActivityService, toolTelemetryService));
     }
 
     IntrospectToolset(final IntrospectToolSupport support) {
@@ -50,6 +56,16 @@ public class IntrospectToolset extends ToolMacroToolset {
     private static ToolActivityService resolveToolActivityService() {
         if (isCdiAvailable()) {
             final var instance = Arc.container().instance(ToolActivityService.class);
+            if (instance != null && instance.isAvailable()) {
+                return instance.get();
+            }
+        }
+        return null;
+    }
+
+    private static ToolTelemetryService resolveToolTelemetryService() {
+        if (isCdiAvailable()) {
+            final var instance = Arc.container().instance(ToolTelemetryService.class);
             if (instance != null && instance.isAvailable()) {
                 return instance.get();
             }

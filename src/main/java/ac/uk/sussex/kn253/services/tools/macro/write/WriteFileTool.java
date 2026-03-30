@@ -56,6 +56,6 @@ public class WriteFileTool implements ToolMacro {
         }
         final String content = ToolArguments.require(args, "content");
         final boolean append = ToolArguments.getBoolean(args, "append", DEFAULT_APPEND);
-        return support.writeFile(output, content, append, "File written");
+        return support.writeFile(project, output, content, append, "File written");
     }
 }

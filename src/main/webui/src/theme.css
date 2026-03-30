@@ -729,6 +729,95 @@ kbd {
   min-width: min(680px, 92vw);
 }
 
+.modal-panel-telemetry {
+  min-width: min(1200px, 96vw);
+  width: min(1200px, 96vw);
+}
+
+.telemetry-modal-body {
+  background: #f4f8f2;
+  color: #1d2b1f;
+}
+
+.telemetry-meta-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  margin-bottom: 10px;
+  color: #32503a;
+}
+
+.telemetry-sheet-wrap {
+  border: 1px solid #8bad7a;
+  background: #ffffff;
+  max-height: 56vh;
+  overflow: auto;
+}
+
+.telemetry-sheet {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 12px;
+  color: #1f2e20;
+}
+
+.telemetry-sheet th,
+.telemetry-sheet td {
+  border: 1px solid #c9d8bf;
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: top;
+  word-break: break-word;
+}
+
+.telemetry-sheet thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: linear-gradient(180deg, #d8ead0, #c4dfb9);
+  color: #1d3a25;
+  font-weight: 700;
+}
+
+.telemetry-sheet tbody tr:nth-child(even) {
+  background: #f6fbf1;
+}
+
+.telemetry-sheet tbody tr:hover {
+  background: #e8f4df;
+}
+
+.telemetry-sheet td:nth-child(1) {
+  width: 56px;
+  text-align: right;
+  background: #eef4e7;
+  color: #4a5e4e;
+}
+
+.telemetry-sheet td:nth-child(4),
+.telemetry-sheet td:nth-child(5),
+.telemetry-sheet td:nth-child(6),
+.telemetry-sheet td:nth-child(7),
+.telemetry-sheet td:nth-child(8),
+.telemetry-sheet td:nth-child(9) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.telemetry-empty-cell {
+  text-align: center;
+  color: #4d6652;
+  font-style: italic;
+  background: #fbfef8;
+}
+
+.telemetry-error-classes {
+  font-family: "Consolas", "Cascadia Code", monospace;
+  font-size: 11px;
+}
+
 .modal-header {
   display: flex;
   align-items: center;

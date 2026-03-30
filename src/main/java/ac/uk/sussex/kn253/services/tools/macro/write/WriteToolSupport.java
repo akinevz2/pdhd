@@ -21,6 +21,7 @@ public class WriteToolSupport {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     public String writeFile(
+            final Path projectDirectory,
             final Path output,
             final String content,
             final boolean append,
@@ -34,10 +35,33 @@ public class WriteToolSupport {
                 Files.writeString(output, content, StandardCharsets.UTF_8,
                         StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
             }
+
+            // Best-effort: cache invalidation requires an active persistence context.
+            try {
+                invalidateReadCaches(projectDirectory);
+            } catch (final Exception ignored) {
+                // Keep writes successful even when persistence is unavailable in plain unit
+                // tests.
+            }
+
             return prefix + ": " + output;
         } catch (final IOException e) {
             return "Failed to write file " + output + ": " + e.getMessage();
         }
+    }
+
+    private long invalidateReadCaches(final Path projectDirectory) {
+        final Project project = Project.find("directory", projectDirectory.toString()).firstResult();
+        if (project == null) {
+            return 0L;
+        }
+
+        return ProjectKnowledge.delete(
+                "project = ?1 and (key like ?2 or key like ?3 or key like ?4)",
+                project,
+                "file:%",
+                "path:%",
+                "folder:%");
     }
 
     public List<String> toStringList(final Object value) {

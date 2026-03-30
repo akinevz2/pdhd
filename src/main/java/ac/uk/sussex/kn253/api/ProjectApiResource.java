@@ -61,6 +61,9 @@ public class ProjectApiResource {
     ToolActivityService toolActivityService;
 
     @Inject
+    ToolTelemetryService toolTelemetryService;
+
+    @Inject
     WorkingDirectoryService workingDirectoryService;
 
     @Inject
@@ -459,6 +462,59 @@ public class ProjectApiResource {
                         event.requestedFiles()))
                 .toList();
         return new ToolActivityResponse(items);
+    }
+
+    /**
+     * Returns recent AI tool-call activity with an explicit schema version.
+     *
+     * @param limit maximum number of events to return (default 100).
+     */
+    @GET
+    @Path("/tool-activity/v2")
+    public VersionedToolActivityResponse toolActivityV2(
+            @QueryParam("limit") @DefaultValue("100") final int limit) {
+        final List<VersionedToolActivityResponse.ToolActivityItem> items = toolActivityService.recent(limit).stream()
+                .map(event -> new VersionedToolActivityResponse.ToolActivityItem(
+                        event.timestamp(),
+                        event.toolName(),
+                        event.argumentsJson(),
+                        event.result(),
+                        event.requestedFiles()))
+                .toList();
+
+        final String summary = "Captured " + items.size() + " recent tool activity event(s).";
+        return new VersionedToolActivityResponse(
+                "tool-activity.v2",
+                Instant.now().toString(),
+                summary,
+                items);
+    }
+
+    /**
+     * Returns per-tool execution telemetry metrics as a versioned API payload.
+     */
+    @GET
+    @Path("/tool-telemetry")
+    public ToolTelemetryResponse toolTelemetry() {
+        final List<ToolTelemetryResponse.ToolTelemetryItem> items = toolTelemetryService.snapshot().stream()
+                .map(snapshot -> new ToolTelemetryResponse.ToolTelemetryItem(
+                        snapshot.toolName(),
+                        snapshot.moduleName(),
+                        snapshot.invocations(),
+                        snapshot.failures(),
+                        snapshot.argumentValidationFailures(),
+                        snapshot.averageDurationMs(),
+                        snapshot.p50DurationMs(),
+                        snapshot.p95DurationMs(),
+                        snapshot.errorClasses()))
+                .toList();
+
+        final String summary = "Telemetry available for " + items.size() + " tool(s).";
+        return new ToolTelemetryResponse(
+                "tool-telemetry.v1",
+                Instant.now().toString(),
+                summary,
+                items);
     }
 
     // -------------------------------------------------------------------------

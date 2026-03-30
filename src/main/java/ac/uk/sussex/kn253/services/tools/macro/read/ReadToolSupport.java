@@ -20,6 +20,9 @@ import ac.uk.sussex.kn253.model.ProjectKnowledge;
 public class ReadToolSupport {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final long FILE_CONTENT_TTL_SECONDS = 600L;
+    private static final long PATH_ANALYSIS_TTL_SECONDS = 300L;
+    private static final long FOLDER_MANIFEST_TTL_SECONDS = 300L;
 
     /**
      * Resolves or creates a Project entity for a given directory.
@@ -66,6 +69,8 @@ public class ReadToolSupport {
             root.put("contentLength", content.length());
             root.put("content", content);
             root.put("type", "file_content");
+            root.put("cachedAt", now.toString());
+            root.put("ttlSeconds", FILE_CONTENT_TTL_SECONDS);
 
             final String jsonContent = OBJECT_MAPPER.writerWithDefaultPrettyPrinter()
                     .writeValueAsString(root);
@@ -116,6 +121,8 @@ public class ReadToolSupport {
             root.put("analysisType", detailed ? "detailed" : "summary");
             root.put("analysisResult", analysis);
             root.put("type", "path_analysis");
+            root.put("cachedAt", now.toString());
+            root.put("ttlSeconds", PATH_ANALYSIS_TTL_SECONDS);
 
             final String jsonContent = OBJECT_MAPPER.writerWithDefaultPrettyPrinter()
                     .writeValueAsString(root);
@@ -161,6 +168,8 @@ public class ReadToolSupport {
             root.put("projectDirectory", projectDirectory.toString());
             root.put("manifestContent", manifest);
             root.put("type", "folder_manifest");
+            root.put("cachedAt", now.toString());
+            root.put("ttlSeconds", FOLDER_MANIFEST_TTL_SECONDS);
 
             final String jsonContent = OBJECT_MAPPER.writerWithDefaultPrettyPrinter()
                     .writeValueAsString(root);

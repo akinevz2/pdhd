@@ -53,6 +53,6 @@ public class CreateReportTool implements ToolMacro {
             return "Invalid report path.";
         }
         final String body = "# " + title + "\n\n" + content + "\n\nGenerated: " + Instant.now() + "\n";
-        return support.writeFile(output, body, false, "Report created");
+        return support.writeFile(project, output, body, false, "Report created");
     }
 }
