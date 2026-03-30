@@ -12,7 +12,7 @@ public class GetGitLogTool implements ToolMacro {
     private final ExploreToolSupport support;
     private final ToolSpecification specification = ToolSpecification.builder()
             .name(ToolMacros.GET_GIT_LOG.name())
-            .description("Return recent git commits (one line per commit) for a repository.")
+            .description(definition().description())
             .parameters(JsonObjectSchema.builder()
                     .addProperty("path",
                             JsonStringSchema.builder()

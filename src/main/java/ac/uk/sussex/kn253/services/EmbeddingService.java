@@ -42,7 +42,11 @@ public class EmbeddingService {
         try {
             final var config = ollamaConfigService.load();
             final String embeddingModel = config.getEmbeddingModel();
-            final String embeddingBaseUrl = config.getEmbeddingBaseUrl();
+            String embeddingBaseUrl = config.getEmbeddingBaseUrl();
+            // Default to chat model's baseUrl if embedding baseUrl not explicitly set
+            if (embeddingBaseUrl == null || embeddingBaseUrl.isBlank()) {
+                embeddingBaseUrl = config.getBaseUrl();
+            }
             final Integer embeddingDimension = config.getEmbeddingDimension();
             final Boolean embeddingEnabled = config.getEmbeddingEnabled();
 

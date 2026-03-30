@@ -11,7 +11,7 @@ public class ListGitProjectsTool implements ToolMacro {
     private final ExploreToolSupport support;
     private final ToolSpecification specification = ToolSpecification.builder()
             .name(ToolMacros.LIST_GIT_PROJECTS.name())
-            .description("List known projects in the database that have a Git repository attached.")
+            .description(definition().description())
             .parameters(JsonObjectSchema.builder().build())
             .build();
 

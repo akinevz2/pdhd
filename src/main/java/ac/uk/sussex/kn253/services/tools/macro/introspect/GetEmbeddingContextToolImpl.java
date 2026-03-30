@@ -28,8 +28,7 @@ public class GetEmbeddingContextToolImpl implements ToolMacro {
         this.embeddingService = embeddingService;
         this.specification = ToolSpecification.builder()
                 .name("get_embedding_context")
-                .description(
-                        "Search for semantically similar content from recent embeddings in the current conversation session.")
+                .description(definition().description())
                 .parameters(JsonObjectSchema.builder()
                         .addProperty("query",
                                 JsonStringSchema.builder()
@@ -47,7 +46,10 @@ public class GetEmbeddingContextToolImpl implements ToolMacro {
     @Override
     public ToolMacroDefinition definition() {
         // Embedding tools are optional and dynamically loaded
-        return new ToolMacroDefinition("get_embedding_context", List.of());
+        return new ToolMacroDefinition("get_embedding_context",
+                "Search for semantically similar content from recent embeddings in the current conversation session.",
+                Map.of(),
+                List.of("context", "keywords", "embeddings"));
     }
 
     @Override

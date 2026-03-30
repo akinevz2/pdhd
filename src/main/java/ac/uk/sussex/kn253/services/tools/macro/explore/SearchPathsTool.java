@@ -12,8 +12,7 @@ public class SearchPathsTool implements ToolMacro {
     private final ExploreToolSupport support;
     private final ToolSpecification specification = ToolSpecification.builder()
             .name(ToolMacros.SEARCH_PATHS.name())
-            .description(
-                    "Search from a directory for likely file or folder candidates matching a partial name. Use this first when the user refers to a vague filesystem target such as frontend, webui, tests, config, or main entry point and you do not yet know the exact path. Do not navigate automatically when multiple plausible matches are returned; summarize the candidates and ask the user to choose.")
+            .description(definition().description())
             .parameters(JsonObjectSchema.builder()
                     .addProperty("query",
                             JsonStringSchema.builder()

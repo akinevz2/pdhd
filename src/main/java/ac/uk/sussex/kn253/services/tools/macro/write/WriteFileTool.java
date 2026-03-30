@@ -16,7 +16,7 @@ public class WriteFileTool implements ToolMacro {
     private final WriteToolSupport support;
     private final ToolSpecification specification = ToolSpecification.builder()
             .name(ToolMacros.WRITE_FILE.name())
-            .description("Write a UTF-8 text file within the project directory.")
+            .description(definition().description())
             .parameters(JsonObjectSchema.builder()
                     .addProperty("projectDirectory",
                             JsonStringSchema.builder().description("Absolute path to project root").build())

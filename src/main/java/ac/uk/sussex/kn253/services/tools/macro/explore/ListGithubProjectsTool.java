@@ -11,7 +11,7 @@ public class ListGithubProjectsTool implements ToolMacro {
     private final ExploreToolSupport support;
     private final ToolSpecification specification = ToolSpecification.builder()
             .name(ToolMacros.LIST_GITHUB_PROJECTS.name())
-            .description("List known projects in the database that have GitHub repository metadata attached.")
+            .description(definition().description())
             .parameters(JsonObjectSchema.builder().build())
             .build();
 

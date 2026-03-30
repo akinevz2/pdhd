@@ -15,7 +15,7 @@ public class CreateReportTool implements ToolMacro {
     private final WriteToolSupport support;
     private final ToolSpecification specification = ToolSpecification.builder()
             .name(ToolMacros.CREATE_REPORT.name())
-            .description("Create a markdown report under <project>/.pdhd/reports.")
+            .description(definition().description())
             .parameters(JsonObjectSchema.builder()
                     .addProperty("projectDirectory",
                             JsonStringSchema.builder().description("Absolute path to project root").build())

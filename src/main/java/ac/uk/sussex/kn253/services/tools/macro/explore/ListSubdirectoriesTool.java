@@ -12,7 +12,7 @@ public class ListSubdirectoriesTool implements ToolMacro {
     private final ExploreToolSupport support;
     private final ToolSpecification specification = ToolSpecification.builder()
             .name(ToolMacros.LIST_SUBDIRECTORIES.name())
-            .description("List immediate sub-folders for a given absolute or relative path.")
+            .description(definition().description())
             .parameters(JsonObjectSchema.builder()
                     .addProperty("path", JsonStringSchema.builder().description("Directory path to inspect").build())
                     .required("path")

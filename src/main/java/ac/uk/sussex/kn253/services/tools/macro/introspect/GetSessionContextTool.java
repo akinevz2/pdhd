@@ -11,8 +11,7 @@ public class GetSessionContextTool implements ToolMacro {
     private final IntrospectToolSupport support;
     private final ToolSpecification specification = ToolSpecification.builder()
             .name(ToolMacros.GET_SESSION_CONTEXT.name())
-            .description(
-                    "Return the current working directory and the recent tool call history for this session.\nUse this to reflect on your current context, especially at the start of a new task or after changing directories.")
+            .description(definition().description())
             .parameters(JsonObjectSchema.builder().build())
             .build();
 

@@ -110,6 +110,30 @@ Return Response
 
 ## Settings and Configuration
 
+### Configuration Source of Truth (Ollama + LangChain)
+
+The application now treats persisted `OllamaSettings` as the runtime source of truth.
+
+Resolution order is:
+
+1. Persisted database settings (if a row exists)
+2. App-level config defaults (`ollama.*`) when creating the first row
+3. LangChain defaults mirrored from `ollama.*` at startup
+
+Implementation notes:
+
+- `application.properties` maps LangChain chat settings to app settings via property aliases:
+  - `quarkus.langchain4j.ollama.base-url=${ollama.base-url}`
+  - `quarkus.langchain4j.ollama.chat-model.model-id=${ollama.model-name}`
+- `application-test.properties` uses the same aliasing so tests resolve against the test base URL.
+- `OllamaConfigService.load()` and `OllamaConfigService.save(...)` synchronize current persisted values into runtime LangChain system properties.
+
+Practical outcome:
+
+- Tests: base URL resolves to `http://desktop-box26:11434`.
+- Runtime out of the box: base URL resolves to `http://localhost:11434`.
+- After user changes settings: the last saved DB values remain authoritative for runtime chat behavior.
+
 ### OllamaSettings Model
 
 **Location:** `src/main/java/ac/uk/sussex/kn253/model/OllamaSettings.java`
@@ -408,3 +432,19 @@ Could track:
 - [Tool Calling Architecture](tool-calling-architecture.md) - How tools are discovered and executed
 - [Embeddings Guide](embeddings.md) - Embedding generation and integration
 - [API Documentation](frontend.md) - Chat API endpoints
+
+## Operational Guardrails
+
+### Telemetry Data Retention (Do Not Drop)
+
+Telemetry tables are persistent operational evidence and must be preserved.
+
+- Current telemetry table: `tool_telemetry` (entity: `ToolTelemetryRecord`).
+- Schema strategy must remain non-destructive (`update`, not `drop-and-create`).
+- Do not add migrations or startup routines that drop, truncate, or recreate telemetry tables.
+
+Signal for future Copilot/agent runs:
+
+- Treat telemetry schema as immutable production history.
+- Any proposal that drops telemetry tables is a hard stop and must be rejected.
+- If schema evolution is required, use additive migrations only.

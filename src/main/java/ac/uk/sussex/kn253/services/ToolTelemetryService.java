@@ -5,7 +5,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.LongAdder;
 
+import ac.uk.sussex.kn253.repository.ToolTelemetryRepository;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 
 /**
  * In-memory telemetry aggregator for tool dispatch and execution.
@@ -13,6 +15,12 @@ import jakarta.enterprise.context.ApplicationScoped;
  * <p>
  * Stores per-tool execution counts, latency summaries, and categorized failures
  * so operators can diagnose regressions as the toolset grows.
+ *
+ * <p>
+ * Each call is also persisted to the {@code tool_telemetry} table via
+ * {@link ToolTelemetryRepository} so that records survive application restarts
+ * and are never lost due to schema changes (the {@code update} strategy never
+ * drops the table).
  */
 @ApplicationScoped
 public class ToolTelemetryService {
@@ -20,6 +28,9 @@ public class ToolTelemetryService {
     private static final int MAX_LATENCY_SAMPLES = 200;
 
     private final ConcurrentMap<String, ToolStats> statsByTool = new ConcurrentHashMap<>();
+
+    @Inject
+    ToolTelemetryRepository repository;
 
     public void record(
             final String toolName,
@@ -30,6 +41,13 @@ public class ToolTelemetryService {
         final String safeToolName = (toolName == null || toolName.isBlank()) ? "<unknown>" : toolName;
         statsByTool.computeIfAbsent(safeToolName, ignored -> new ToolStats())
                 .record(moduleName, durationNanos, errorClass, argumentValidationFailure);
+        if (repository != null) {
+            try {
+                repository.save(safeToolName, moduleName, durationNanos, errorClass, argumentValidationFailure);
+            } catch (final Exception ignored) {
+                // telemetry persistence must never interfere with tool execution
+            }
+        }
     }
 
     public List<ToolTelemetrySnapshot> snapshot() {

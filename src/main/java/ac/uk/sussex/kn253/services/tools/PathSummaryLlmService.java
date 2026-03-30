@@ -11,9 +11,20 @@ import jakarta.inject.Inject;
 /**
  * Produces concise, human-readable file/folder summaries using an isolated
  * one-shot LLM session (no tool access, no shared conversation state).
+ *
+ * <p>When summarization is not possible the return value will start with one of
+ * the sentinel prefixes {@link #SUMMARY_ERROR_PREFIX} or
+ * {@link #SUMMARY_UNAVAILABLE_PREFIX}. Callers can test for these to decide
+ * whether to fall back to static analysis.
  */
 @ApplicationScoped
 public class PathSummaryLlmService {
+
+    /** Prefix used when an exception prevents LLM summarization. */
+    public static final String SUMMARY_ERROR_PREFIX = "Failed to summarize";
+
+    /** Prefix used when the LLM returns a blank or null response. */
+    public static final String SUMMARY_UNAVAILABLE_PREFIX = "Summary unavailable";
 
     @Inject
     OllamaConfigService ollamaConfigService;
@@ -65,11 +76,11 @@ public class PathSummaryLlmService {
                     .sendOneShot(userPrompt);
 
             if (summary == null || summary.isBlank()) {
-                return "Summary unavailable for " + target + ".";
+                return SUMMARY_UNAVAILABLE_PREFIX + " for " + target + ".";
             }
             return "path=" + target.toAbsolutePath().normalize() + "\nsummary=\n" + summary.trim();
         } catch (final Exception e) {
-            return "Failed to summarize path via LLM for " + target + ": " + e.getMessage();
+            return SUMMARY_ERROR_PREFIX + " path via LLM for " + target + ": " + e.getMessage();
         }
     }
 }

@@ -8,7 +8,7 @@ class OllamaChatSessionTest {
 
     @Test
     void buildEffectiveSystemPromptIncludesPerRequestMetadata() {
-        final OllamaChatSession session = new OllamaChatSession("http://localhost:11434", "llama3.2")
+        final OllamaChatSession session = new OllamaChatSession("http://desktop-box26:11434", "llama3.2")
                 .setSystemPrompt("Base prompt")
                 .setRequestMetadataSupplier(() -> "Current folder metadata:\n- previouslyWorkedOnHere: true");
 

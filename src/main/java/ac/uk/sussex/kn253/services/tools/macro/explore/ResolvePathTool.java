@@ -12,7 +12,7 @@ public class ResolvePathTool implements ToolMacro {
     private final ExploreToolSupport support;
     private final ToolSpecification specification = ToolSpecification.builder()
             .name(ToolMacros.RESOLVE_PATH.name())
-            .description("Resolve an absolute or relative path against cwd and return the normalized absolute path.")
+            .description(definition().description())
             .parameters(JsonObjectSchema.builder()
                     .addProperty("path", JsonStringSchema.builder().description("Absolute or relative path").build())
                     .required("path")

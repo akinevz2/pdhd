@@ -12,7 +12,7 @@ public class SummarizePathTool implements ToolMacro {
     private final ExploreToolSupport support;
     private final ToolSpecification specification = ToolSpecification.builder()
             .name(ToolMacros.SUMMARIZE_PATH.name())
-            .description("Provide a concise summary of a file or directory path.")
+            .description(definition().description())
             .parameters(JsonObjectSchema.builder()
                     .addProperty("path",
                             JsonStringSchema.builder().description("File or directory path to summarize").build())

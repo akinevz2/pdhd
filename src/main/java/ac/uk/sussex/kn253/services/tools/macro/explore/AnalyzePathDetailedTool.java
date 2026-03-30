@@ -14,7 +14,7 @@ public class AnalyzePathDetailedTool implements ToolMacro {
     private final ExploreToolSupport support;
     private final ToolSpecification specification = ToolSpecification.builder()
             .name(ToolMacros.ANALYZE_PATH_DETAILED.name())
-            .description("Provide a detailed analysis of a file or directory path.")
+            .description(definition().description())
             .parameters(JsonObjectSchema.builder()
                     .addProperty("path",
                             JsonStringSchema.builder().description("File or directory path to analyze").build())

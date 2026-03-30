@@ -30,15 +30,15 @@ public interface OllamaConfig {
     @WithDefault("llama3.2")
     String modelName();
 
+    /** Default embeddings model name used when no explicit model is supplied. */
+    @WithName("embedding-model-name")
+    @WithDefault("qwen3-embedding")
+    String embeddingModelName();
+
     /** Request timeout in seconds for chat / generate calls. */
     @WithName("timeout-seconds")
     @WithDefault("120")
     int timeoutSeconds();
-
-    /** Whether to stream responses token-by-token. */
-    @WithName("streaming")
-    @WithDefault("false")
-    boolean streaming();
 
     /** Temperature (0.0 – 2.0). Higher = more creative. */
     @WithName("temperature")
@@ -54,4 +54,17 @@ public interface OllamaConfig {
     @WithName("num-ctx")
     @WithDefault("0")
     int numCtx();
+
+    /** Whether embeddings are enabled. */
+    @WithName("embedding-enabled")
+    @WithDefault("true")
+    Boolean embeddingEnabled();
+
+    @WithName("embedding-max-results")
+    @WithDefault("5")
+    Integer embeddingMaxResults();
+
+    @WithName("embedding-dimension")
+    @WithDefault("384")
+    Integer embeddingDimension();
 }

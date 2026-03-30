@@ -12,12 +12,7 @@ public class ReadProjectManifestTool implements ToolMacro {
     private final IntrospectToolSupport support;
     private final ToolSpecification specification = ToolSpecification.builder()
             .name(ToolMacros.READ_PROJECT_MANIFEST.name())
-            .description(
-                    "Read key project identity files (README, package.json, pom.xml, Cargo.toml, go.mod, requirements.txt, Makefile, etc.) from a directory and inspect src/ recursively (file list + sampled exact contents) to understand the project's purpose and technology stack.\n"
-                            + "Use ONLY for summarising or explaining the entire project.\n"
-                            + "Do NOT use for summarising individual files or folders—use read_folder_manifest (preferred) or the 'summarize_path' tool from ExploreToolset for those cases.\n"
-                            + "If the user asks to summarise a folder or file, do NOT call this tool.\n"
-                            + "Parameter 'path' is required unless using the current working directory.")
+            .description(definition().description())
             .parameters(JsonObjectSchema.builder()
                     .addProperty("path",
                             JsonStringSchema.builder()

@@ -33,7 +33,7 @@ public class GetRecentEmbeddingsToolImpl implements ToolMacro {
         this.embeddingService = embeddingService;
         this.specification = ToolSpecification.builder()
                 .name("get_recent_embeddings")
-                .description("Retrieve recently generated embeddings from the current conversation session.")
+                .description(definition().description())
                 .parameters(JsonObjectSchema.builder()
                         .addProperty("limit",
                                 JsonIntegerSchema.builder()
@@ -46,7 +46,10 @@ public class GetRecentEmbeddingsToolImpl implements ToolMacro {
     @Override
     public ToolMacroDefinition definition() {
         // Embedding tools are optional and dynamically loaded
-        return new ToolMacroDefinition("get_recent_embeddings", List.of());
+        return new ToolMacroDefinition("get_recent_embeddings",
+                "Retrieve recently generated embeddings from the current conversation session.",
+                Map.of(),
+                List.of("recent", "recall", "embeddings", "memory"));
     }
 
     @Override

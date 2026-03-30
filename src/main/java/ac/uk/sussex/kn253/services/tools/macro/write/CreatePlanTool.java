@@ -15,7 +15,7 @@ public class CreatePlanTool implements ToolMacro {
     private final WriteToolSupport support;
     private final ToolSpecification specification = ToolSpecification.builder()
             .name(ToolMacros.CREATE_PLAN.name())
-            .description("Create an execution plan markdown under <project>/.pdhd/plans.")
+            .description(definition().description())
             .parameters(JsonObjectSchema.builder()
                     .addProperty("projectDirectory",
                             JsonStringSchema.builder().description("Absolute path to project root").build())

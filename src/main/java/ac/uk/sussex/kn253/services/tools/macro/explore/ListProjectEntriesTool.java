@@ -12,7 +12,7 @@ public class ListProjectEntriesTool implements ToolMacro {
     private final ExploreToolSupport support;
     private final ToolSpecification specification = ToolSpecification.builder()
             .name(ToolMacros.LIST_PROJECT_ENTRIES.name())
-            .description("List files and folders in a project's directory, optionally under a relative subpath.")
+            .description(definition().description())
             .parameters(JsonObjectSchema.builder()
                     .addProperty("projectDirectory",
                             JsonStringSchema.builder().description("Absolute path to the project root directory")

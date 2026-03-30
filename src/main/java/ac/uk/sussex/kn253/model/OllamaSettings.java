@@ -97,18 +97,18 @@ public class OllamaSettings extends PanacheEntityBase {
         @Column(nullable = true)
         private String toolSystemPrompt = DEFAULT_TOOL_SYSTEM_PROMPT;
 
-        @Column(nullable = false)
+        @Column(nullable = true, columnDefinition = "BOOLEAN DEFAULT 0")
         private Boolean embeddingEnabled = false;
 
         @Column(nullable = true)
         private String embeddingModel = "qwen3-embedding";
 
         @Column(nullable = true)
-        private String embeddingBaseUrl = baseUrl;
+        private String embeddingBaseUrl; // null means: fall back to baseUrl at runtime
 
-        @Column(nullable = false)
+        @Column(nullable = true, columnDefinition = "INTEGER DEFAULT 384")
         private Integer embeddingDimension = 384;
 
-        @Column(nullable = false)
+        @Column(nullable = true, columnDefinition = "INTEGER DEFAULT 5")
         private Integer embeddingMaxResults = 5;
 }
