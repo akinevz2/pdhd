@@ -4,51 +4,24 @@ package ac.uk.sussex.kn253.model;
  * Represents a matched embedding from a semantic search, including similarity
  * score.
  */
-public class EmbeddingMatch {
+public record EmbeddingMatch(
+        String id,
+        String text,
+        String sourceType,
+        String sourceId,
+        long timestamp, float similarity) {
 
-    private final String id;
-    private final String text;
-    private final float similarity;
-    private final String sourceType;
-    private final String sourceId;
-    private final long timestamp;
-
-    public EmbeddingMatch(
-            final String id,
-            final String text,
-            final float similarity,
-            final String sourceType,
-            final String sourceId,
-            final long timestamp) {
-        this.id = id;
-        this.text = text;
-        this.similarity = similarity;
-        this.sourceType = sourceType;
-        this.sourceId = sourceId;
-        this.timestamp = timestamp;
+    public EmbeddingMatch(final EmbeddingEntity entity, final float similarity) {
+        this(
+                entity.getId(),
+                entity.getTextSnippet(),
+                entity.getSourceType(),
+                entity.getSourceId(),
+                entity.getTimestamp(),
+                similarity);
     }
 
-    public String id() {
-        return id;
-    }
-
-    public String text() {
-        return text;
-    }
-
-    public float similarity() {
-        return similarity;
-    }
-
-    public String sourceType() {
-        return sourceType;
-    }
-
-    public String sourceId() {
-        return sourceId;
-    }
-
-    public long timestamp() {
-        return timestamp;
+    public EmbeddingMatch(final EmbeddingEntity entity) {
+        this(entity, 0f);
     }
 }

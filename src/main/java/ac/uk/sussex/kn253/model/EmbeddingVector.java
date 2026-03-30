@@ -7,59 +7,22 @@ package ac.uk.sussex.kn253.model;
  * An embedding is a numerical representation of text that captures
  * semantic meaning, enabling similarity-based retrieval.
  */
-public class EmbeddingVector {
+public record EmbeddingVector(
+        String id,
+        String text,
+        long timestamp,
+        String sourceType,
+        String sourceId,
+        String memoryId, float[] vector) {
 
-    private final String id;
-    private final float[] vector;
-    private final String text;
-    private final long timestamp;
-    private final String sourceType;
-    private final String sourceId;
-    private final String memoryId;
-
-    public EmbeddingVector(
-            final String id,
-            final float[] vector,
-            final String text,
-            final long timestamp,
-            final String sourceType,
-            final String sourceId,
-            final String memoryId) {
-        this.id = id;
-        this.vector = vector;
-        this.text = text;
-        this.timestamp = timestamp;
-        this.sourceType = sourceType;
-        this.sourceId = sourceId;
-        this.memoryId = memoryId;
-    }
-
-    public String id() {
-        return id;
-    }
-
-    public float[] vector() {
-        return vector;
-    }
-
-    public String text() {
-        return text;
-    }
-
-    public long timestamp() {
-        return timestamp;
-    }
-
-    public String sourceType() {
-        return sourceType;
-    }
-
-    public String sourceId() {
-        return sourceId;
-    }
-
-    public String memoryId() {
-        return memoryId;
+    public EmbeddingVector(final EmbeddingEntity entity, final float[] vector) {
+        this(
+                entity.getId(),
+                entity.getTextSnippet(),
+                entity.getTimestamp(),
+                entity.getSourceType(),
+                entity.getSourceId(),
+                entity.getMemoryId(), vector);
     }
 
     public int dimension() {
@@ -71,7 +34,7 @@ public class EmbeddingVector {
      * Returns value between -1 and 1 (typically 0 to 1 for normalized vectors).
      */
     public float cosineSimilarity(final EmbeddingVector other) {
-        if (other == null || other.vector.length != this.vector.length) {
+        if (other == null || other.vector().length != this.vector.length) {
             return 0f;
         }
 
@@ -80,9 +43,9 @@ public class EmbeddingVector {
         float normB = 0f;
 
         for (int i = 0; i < this.vector.length; i++) {
-            dotProduct += this.vector[i] * other.vector[i];
+            dotProduct += this.vector[i] * other.vector()[i];
             normA += this.vector[i] * this.vector[i];
-            normB += other.vector[i] * other.vector[i];
+            normB += other.vector()[i] * other.vector()[i];
         }
 
         if (normA == 0f || normB == 0f) {

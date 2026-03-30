@@ -26,14 +26,14 @@ class SystemPromptBuilderTest {
 
         assertTrue(prompt.contains("read_project_knowledge"));
         assertTrue(prompt.contains("cache_project_knowledge"));
-        assertTrue(prompt.contains("previouslyWorkedOnHere=true"));
+        assertTrue(prompt.contains("hasHistory=true"));
         assertTrue(prompt.contains("Treat current-folder metadata as authoritative context"));
         assertTrue(prompt.contains("After completing work that establishes a durable requirement"));
     }
 
     @Test
     void defaultPromptsMentionKnowledgeRecallAndCaching() {
-        assertTrue(OllamaSettings.DEFAULT_SYSTEM_PROMPT.contains("previouslyWorkedOnHere=true"));
+        assertTrue(OllamaSettings.DEFAULT_SYSTEM_PROMPT.contains("hasHistory=true"));
         assertTrue(OllamaSettings.DEFAULT_SYSTEM_PROMPT.contains("persist a concise tagged knowledge note"));
         assertTrue(OllamaSettings.DEFAULT_TOOL_SYSTEM_PROMPT.contains("read_project_knowledge"));
         assertTrue(OllamaSettings.DEFAULT_TOOL_SYSTEM_PROMPT.contains("cache_project_knowledge"));

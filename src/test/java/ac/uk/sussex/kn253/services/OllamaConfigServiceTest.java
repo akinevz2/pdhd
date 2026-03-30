@@ -1,11 +1,11 @@
 package ac.uk.sussex.kn253.services;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 
 import ac.uk.sussex.kn253.model.OllamaSettings;
+import ac.uk.sussex.kn253.testsupport.OllamaTestSupport;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
@@ -26,10 +26,15 @@ class OllamaConfigServiceTest {
 
     @Test
     void loadSeedsLangchainSystemPropertiesFromResolvedDefaults() {
+        final String baseUrl = OllamaTestSupport.testBaseUrl();
+        Assumptions.assumeTrue(
+                OllamaTestSupport.isReachable(baseUrl),
+                () -> "Skipping: workstation Ollama not reachable at " + baseUrl);
+
         final OllamaSettings loaded = ollamaConfigService.load();
 
-        assertEquals("http://desktop-box26:11434", loaded.getBaseUrl());
-        assertEquals("http://desktop-box26:11434", System.getProperty("quarkus.langchain4j.ollama.base-url"));
+        assertEquals(baseUrl, loaded.getBaseUrl());
+        assertEquals(baseUrl, System.getProperty("quarkus.langchain4j.ollama.base-url"));
         assertEquals(loaded.getModelName(), System.getProperty("quarkus.langchain4j.ollama.chat-model.model-id"));
     }
 

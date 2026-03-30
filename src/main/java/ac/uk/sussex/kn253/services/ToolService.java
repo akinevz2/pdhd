@@ -2,6 +2,8 @@ package ac.uk.sussex.kn253.services;
 
 import java.util.*;
 
+import org.jspecify.annotations.NonNull;
+
 import ac.uk.sussex.kn253.services.tools.ToolModule;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.agent.tool.ToolSpecification;
@@ -20,18 +22,18 @@ public class ToolService {
     @Inject
     ToolTelemetryService toolTelemetryService;
 
-    private List<ToolModule> testToolModules;
-    private volatile List<ToolModule> resolvedToolModules;
+    private List<@NonNull ToolModule> testToolModules;
+    private volatile List<@NonNull ToolModule> resolvedToolModules;
     private volatile boolean modulesValidated;
 
     ToolService() {
     }
 
-    ToolService(final List<ToolModule> toolModules) {
+    ToolService(final List<@NonNull ToolModule> toolModules) {
         this(toolModules, null);
     }
 
-    ToolService(final List<ToolModule> toolModules, final ToolTelemetryService toolTelemetryService) {
+    ToolService(final List<@NonNull ToolModule> toolModules, final ToolTelemetryService toolTelemetryService) {
         this.testToolModules = List.copyOf(toolModules);
         this.toolTelemetryService = toolTelemetryService;
     }
@@ -83,7 +85,7 @@ public class ToolService {
         return result;
     }
 
-    private List<ToolModule> toolModules() {
+    private List<@NonNull ToolModule> toolModules() {
         if (modulesValidated && resolvedToolModules != null) {
             return resolvedToolModules;
         }
@@ -93,14 +95,18 @@ public class ToolService {
                 return resolvedToolModules;
             }
 
-            final List<ToolModule> rawModules;
+            final List<@NonNull ToolModule> rawModules;
             if (testToolModules != null) {
                 rawModules = testToolModules;
             } else {
-                rawModules = toolModules == null ? List.of() : toolModules.stream().toList();
+                rawModules = toolModules == null ? List.of()
+                        : toolModules.stream()
+                                .filter(Objects::nonNull)
+                                .map(module -> (@NonNull ToolModule) module)
+                                .toList();
             }
 
-            final List<ToolModule> orderedModules = rawModules.stream()
+            final List<@NonNull ToolModule> orderedModules = rawModules.stream()
                     .sorted(Comparator.comparing(module -> module.getClass().getName()))
                     .toList();
 
@@ -111,7 +117,7 @@ public class ToolService {
         }
     }
 
-    private void validateUniqueToolNames(final List<ToolModule> modules) {
+    private void validateUniqueToolNames(final List<@NonNull ToolModule> modules) {
         final Map<String, List<String>> owners = new LinkedHashMap<>();
 
         for (final ToolModule module : modules) {

@@ -2,6 +2,8 @@ package ac.uk.sussex.kn253.model;
 
 import java.util.List;
 
+import org.jspecify.annotations.NonNull;
+
 import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 import jakarta.persistence.*;
 import lombok.*;
@@ -21,5 +23,5 @@ public class GitRepository extends PanacheEntityBase {
     public Long id;
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "git_repository_origins", joinColumns = @JoinColumn(name = "git_repository_id"))
-    List<Origin> origins;
+    List<@NonNull Origin> origins;
 }

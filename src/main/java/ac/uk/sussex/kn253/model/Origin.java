@@ -17,13 +17,15 @@ import lombok.*;
 @Setter
 @Getter
 public class Origin {
+    private static final String GITHUB_HOST = "github.com";
+
     @Column(nullable = false)
     String name;
     @Column(nullable = true)
-    String url;
+    URL url;
 
-    public Origin(final String name, final URL url) {
-        this.name = name;
-        this.url = url != null ? url.toString() : null;
+    public boolean isGithub() {
+        return url != null && GITHUB_HOST.equalsIgnoreCase(url.getHost());
     }
+
 }

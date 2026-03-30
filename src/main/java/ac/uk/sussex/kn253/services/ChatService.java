@@ -2,9 +2,13 @@ package ac.uk.sussex.kn253.services;
 
 import java.util.Locale;
 
+import org.jboss.logging.Logger;
+
+import ac.uk.sussex.kn253.Main;
 import ac.uk.sussex.kn253.model.EmbeddingVector;
 import ac.uk.sussex.kn253.model.OllamaSettings;
 import ac.uk.sussex.kn253.ollama.OllamaChatSession;
+import ac.uk.sussex.kn253.schema.ToolSupport;
 import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -22,6 +26,7 @@ import jakarta.inject.Inject;
 @ApplicationScoped
 public class ChatService {
 
+    private static final Logger LOG = Logger.getLogger(ChatService.class);
     private static final String EMBEDDINGS_SESSION_ID = "default-chat-session";
 
     @Inject
@@ -32,6 +37,9 @@ public class ChatService {
 
     @Inject
     OllamaConfigService ollamaConfigService;
+
+    @Inject
+    Main main;
 
     @Inject
     WorkingDirectoryService workingDirectoryService;
@@ -54,13 +62,12 @@ public class ChatService {
      * Called on startup and after the user saves new config.
      */
     public void reconfigure(final OllamaSettings settings) {
-        final String systemPrompt = settings.getSystemPrompt() == null || settings.getSystemPrompt().isBlank()
-                ? OllamaSettings.DEFAULT_SYSTEM_PROMPT
-                : settings.getSystemPrompt();
-        final String toolSystemPrompt = settings.getToolSystemPrompt() == null
-                || settings.getToolSystemPrompt().isBlank()
-                        ? OllamaSettings.DEFAULT_TOOL_SYSTEM_PROMPT
-                        : settings.getToolSystemPrompt();
+        final String systemPrompt = withDefaultPrompt(
+                settings.getSystemPrompt(),
+                OllamaSettings.DEFAULT_SYSTEM_PROMPT);
+        final String toolSystemPrompt = withDefaultPrompt(
+                settings.getToolSystemPrompt(),
+                OllamaSettings.DEFAULT_TOOL_SYSTEM_PROMPT);
 
         this.chatSession = OllamaChatSession.builder()
                 .baseUrl(settings.getBaseUrl())
@@ -83,22 +90,22 @@ public class ChatService {
             return directReply;
         }
 
-        // Generate embedding for user input
-        if (embeddingService.isEnabled()) {
-            try {
-                final EmbeddingVector embedding = embeddingService.generateEmbedding(
-                        message,
-                        EMBEDDINGS_SESSION_ID);
-                if (embedding != null) {
-                    embeddingService.storeEmbedding(
-                            embedding,
-                            "user-input-" + System.currentTimeMillis(),
-                            "user_input",
-                            EMBEDDINGS_SESSION_ID);
-                }
-            } catch (final Exception e) {
-                // Graceful degradation - embedding failure doesn't block conversation
-            }
+        if (!embeddingService.isEnabled()) {
+            return chatSession.send(message);
+        }
+
+        try {
+            final EmbeddingVector embedding = embeddingService.generateEmbedding(
+                    message,
+                    EMBEDDINGS_SESSION_ID);
+            embeddingService.storeEmbedding(
+                    embedding,
+                    "user-input-" + System.currentTimeMillis(),
+                    ToolSupport.VALUE_USER_INPUT,
+                    EMBEDDINGS_SESSION_ID);
+        } catch (final Exception e) {
+            LOG.errorf(e, "Failed to generate/store embedding for chat message");
+            throw new IllegalStateException("Failed to generate embeddings for this message", e);
         }
 
         return chatSession.send(message);
@@ -110,22 +117,22 @@ public class ChatService {
             return directReply;
         }
 
-        // Generate embedding for user input
-        if (embeddingService.isEnabled()) {
-            try {
-                final EmbeddingVector embedding = embeddingService.generateEmbedding(
-                        message,
-                        EMBEDDINGS_SESSION_ID);
-                if (embedding != null) {
-                    embeddingService.storeEmbedding(
-                            embedding,
-                            "user-input-oneshot-" + System.currentTimeMillis(),
-                            "user_input",
-                            EMBEDDINGS_SESSION_ID);
-                }
-            } catch (final Exception e) {
-                // Graceful degradation - embedding failure doesn't block conversation
-            }
+        if (!embeddingService.isEnabled()) {
+            return chatSession.sendOneShot(message);
+        }
+
+        try {
+            final EmbeddingVector embedding = embeddingService.generateEmbedding(
+                    message,
+                    EMBEDDINGS_SESSION_ID);
+            embeddingService.storeEmbedding(
+                    embedding,
+                    "user-input-oneshot-" + System.currentTimeMillis(),
+                    ToolSupport.VALUE_USER_INPUT,
+                    EMBEDDINGS_SESSION_ID);
+        } catch (final Exception e) {
+            LOG.errorf(e, "Failed to generate/store embedding for one-shot message");
+            throw new IllegalStateException("Failed to generate embeddings for this message", e);
         }
 
         return chatSession.sendOneShot(message);
@@ -148,11 +155,23 @@ public class ChatService {
         }
 
         return switch (normalized) {
-            case "hello", "hi", "hey", "hello there", "hi there", "hey there" ->
+            case "hello", "hi", "hey", "hello there", "hi there", "hey there", "/hi" ->
                 "Hello. Ask about the project, files, or repository and I can inspect them.";
-            case "thanks", "thank you", "cheers" ->
+            case "thanks", "thank you", "cheers", "/thanks" ->
                 "You're welcome.";
+            case "goodbye", "bye", "see you", "see ya", "/bye" -> {
+                main.exit();
+                yield "Goodbye.";
+            }
+
             default -> null;
         };
+    }
+
+    private String withDefaultPrompt(final String configuredPrompt, final String defaultPrompt) {
+        if (configuredPrompt == null || configuredPrompt.isBlank()) {
+            return defaultPrompt;
+        }
+        return configuredPrompt;
     }
 }

@@ -11,6 +11,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import org.jspecify.annotations.NonNull;
+
+import ac.uk.sussex.kn253.api.*;
 import ac.uk.sussex.kn253.model.*;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -41,11 +44,22 @@ public class RepoService {
 
     /**
      * Resolves the full {@link Project} for the given directory: detects the git
-     * repository, queries GitHub via the {@code gh} CLI if available, and persists
-     * everything to the database.
+     * repository, optionally queries GitHub metadata, and persists the project.
+     *
+     * <p>
+     * <ul>
+     * <li>Non-git paths are rejected via {@link NotAGitRepositoryException}.</li>
+     * <li>Git paths always produce a persisted {@link Project} with a persisted
+     * {@link GitRepository}.</li>
+     * <li>GitHub metadata is best-effort: if the repo is not linked to GitHub,
+     * or GitHub metadata cannot be resolved, the project is still persisted with
+     * {@code githubRepo == null}.</li>
+     * </ul>
+     * 
+     * @throws ResolutionException if there are errors resolving the project
      */
     @Transactional
-    public Project resolveProject(final Path path) {
+    public Project resolveProject(final Path path) throws ResolutionException {
         final String directory = path.toAbsolutePath().normalize().toString();
         final Project existing = Project.find("directory", directory).firstResult();
         if (existing != null) {
@@ -53,11 +67,14 @@ public class RepoService {
         }
 
         final GitRepository gitRepo = getGitRepository(path);
-        final GithubRepository githubRepo = getGithubRepository(path);
-
-        if (gitRepo != null) {
-            gitRepo.persist();
+        GithubRepository githubRepo = null;
+        try {
+            githubRepo = getGithubRepository(path);
+        } catch (final IOException | InterruptedException forwarded) {
+            throw new ResolutionException(path, "GitHub repository metadata", forwarded);
         }
+
+        gitRepo.persist();
         if (githubRepo != null) {
             githubRepo.persist();
         }
@@ -69,43 +86,48 @@ public class RepoService {
 
     /**
      * Queries GitHub repository metadata (name, description) for the repository at
-     * {@code path} using the {@code gh} CLI. Returns {@code null} if {@code gh} is
-     * not installed, the path is not a git repository, or it is not linked to
-     * GitHub.
+     * {@code path} using the {@code gh} CLI.
+     *
+     * <p>
+     * Intended behaviour (strict getter):
+     * <ul>
+     * <li>Throws {@link NotAGitRepositoryException} when {@code path} is not a git
+     * repository.</li>
+     * <li>Throws {@link NotAGithubRepositoryException} when the git repo has no
+     * GitHub remotes, the {@code gh} CLI is unavailable, or metadata lookup
+     * fails.</li>
+     * <li>Returns a non-null {@link GithubRepository} on success.</li>
+     * </ul>
+     * 
+     * @throws InterruptedException
+     * @throws IOException
      */
-    public GithubRepository getGithubRepository(final Path path) {
-        if (!isGhInstalled() || !isGitRepository(path)) {
-            return null;
+    public GithubRepository getGithubRepository(final Path path) throws IOException, InterruptedException {
+        if (!isGitRepository(path)) {
+            throw new NotAGitRepositoryException(path);
         }
-        try {
-            final ProcessBuilder pb = new ProcessBuilder(
-                    "gh", "repo", "view", "--json", "name,description");
-            pb.directory(path.toFile());
-            pb.redirectErrorStream(true);
-
-            final Process process = pb.start();
-            final String output;
-            try (final BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
-                output = reader.lines().collect(Collectors.joining("\n"));
-            }
-            if (!waitForProcess(process, "gh repo view", path) || process.exitValue() != 0) {
-                return null;
-            }
-            return parseGhRepoJson(output);
-        } catch (final Exception e) {
-            Log.warnf("Failed to query GitHub repository info at %s: %s", path, e.getMessage());
-            return null;
+        if (!isGhInstalled()) {
+            throw new NotAGithubRepositoryException(path, NotAGithubRepositoryException.GITHUB_CLI_MISSING);
         }
+        final var gitOrigins = getGitOrigins(path);
+        if (gitOrigins.isEmpty()) {
+            throw new NotAGithubRepositoryException(path, "No remotes found");
+        }
+        if (gitOrigins.stream().noneMatch(Origin::isGithub)) {
+            throw new NotAGithubRepositoryException(path, "No GitHub remotes found");
+        }
+        return queryGithubMetadata(path);
     }
 
     /**
      * Returns a {@link GitRepository} populated with all fetch remotes for the
-     * repository at {@code path}, or {@code null} if the path is not a git repo.
+     * repository at {@code path}.
+     *
+     * @throws NotAGitRepositoryException if the path is not a git repository
      */
-    public GitRepository getGitRepository(final Path path) {
+    public @NonNull GitRepository getGitRepository(final Path path) {
         if (!isGitRepository(path)) {
-            return null;
+            throw new NotAGitRepositoryException(path);
         }
         return new GitRepository(null, getGitOrigins(path));
     }
@@ -114,13 +136,48 @@ public class RepoService {
     // Private helpers
     // -------------------------------------------------------------------------
 
-    private GithubRepository parseGhRepoJson(final String json) {
-        final String name = extractJsonStringField(json, "name");
-        final String description = extractJsonStringField(json, "description");
-        if (name == null) {
-            return null;
+    private GithubRepository parseGhRepoJson(final Process process, final Path path)
+            throws IOException, InterruptedException {
+        try (final BufferedReader reader = new BufferedReader(
+                new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+            final String output = reader.lines().collect(Collectors.joining("\n"));
+
+            if (!waitForProcess(process, "gh repo view", path) || process.exitValue() != 0) {
+                throw new NotAGithubRepositoryException(path, "gh repo view command failed");
+            }
+
+            final String name = extractJsonStringField(output, "name");
+            final String description = extractJsonStringField(output, "description");
+            if (name == null) {
+                throw new NotAGithubRepositoryException(path, "Failed to parse GitHub repository metadata");
+            }
+            return new GithubRepository(null, name, description);
         }
-        return new GithubRepository(null, name, description);
+    }
+
+    /**
+     * Queries GitHub repository metadata by executing {@code gh repo view} in the
+     * given directory.
+     *
+     * @return a {@link GithubRepository} with name and description, or {@code null}
+     *         if the repository is not a GitHub repository
+     * @throws IOException          if there are errors executing the {@code gh}
+     *                              command or
+     *                              parsing its output
+     * @throws InterruptedException if the {@code gh} command is interrupted during
+     *                              execution
+     */
+    private GithubRepository queryGithubMetadata(final Path path) throws ResolutionException {
+        try {
+            final ProcessBuilder pb = new ProcessBuilder("gh", "repo", "view", "--json", "name,description");
+            pb.directory(path.toFile());
+            pb.redirectErrorStream(true);
+
+            final Process process = pb.start();
+            return parseGhRepoJson(process, path);
+        } catch (final IOException | InterruptedException e) {
+            throw new ResolutionException(path, "gh repo view command failed", e);
+        }
     }
 
     /**
@@ -154,7 +211,7 @@ public class RepoService {
         }
     }
 
-    private List<Origin> getGitOrigins(final Path path) {
+    private List<@NonNull Origin> getGitOrigins(final Path path) {
         try {
             final ProcessBuilder pb = new ProcessBuilder("git", "remote", "-v");
             pb.directory(path.toFile());
@@ -163,20 +220,22 @@ public class RepoService {
             final Process process = pb.start();
             try (final BufferedReader reader = new BufferedReader(
                     new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
-                final List<Origin> origins = reader.lines()
+                final List<@NonNull Origin> origins = reader.lines()
                         .filter(line -> line.endsWith("(fetch)"))
                         .map(line -> {
                             final String[] parts = line.split("\\s+");
                             return new Origin(parts[0], parseRemoteUrl(parts[1]));
                         })
                         .toList();
-                if (!waitForProcess(process, "git remote -v", path) || process.exitValue() != 0) {
+                final boolean processSuccess = waitForProcess(process, "git remote -v", path)
+                        && process.exitValue() == 0;
+                if (!processSuccess) {
                     return List.of();
                 }
                 return origins;
             }
-        } catch (final Exception e) {
-            return List.of();
+        } catch (final IOException | InterruptedException e) {
+            throw new ResolutionException(path, "git remote -v command failed", e);
         }
     }
 

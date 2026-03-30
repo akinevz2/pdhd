@@ -137,7 +137,7 @@ class OllamaToolRequestIntegrationTest {
         }
 
         @Test
-        void toolRequestRoundTripAgainstQwenAndLlamaModels() {
+        void toolRequestRoundTripAgainstGlmAndLlamaModels() {
                 final String baseUrl = OllamaTestSupport.testBaseUrl();
                 Assumptions.assumeTrue(
                                 OllamaTestSupport.isReachable(baseUrl),

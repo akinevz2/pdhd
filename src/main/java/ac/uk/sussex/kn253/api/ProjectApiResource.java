@@ -1,17 +1,20 @@
 package ac.uk.sussex.kn253.api;
 
 import java.io.IOException;
-import java.net.URI;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Stream;
 
+import org.jspecify.annotations.NonNull;
+
 import ac.uk.sussex.kn253.api.model.*;
 import ac.uk.sussex.kn253.model.*;
+import ac.uk.sussex.kn253.schema.SchemaKeys;
+import ac.uk.sussex.kn253.schema.ToolSupport;
 import ac.uk.sussex.kn253.services.*;
-import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
@@ -56,6 +59,8 @@ public class ProjectApiResource {
     private static final int MAX_TREE_DEPTH = 5;
     private static final int MAX_FILE_BYTES = 1024 * 1024;
     private static final int MAX_IMAGE_FILE_BYTES = 5 * 1024 * 1024;
+    private static final String SCHEMA_TOOL_ACTIVITY_V2 = "tool-activity.v2";
+    private static final String SCHEMA_TOOL_TELEMETRY_V1 = "tool-telemetry.v1";
 
     @Inject
     ToolActivityService toolActivityService;
@@ -84,22 +89,20 @@ public class ProjectApiResource {
      * a corresponding {@link Project} tag in the database.
      *
      * @return ordered list of project summaries.
+     * @throws IOException if there are filesystem errors during discovery
+     *                     are propagated to the caller.
      */
     @GET
     @Path("/projects")
     @Transactional
-    public List<ProjectSummaryResponse> projects() {
+    public List<@NonNull ProjectSummaryResponse> projects() throws IOException {
         try {
             projectDiscoveryService.discoverFromCwd();
-        } catch (final Exception e) {
-            Log.warnf("Project discovery failed: %s", e.getMessage());
+        } catch (final IOException e) {
+            throw e;
         }
-        return Project.<Project>listAll().stream()
-                .sorted(Comparator.comparing(p -> p.id))
-                .map(p -> new ProjectSummaryResponse(
-                        p.id,
-                        p.getDirectory(),
-                        p.getGitRepository() != null))
+        return Project.<Project>streamAll()
+                .map(ProjectSummaryResponse::new)
                 .toList();
     }
 
@@ -116,10 +119,10 @@ public class ProjectApiResource {
                 .sorted(Comparator.comparing(ProjectKnowledge::getKey))
                 .map(k -> {
                     final Map<String, Object> m = new LinkedHashMap<>();
-                    m.put("id", k.id);
-                    m.put("key", k.getKey());
-                    m.put("jsonContent", k.getJsonContent());
-                    m.put("updatedAt", k.getUpdatedAt().toString());
+                    m.put(SchemaKeys.ID, k.id);
+                    m.put(SchemaKeys.KEY, k.getKey());
+                    m.put(SchemaKeys.JSON_CONTENT, k.getJsonContent());
+                    m.put(SchemaKeys.UPDATED_AT, k.getUpdatedAt().toString());
                     return m;
                 })
                 .toList();
@@ -143,9 +146,10 @@ public class ProjectApiResource {
         if (key == null || key.isBlank()) {
             throw new WebApplicationException("Knowledge key must not be blank", Response.Status.BAD_REQUEST);
         }
-        final String jsonContent = body == null ? null : String.valueOf(body.get("jsonContent"));
+        final String jsonContent = body == null ? null : String.valueOf(body.get(SchemaKeys.JSON_CONTENT));
         if (jsonContent == null || jsonContent.equals("null")) {
-            throw new WebApplicationException("Missing required field: jsonContent", Response.Status.BAD_REQUEST);
+            throw new WebApplicationException("Missing required field: " + SchemaKeys.JSON_CONTENT,
+                    Response.Status.BAD_REQUEST);
         }
         final Project project = requireProject(id);
         final Instant now = Instant.now();
@@ -158,10 +162,10 @@ public class ProjectApiResource {
         }
         entry.persist();
         final Map<String, Object> result = new LinkedHashMap<>();
-        result.put("id", entry.id);
-        result.put("key", entry.getKey());
-        result.put("jsonContent", entry.getJsonContent());
-        result.put("updatedAt", entry.getUpdatedAt().toString());
+        result.put(SchemaKeys.ID, entry.id);
+        result.put(SchemaKeys.KEY, entry.getKey());
+        result.put(SchemaKeys.JSON_CONTENT, entry.getJsonContent());
+        result.put(SchemaKeys.UPDATED_AT, entry.getUpdatedAt().toString());
         return result;
     }
 
@@ -190,7 +194,7 @@ public class ProjectApiResource {
     @GET
     @Path("/cwd")
     public Map<String, String> cwd() {
-        return Map.of("cwd", workingDirectoryService.getCurrentWorkingDirectory().toString());
+        return Map.of(SchemaKeys.CWD, workingDirectoryService.getCurrentWorkingDirectory().toString());
     }
 
     /**
@@ -203,12 +207,13 @@ public class ProjectApiResource {
     @Path("/cwd")
     @Consumes(MediaType.APPLICATION_JSON)
     public Map<String, String> setCwd(final Map<String, String> request) {
-        final String path = request == null ? null : request.get("path");
+        final String path = request == null ? null : request.get(SchemaKeys.PATH);
         if (path == null || path.isBlank()) {
-            throw new WebApplicationException("Missing required field: path", Response.Status.BAD_REQUEST);
+            throw new WebApplicationException("Missing required field: " + SchemaKeys.PATH,
+                    Response.Status.BAD_REQUEST);
         }
         try {
-            return Map.of("cwd", workingDirectoryService.navigateTo(path).toString());
+            return Map.of(SchemaKeys.CWD, workingDirectoryService.navigateTo(path).toString());
         } catch (final IllegalArgumentException e) {
             throw new WebApplicationException(e.getMessage(), Response.Status.BAD_REQUEST);
         }
@@ -298,9 +303,13 @@ public class ProjectApiResource {
                     .map(this::toFsEntry)
                     .toList();
             final Map<String, Object> response = new LinkedHashMap<>();
-            response.put("path", directory.toAbsolutePath().normalize().toString());
-            response.put("entries", entries);
-            response.put("repoUrl", repositoryUrlFor(directory));
+            response.put(SchemaKeys.PATH, directory.toAbsolutePath().normalize().toString());
+            response.put(SchemaKeys.ENTRIES, entries);
+            try {
+                response.put(SchemaKeys.REPO_URL, getRepositoryUrl(directory));
+            } catch (final NotAGitRepositoryException e) {
+                response.put(SchemaKeys.REPO_URL, ToolSupport.VALUE_REPO_URL_ABSENT);
+            }
             return response;
         } catch (final IOException e) {
             throw new WebApplicationException("Failed to list directory", Response.Status.INTERNAL_SERVER_ERROR);
@@ -309,59 +318,29 @@ public class ProjectApiResource {
 
     private Map<String, Object> toFsEntry(final java.nio.file.Path path) {
         final Map<String, Object> entry = new LinkedHashMap<>();
-        entry.put("name", path.getFileName().toString());
-        entry.put("path", path.toAbsolutePath().normalize().toString());
-        entry.put("directory", Files.isDirectory(path));
-        entry.put("repoUrl", repositoryUrlFor(path));
+        entry.put(SchemaKeys.NAME, path.getFileName().toString());
+        entry.put(SchemaKeys.PATH, path.toAbsolutePath().normalize().toString());
+        entry.put(SchemaKeys.DIRECTORY, Files.isDirectory(path));
+        try {
+            entry.put(SchemaKeys.REPO_URL, getRepositoryUrl(path));
+        } catch (final NotAGitRepositoryException e) {
+            entry.put(SchemaKeys.REPO_URL, ToolSupport.VALUE_REPO_URL_ABSENT);
+        }
         return entry;
     }
 
-    private String repositoryUrlFor(final java.nio.file.Path path) {
-        if (!Files.isDirectory(path) || !Files.exists(path.resolve(".git"))) {
-            return null;
-        }
-
-        final GitRepository gitRepository = repoService.getGitRepository(path);
-        if (gitRepository == null || gitRepository.getOrigins() == null) {
-            return null;
-        }
-
-        return gitRepository.getOrigins().stream()
+    private URL getRepositoryUrl(final java.nio.file.Path path) throws NotAGitRepositoryException {
+        return repoService.getGitRepository(path)
+                .getOrigins()
+                .stream()
                 .filter(Objects::nonNull)
                 .sorted(Comparator.comparing(origin -> {
                     final String name = origin.getName();
                     return "origin".equalsIgnoreCase(name != null ? name : "") ? 0 : 1;
                 }))
                 .map(Origin::getUrl)
-                .filter(Objects::nonNull)
-                .map(String::trim)
-                .filter(url -> !url.isBlank())
-                .map(ProjectApiResource::normalizeRepoUrl)
-                .filter(Objects::nonNull)
                 .findFirst()
-                .orElse(null);
-    }
-
-    private static String normalizeRepoUrl(final String url) {
-        try {
-            final URI uri = URI.create(url);
-            final String scheme = uri.getScheme();
-            if (scheme == null
-                    || (!scheme.equalsIgnoreCase("http") && !scheme.equalsIgnoreCase("https"))) {
-                return null;
-            }
-
-            String normalized = uri.toString();
-            if (normalized.endsWith(".git")) {
-                normalized = normalized.substring(0, normalized.length() - 4);
-            }
-            while (normalized.endsWith("/")) {
-                normalized = normalized.substring(0, normalized.length() - 1);
-            }
-            return normalized;
-        } catch (final IllegalArgumentException e) {
-            return null;
-        }
+                .orElseThrow(() -> new NotAGitRepositoryException(path));
     }
 
     /**
@@ -453,15 +432,9 @@ public class ProjectApiResource {
     @Path("/tool-activity")
     public ToolActivityResponse toolActivity(
             @QueryParam("limit") @DefaultValue("100") final int limit) {
-        final List<ToolActivityResponse.ToolActivityItem> items = toolActivityService.recent(limit).stream()
-                .map(event -> new ToolActivityResponse.ToolActivityItem(
-                        event.timestamp(),
-                        event.toolName(),
-                        event.argumentsJson(),
-                        event.result(),
-                        event.requestedFiles()))
-                .toList();
-        return new ToolActivityResponse(items);
+        return new ToolActivityResponse(toolActivityService.recent(limit).stream()
+                .map(ToolActivityResponse.ToolActivityItem::new)
+                .toList());
     }
 
     /**
@@ -473,18 +446,14 @@ public class ProjectApiResource {
     @Path("/tool-activity/v2")
     public VersionedToolActivityResponse toolActivityV2(
             @QueryParam("limit") @DefaultValue("100") final int limit) {
-        final List<VersionedToolActivityResponse.ToolActivityItem> items = toolActivityService.recent(limit).stream()
-                .map(event -> new VersionedToolActivityResponse.ToolActivityItem(
-                        event.timestamp(),
-                        event.toolName(),
-                        event.argumentsJson(),
-                        event.result(),
-                        event.requestedFiles()))
+        final List<VersionedToolActivityResponse.@NonNull ToolActivityItem> items = toolActivityService.recent(limit)
+                .stream()
+                .map(VersionedToolActivityResponse.ToolActivityItem::new)
                 .toList();
 
         final String summary = "Captured " + items.size() + " recent tool activity event(s).";
         return new VersionedToolActivityResponse(
-                "tool-activity.v2",
+                SCHEMA_TOOL_ACTIVITY_V2,
                 Instant.now().toString(),
                 summary,
                 items);
@@ -496,22 +465,13 @@ public class ProjectApiResource {
     @GET
     @Path("/tool-telemetry")
     public ToolTelemetryResponse toolTelemetry() {
-        final List<ToolTelemetryResponse.ToolTelemetryItem> items = toolTelemetryService.snapshot().stream()
-                .map(snapshot -> new ToolTelemetryResponse.ToolTelemetryItem(
-                        snapshot.toolName(),
-                        snapshot.moduleName(),
-                        snapshot.invocations(),
-                        snapshot.failures(),
-                        snapshot.argumentValidationFailures(),
-                        snapshot.averageDurationMs(),
-                        snapshot.p50DurationMs(),
-                        snapshot.p95DurationMs(),
-                        snapshot.errorClasses()))
+        final List<ToolTelemetryResponse.@NonNull ToolTelemetryItem> items = toolTelemetryService.snapshot().stream()
+                .map(ToolTelemetryResponse.ToolTelemetryItem::new)
                 .toList();
 
         final String summary = "Telemetry available for " + items.size() + " tool(s).";
         return new ToolTelemetryResponse(
-                "tool-telemetry.v1",
+                SCHEMA_TOOL_TELEMETRY_V1,
                 Instant.now().toString(),
                 summary,
                 items);

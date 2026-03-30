@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.jboss.logging.Logger;
+
 import ac.uk.sussex.kn253.services.tools.ToolArguments;
 import ac.uk.sussex.kn253.services.tools.macro.*;
 import dev.langchain4j.agent.tool.ToolSpecification;
@@ -16,6 +18,7 @@ import dev.langchain4j.model.chat.request.json.JsonStringSchema;
 
 public class ReadFileTool implements ToolMacro {
 
+    private static final Logger LOG = Logger.getLogger(ReadFileTool.class);
     private static final int DEFAULT_MAX_LINES = 400;
 
     private final ReadToolSupport support;
@@ -82,8 +85,12 @@ public class ReadFileTool implements ToolMacro {
                 final String fullContent = String.join("\n", lines);
                 final String relativePath = project.relativize(file).toString();
                 support.cacheFileContent(project, relativePath, fullContent);
-            } catch (final Exception ignored) {
-                // Caching failure should not break the tool
+            } catch (final UnsupportedOperationException e) {
+                // Persistence layer not available (e.g., in tests without CDI container)
+                LOG.debugf("Skipping file content cache: %s", e.getMessage());
+            } catch (final Exception e) {
+                // Unexpected error during caching, but don't break the tool
+                LOG.warnf(e, "Failed to cache file content for %s: %s", file, e.getMessage());
             }
 
             return result;

@@ -1,5 +1,6 @@
 package ac.uk.sussex.kn253.services;
 
+import org.jboss.logging.Logger;
 import org.jline.reader.*;
 import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
@@ -19,6 +20,8 @@ import jakarta.inject.Inject;
  */
 @ApplicationScoped
 public class AssistantService {
+
+    private static final Logger LOG = Logger.getLogger(AssistantService.class);
 
     @Inject
     ChatService chatService;
@@ -53,14 +56,21 @@ public class AssistantService {
                         runOperatorMenu(reader);
                         continue;
                     }
-                    final String response = chatService.sendMessage(message.trim());
-                    System.out.println("Assistant: " + response);
+                    try {
+                        final String response = chatService.sendMessage(message.trim());
+                        System.out.println("Assistant: " + response);
+                    } catch (final Exception e) {
+                        final String messageText = e.getMessage() == null ? "unknown error" : e.getMessage();
+                        System.out.println("Assistant error: " + messageText);
+                        LOG.errorf(e, "Assistant chat failed: %s", messageText);
+                    }
                 } catch (final UserInterruptException e) {
                     break;
                 }
             }
         } catch (final Exception e) {
             System.out.println("Failed to launch assistant: " + e.getMessage());
+            LOG.errorf(e, "Failed to launch assistant: %s", e.getMessage());
         }
     }
 

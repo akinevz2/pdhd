@@ -2,6 +2,7 @@ package ac.uk.sussex.kn253.api;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -47,7 +48,7 @@ class ProjectApiResourceTest {
     }
 
     @Test
-    void projectsAutoDiscoversCurrentDirectoryWhenDatabaseIsEmpty() {
+    void projectsAutoDiscoversCurrentDirectoryWhenDatabaseIsEmpty() throws IOException {
         final var projects = resource.projects();
 
         assertFalse(projects.isEmpty(), "Expected at least one project after auto-discovery");
@@ -78,10 +79,8 @@ class ProjectApiResourceTest {
 
     @Test
     @Transactional
-    void knowledgeCanBeUpsertedAndListed() {
-        final var projects = resource.projects();
-        assertFalse(projects.isEmpty());
-        final long id = projects.get(0).id();
+    void knowledgeCanBeUpsertedAndListed() throws IOException {
+        final long id = createProject().id;
 
         resource.putKnowledge(id, "summary", Map.of("jsonContent", "{\"text\":\"hello\"}"));
 
@@ -93,9 +92,8 @@ class ProjectApiResourceTest {
 
     @Test
     @Transactional
-    void knowledgePutIsIdempotent() {
-        final var projects = resource.projects();
-        final long id = projects.get(0).id();
+    void knowledgePutIsIdempotent() throws IOException {
+        final long id = createProject().id;
 
         resource.putKnowledge(id, "notes", Map.of("jsonContent", "\"v1\""));
         resource.putKnowledge(id, "notes", Map.of("jsonContent", "\"v2\""));
@@ -107,9 +105,8 @@ class ProjectApiResourceTest {
 
     @Test
     @Transactional
-    void knowledgeCanBeDeleted() {
-        final var projects = resource.projects();
-        final long id = projects.get(0).id();
+    void knowledgeCanBeDeleted() throws IOException {
+        final long id = createProject().id;
 
         resource.putKnowledge(id, "temp", Map.of("jsonContent", "{}"));
         assertEquals(1, resource.listKnowledge(id).size());
@@ -132,8 +129,8 @@ class ProjectApiResourceTest {
 
     @Test
     void toolTelemetryEndpointReturnsVersionedTypedPayload() {
-        toolTelemetryService.record("read_file", "READ", 2_000_000L, null, false);
-        toolTelemetryService.record("read_file", "READ", 3_000_000L, "ArgumentValidation", true);
+        toolTelemetryService.record("read_file", "ReadToolset", 2_000_000L, null, false);
+        toolTelemetryService.record("read_file", "ReadToolset", 3_000_000L, "ArgumentValidation", true);
 
         final ToolTelemetryResponse response = resource.toolTelemetry();
 
@@ -142,5 +139,12 @@ class ProjectApiResourceTest {
         assertNotNull(response.summary());
         assertFalse(response.items().isEmpty());
         assertTrue(response.items().stream().anyMatch(item -> "read_file".equals(item.toolName())));
+    }
+
+    private Project createProject() {
+        final String directory = Path.of("").toAbsolutePath().normalize().toString();
+        final Project project = new Project(null, directory, null, null);
+        project.persist();
+        return project;
     }
 }
