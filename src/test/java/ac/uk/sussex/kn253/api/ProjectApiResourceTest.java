@@ -132,8 +132,8 @@ class ProjectApiResourceTest {
 
     @Test
     void toolTelemetryEndpointReturnsVersionedTypedPayload() {
-        toolTelemetryService.record("read_file", "ReadToolset", 2_000_000L, null, false);
-        toolTelemetryService.record("read_file", "ReadToolset", 3_000_000L, "ArgumentValidation", true);
+        toolTelemetryService.record("read_file", "READ", 2_000_000L, null, false);
+        toolTelemetryService.record("read_file", "READ", 3_000_000L, "ArgumentValidation", true);
 
         final ToolTelemetryResponse response = resource.toolTelemetry();
 

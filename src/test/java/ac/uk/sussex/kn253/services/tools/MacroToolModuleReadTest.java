@@ -11,9 +11,9 @@ import org.junit.jupiter.api.io.TempDir;
 
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 
-class ReadToolsetTest {
+class MacroToolModuleReadTest {
 
-    private final ReadToolset toolset = new ReadToolset();
+    private final MacroToolModule toolset = new MacroToolModule();
 
     @Test
     void readFileReturnsContentWithLineLimit(@TempDir final Path tempDir) throws Exception {

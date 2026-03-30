@@ -14,12 +14,6 @@ import jakarta.transaction.Transactional;
 @ApplicationScoped
 public class ToolService {
 
-    private static final List<String> MODULE_PRECEDENCE = List.of(
-            "ac.uk.sussex.kn253.services.tools.ExploreToolset",
-            "ac.uk.sussex.kn253.services.tools.ReadToolset",
-            "ac.uk.sussex.kn253.services.tools.WriteToolset",
-            "ac.uk.sussex.kn253.services.tools.IntrospectToolset");
-
     @Inject
     Instance<ToolModule> toolModules;
 
@@ -71,14 +65,14 @@ public class ToolService {
 
         for (final ToolModule toolModule : toolModules()) {
             if (toolModule.canHandle(request.name())) {
-                final String moduleName = toolModule.getClass().getSimpleName();
+                final String category = toolModule.operationCategoryFor(request.name());
                 try {
                     final String result = toolModule.execute(request, memoryId);
-                    recordTelemetry(toolName, moduleName, startedAt, result, classifyError(result));
+                    recordTelemetry(toolName, category, startedAt, result, classifyError(result));
                     return result;
                 } catch (final RuntimeException e) {
                     final String result = "Tool execution failed for " + request.name() + ": " + e.getMessage();
-                    recordTelemetry(toolName, moduleName, startedAt, result, e.getClass().getSimpleName());
+                    recordTelemetry(toolName, category, startedAt, result, e.getClass().getSimpleName());
                     return result;
                 }
             }
@@ -107,9 +101,7 @@ public class ToolService {
             }
 
             final List<ToolModule> orderedModules = rawModules.stream()
-                    .sorted(Comparator
-                            .comparingInt(this::precedenceRank)
-                            .thenComparing(module -> module.getClass().getName()))
+                    .sorted(Comparator.comparing(module -> module.getClass().getName()))
                     .toList();
 
             validateUniqueToolNames(orderedModules);
@@ -117,12 +109,6 @@ public class ToolService {
             modulesValidated = true;
             return resolvedToolModules;
         }
-    }
-
-    private int precedenceRank(final ToolModule module) {
-        final String className = module.getClass().getName();
-        final int index = MODULE_PRECEDENCE.indexOf(className);
-        return index >= 0 ? index : MODULE_PRECEDENCE.size() + 1;
     }
 
     private void validateUniqueToolNames(final List<ToolModule> modules) {

@@ -14,7 +14,7 @@ public class CreateReportTool implements ToolMacro {
 
     private final WriteToolSupport support;
     private final ToolSpecification specification = ToolSpecification.builder()
-            .name(ToolMacros.CREATE_REPORT.name())
+            .name(definition().name())
             .description(definition().description())
             .parameters(JsonObjectSchema.builder()
                     .addProperty("projectDirectory",

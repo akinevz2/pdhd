@@ -8,17 +8,15 @@ import org.junit.jupiter.api.Test;
 
 import ac.uk.sussex.kn253.model.OllamaSettings;
 import ac.uk.sussex.kn253.ollama.SystemPromptBuilder;
-import ac.uk.sussex.kn253.services.tools.*;
+import ac.uk.sussex.kn253.services.tools.MacroToolModule;
+
 
 class SystemPromptBuilderTest {
 
     @Test
     void buildIncludesProjectKnowledgeRecallAndCachingGuidance() {
         final ToolService toolService = new ToolService(List.of(
-                new ExploreToolset(),
-                new ReadToolset(),
-                new WriteToolset(),
-                new IntrospectToolset()));
+                new MacroToolModule()));
 
         final String prompt = SystemPromptBuilder.build(
                 OllamaSettings.DEFAULT_SYSTEM_PROMPT,

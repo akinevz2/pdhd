@@ -11,9 +11,9 @@ import org.junit.jupiter.api.io.TempDir;
 
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 
-class WriteToolsetTest {
+class MacroToolModuleWriteTest {
 
-    private final WriteToolset toolset = new WriteToolset();
+    private final MacroToolModule toolset = new MacroToolModule();
 
     @Test
     void writeFileCreatesAndAppends(@TempDir final Path tempDir) throws Exception {

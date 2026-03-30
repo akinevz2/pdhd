@@ -2,6 +2,7 @@ package ac.uk.sussex.kn253.services;
 
 import java.util.Locale;
 
+import ac.uk.sussex.kn253.model.EmbeddingVector;
 import ac.uk.sussex.kn253.model.OllamaSettings;
 import ac.uk.sussex.kn253.ollama.OllamaChatSession;
 import jakarta.annotation.PostConstruct;
@@ -21,6 +22,8 @@ import jakarta.inject.Inject;
 @ApplicationScoped
 public class ChatService {
 
+    private static final String EMBEDDINGS_SESSION_ID = "default-chat-session";
+
     @Inject
     ToolService toolService;
 
@@ -35,6 +38,9 @@ public class ChatService {
 
     @Inject
     CurrentFolderMetadataService currentFolderMetadataService;
+
+    @Inject
+    EmbeddingService embeddingService;
 
     private OllamaChatSession chatSession;
 
@@ -76,6 +82,25 @@ public class ChatService {
         if (directReply != null) {
             return directReply;
         }
+
+        // Generate embedding for user input
+        if (embeddingService.isEnabled()) {
+            try {
+                final EmbeddingVector embedding = embeddingService.generateEmbedding(
+                        message,
+                        EMBEDDINGS_SESSION_ID);
+                if (embedding != null) {
+                    embeddingService.storeEmbedding(
+                            embedding,
+                            "user-input-" + System.currentTimeMillis(),
+                            "user_input",
+                            EMBEDDINGS_SESSION_ID);
+                }
+            } catch (final Exception e) {
+                // Graceful degradation - embedding failure doesn't block conversation
+            }
+        }
+
         return chatSession.send(message);
     }
 
@@ -84,6 +109,25 @@ public class ChatService {
         if (directReply != null) {
             return directReply;
         }
+
+        // Generate embedding for user input
+        if (embeddingService.isEnabled()) {
+            try {
+                final EmbeddingVector embedding = embeddingService.generateEmbedding(
+                        message,
+                        EMBEDDINGS_SESSION_ID);
+                if (embedding != null) {
+                    embeddingService.storeEmbedding(
+                            embedding,
+                            "user-input-oneshot-" + System.currentTimeMillis(),
+                            "user_input",
+                            EMBEDDINGS_SESSION_ID);
+                }
+            } catch (final Exception e) {
+                // Graceful degradation - embedding failure doesn't block conversation
+            }
+        }
+
         return chatSession.sendOneShot(message);
     }
 

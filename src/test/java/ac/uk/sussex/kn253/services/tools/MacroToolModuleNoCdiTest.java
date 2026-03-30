@@ -9,11 +9,11 @@ import org.junit.jupiter.api.Test;
 
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 
-class ExploreToolsetNoCdiTest {
+class MacroToolModuleNoCdiTest {
 
         @Test
         void listGitProjectsDoesNotFailWithoutCdi() {
-                final ExploreToolset toolset = new ExploreToolset();
+                final MacroToolModule toolset = new MacroToolModule();
                 final String result = toolset.execute(request("list_git_projects", "{}"), null);
 
                 assertTrue(!result.startsWith("Tool execution failed"),
@@ -24,7 +24,7 @@ class ExploreToolsetNoCdiTest {
 
         @Test
         void listGithubProjectsDoesNotFailWithoutCdi() {
-                final ExploreToolset toolset = new ExploreToolset();
+                final MacroToolModule toolset = new MacroToolModule();
                 final String result = toolset.execute(request("list_github_projects", "{}"), null);
 
                 assertTrue(!result.startsWith("Tool execution failed"),
@@ -35,7 +35,7 @@ class ExploreToolsetNoCdiTest {
 
         @Test
         void navigateToolWorksWithoutCdi() {
-                final ExploreToolset toolset = new ExploreToolset();
+                final MacroToolModule toolset = new MacroToolModule();
                 final String result = toolset.execute(request("change_working_directory", "{\"path\":\".\"}"), null);
 
                 final String expected = Path.of(".").toAbsolutePath().normalize().toString();
