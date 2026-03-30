@@ -1,8 +1,8 @@
 import type { Dispatch, SetStateAction } from "react";
 import type {
-  OllamaSettings,
-  ToolActivityItem,
-  ToolTelemetryItem,
+    OllamaSettingField,
+    ToolActivityItem,
+    ToolTelemetryItem,
 } from "../types";
 
 type TopMenuAndModalsProps = {
@@ -14,12 +14,15 @@ type TopMenuAndModalsProps = {
   onExit: () => Promise<void>;
 
   ollamaOpen: boolean;
-  ollamaForm: OllamaSettings | null;
+  ollamaForm: Record<string, string | number | boolean | null> | null;
+  ollamaFields: OllamaSettingField[];
   ollamaError: string | null;
   availableModels: string[];
   modelsLoading: boolean;
   setOllamaOpen: Dispatch<SetStateAction<boolean>>;
-  setOllamaForm: Dispatch<SetStateAction<OllamaSettings | null>>;
+  setOllamaForm: Dispatch<
+    SetStateAction<Record<string, string | number | boolean | null> | null>
+  >;
   fetchModels: (baseUrl: string) => Promise<void>;
   saveOllamaConfig: () => Promise<void>;
   ollamaSaving: boolean;
@@ -60,6 +63,7 @@ export function TopMenuAndModals({
   onExit,
   ollamaOpen,
   ollamaForm,
+  ollamaFields,
   ollamaError,
   availableModels,
   modelsLoading,
@@ -92,6 +96,15 @@ export function TopMenuAndModals({
   telemetryGeneratedAt,
   onRefreshTelemetry,
 }: TopMenuAndModalsProps) {
+  const fieldString = (key: string) => String(ollamaForm?.[key] ?? "");
+  const fieldNumber = (key: string) => {
+    const raw = ollamaForm?.[key];
+    if (typeof raw === "number") return raw;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+  const fieldBoolean = (key: string) => Boolean(ollamaForm?.[key]);
+
   return (
     <>
       <nav className="menu-bar panel">
@@ -149,122 +162,111 @@ export function TopMenuAndModals({
             <div className="modal-body">
               {ollamaError && <p className="form-error">{ollamaError}</p>}
               <div className="form-grid">
-                <label>Base URL</label>
-                <input
-                  className="form-input"
-                  value={ollamaForm.baseUrl}
-                  onChange={(e) =>
-                    setOllamaForm({ ...ollamaForm, baseUrl: e.target.value })
-                  }
-                />
-                <label>Model</label>
-                <div className="model-row">
-                  {availableModels.length > 0 ? (
-                    <select
-                      className="form-input"
-                      value={ollamaForm.modelName}
-                      onChange={(e) =>
-                        setOllamaForm({
-                          ...ollamaForm,
-                          modelName: e.target.value,
-                        })
-                      }
-                    >
-                      {!availableModels.includes(ollamaForm.modelName) && (
-                        <option value={ollamaForm.modelName}>
-                          {ollamaForm.modelName}
-                        </option>
-                      )}
-                      {availableModels.map((m) => (
-                        <option key={m} value={m}>
-                          {m}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      className="form-input"
-                      value={ollamaForm.modelName}
-                      placeholder="e.g. llama3.2"
-                      onChange={(e) =>
-                        setOllamaForm({
-                          ...ollamaForm,
-                          modelName: e.target.value,
-                        })
-                      }
-                    />
-                  )}
-                  <button
-                    onClick={() => {
-                      fetchModels(ollamaForm.baseUrl).catch(() => {});
-                    }}
-                    disabled={modelsLoading}
-                  >
-                    {modelsLoading ? "..." : "Fetch"}
-                  </button>
-                </div>
-                <label>Timeout (s)</label>
-                <input
-                  className="form-input"
-                  type="number"
-                  min={1}
-                  value={ollamaForm.timeoutSeconds}
-                  onChange={(e) =>
-                    setOllamaForm({
-                      ...ollamaForm,
-                      timeoutSeconds: Number(e.target.value),
-                    })
-                  }
-                />
-                <label>Temperature</label>
-                <div className="slider-row">
-                  <input
-                    className="form-range"
-                    type="range"
-                    min={0}
-                    max={2}
-                    step={0.05}
-                    value={ollamaForm.temperature}
-                    onChange={(e) =>
-                      setOllamaForm({
-                        ...ollamaForm,
-                        temperature: parseFloat(e.target.value),
-                      })
-                    }
-                  />
-                  <span>{ollamaForm.temperature.toFixed(2)}</span>
-                </div>
-                <label>Num Predict</label>
-                <div className="hint-row">
-                  <input
-                    className="form-input"
-                    type="number"
-                    value={ollamaForm.numPredict}
-                    onChange={(e) =>
-                      setOllamaForm({
-                        ...ollamaForm,
-                        numPredict: Number(e.target.value),
-                      })
-                    }
-                  />
-                  <span className="form-hint">-1 = model default</span>
-                </div>
-                <label>Context Window</label>
-                <div className="hint-row">
-                  <input
-                    className="form-input"
-                    type="number"
-                    min={0}
-                    value={ollamaForm.numCtx}
-                    onChange={(e) =>
-                      setOllamaForm({
-                        ...ollamaForm,
-                        numCtx: Number(e.target.value),
-                      })
-                    }
-                  />
-                  <span className="form-hint">0 = model default</span>
-                </div>
+                {ollamaFields.map((field) => (
+                  <div key={field.key} style={{ display: "contents" }}>
+                    <label>{field.label}</label>
+                    {field.inputType === "boolean" ? (
+                      <div className="hint-row">
+                        <input
+                          type="checkbox"
+                          checked={fieldBoolean(field.key)}
+                          onChange={(e) =>
+                            setOllamaForm({
+                              ...ollamaForm,
+                              [field.key]: e.target.checked,
+                            })
+                          }
+                        />
+                        {field.hint && (
+                          <span className="form-hint">{field.hint}</span>
+                        )}
+                      </div>
+                    ) : field.modelField ? (
+                      <div className="model-row">
+                        {availableModels.length > 0 ? (
+                          <select
+                            className="form-input"
+                            value={fieldString(field.key)}
+                            onChange={(e) =>
+                              setOllamaForm({
+                                ...ollamaForm,
+                                [field.key]: e.target.value,
+                              })
+                            }
+                          >
+                            {!availableModels.includes(
+                              fieldString(field.key),
+                            ) && (
+                              <option value={fieldString(field.key)}>
+                                {fieldString(field.key)}
+                              </option>
+                            )}
+                            {availableModels.map((m) => (
+                              <option key={m} value={m}>
+                                {m}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            className="form-input"
+                            value={fieldString(field.key)}
+                            onChange={(e) =>
+                              setOllamaForm({
+                                ...ollamaForm,
+                                [field.key]: e.target.value,
+                              })
+                            }
+                          />
+                        )}
+                        <button
+                          onClick={() => {
+                            fetchModels(fieldString("baseUrl")).catch(() => {});
+                          }}
+                          disabled={modelsLoading}
+                        >
+                          {modelsLoading ? "..." : "Fetch"}
+                        </button>
+                      </div>
+                    ) : field.inputType === "number" ? (
+                      <div className="hint-row">
+                        <input
+                          className="form-input"
+                          type="number"
+                          min={field.min ?? undefined}
+                          max={field.max ?? undefined}
+                          step={field.step ?? 1}
+                          value={fieldNumber(field.key)}
+                          onChange={(e) =>
+                            setOllamaForm({
+                              ...ollamaForm,
+                              [field.key]: Number(e.target.value),
+                            })
+                          }
+                        />
+                        {field.hint && (
+                          <span className="form-hint">{field.hint}</span>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="hint-row">
+                        <input
+                          className="form-input"
+                          value={fieldString(field.key)}
+                          onChange={(e) =>
+                            setOllamaForm({
+                              ...ollamaForm,
+                              [field.key]: e.target.value,
+                            })
+                          }
+                        />
+                        {field.hint && (
+                          <span className="form-hint">{field.hint}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
             <div className="modal-footer">

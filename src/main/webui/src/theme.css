@@ -215,7 +215,25 @@ button:active {
   transform: rotate(-45deg);
 }
 
-.left-rail,
+.left-rail {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 8px;
+}
+
+.left-rail-scroll {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+}
+
+.left-rail-explore-btn {
+  flex-shrink: 0;
+  margin-top: 6px;
+  width: 100%;
+}
+
 .right-rail {
   overflow: auto;
   padding: 8px;
@@ -418,6 +436,21 @@ button:active {
 .browser-row-action:hover,
 .repo-popout-button:hover {
   filter: brightness(1.08);
+}
+
+.explore-button {
+  color: var(--accent-2);
+  background: rgba(103, 215, 255, 0.08);
+  border: 1px solid rgba(103, 215, 255, 0.2);
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.explore-button:hover {
+  background: rgba(103, 215, 255, 0.16);
+  border-color: rgba(103, 215, 255, 0.4);
+  filter: none;
 }
 
 .project-body {
