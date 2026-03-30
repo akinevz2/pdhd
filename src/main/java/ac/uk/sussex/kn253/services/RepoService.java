@@ -5,7 +5,7 @@ import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -15,6 +15,7 @@ import org.jspecify.annotations.NonNull;
 
 import ac.uk.sussex.kn253.api.*;
 import ac.uk.sussex.kn253.model.*;
+import ac.uk.sussex.kn253.schema.BackendSupport;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
@@ -70,8 +71,15 @@ public class RepoService {
         GithubRepository githubRepo = null;
         try {
             githubRepo = getGithubRepository(path);
-        } catch (final IOException | InterruptedException forwarded) {
-            throw new ResolutionException(path, "GitHub repository metadata", forwarded);
+        } catch (final NotAGithubRepositoryException ignored) {
+            Log.debugf("No GitHub metadata for %s: %s", path, ignored.getMessage());
+        } catch (final IOException forwarded) {
+            Log.warnf("Failed to resolve GitHub metadata for %s: %s", path, forwarded.getMessage());
+        } catch (final InterruptedException forwarded) {
+            Thread.currentThread().interrupt();
+            Log.warnf("Interrupted while resolving GitHub metadata for %s", path);
+        } catch (final ResolutionException forwarded) {
+            Log.warnf("Failed to resolve GitHub metadata for %s: %s", path, forwarded.getMessage());
         }
 
         gitRepo.persist();
@@ -132,6 +140,35 @@ public class RepoService {
         return new GitRepository(null, getGitOrigins(path));
     }
 
+    /**
+     * Returns a browsable GitHub repository URL for the git repository at
+     * {@code path}. Only canonical repo URLs are accepted
+     * (https://github.com/{owner}/{repo}[.git]).
+     *
+     * @throws NotAGitRepositoryException    if {@code path} is not a git
+     *                                       repository
+     * @throws NotAGithubRepositoryException if no valid browsable GitHub remote
+     *                                       exists
+     */
+    public @NonNull URL getBrowsableGithubRepositoryUrl(final Path path) {
+        if (!isGitRepository(path)) {
+            throw new NotAGitRepositoryException(path);
+        }
+
+        final URL resolvedUrl = getGitOrigins(path).stream()
+                .filter(Objects::nonNull)
+                .sorted(Comparator.comparing(origin -> {
+                    final String name = origin.getName();
+                    return BackendSupport.REMOTE_NAME_ORIGIN.equalsIgnoreCase(name != null ? name : "") ? 0 : 1;
+                }))
+                .map(Origin::getUrl)
+                .filter(this::isBrowsableGithubRepoUrl)
+                .findFirst().orElseThrow(
+                        () -> new NotAGithubRepositoryException(path, BackendSupport.ERROR_NO_BROWSABLE_GITHUB_REMOTE));
+
+        return requireNonNullUrl(resolvedUrl, path);
+    }
+
     // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------
@@ -142,12 +179,12 @@ public class RepoService {
                 new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
             final String output = reader.lines().collect(Collectors.joining("\n"));
 
-            if (!waitForProcess(process, "gh repo view", path) || process.exitValue() != 0) {
+            if (!waitForProcess(process, BackendSupport.GH_REPO_VIEW_COMMAND, path) || process.exitValue() != 0) {
                 throw new NotAGithubRepositoryException(path, "gh repo view command failed");
             }
 
-            final String name = extractJsonStringField(output, "name");
-            final String description = extractJsonStringField(output, "description");
+            final String name = extractJsonStringField(output, BackendSupport.JSON_FIELD_NAME);
+            final String description = extractJsonStringField(output, BackendSupport.JSON_FIELD_DESCRIPTION);
             if (name == null) {
                 throw new NotAGithubRepositoryException(path, "Failed to parse GitHub repository metadata");
             }
@@ -265,6 +302,32 @@ public class RepoService {
         }
     }
 
+    private boolean isBrowsableGithubRepoUrl(final URL url) {
+        if (url == null) {
+            return false;
+        }
+
+        final String protocol = url.getProtocol();
+        if (!BackendSupport.PROTOCOL_HTTP.equalsIgnoreCase(protocol)
+                && !BackendSupport.PROTOCOL_HTTPS.equalsIgnoreCase(protocol)) {
+            return false;
+        }
+        if (!BackendSupport.HOST_GITHUB.equalsIgnoreCase(url.getHost())) {
+            return false;
+        }
+
+        final String[] parts = Arrays.stream(url.getPath().split("/"))
+                .filter(part -> part != null && !part.isBlank())
+                .toArray(String[]::new);
+        if (parts.length != 2) {
+            return false;
+        }
+
+        final String owner = parts[0].trim();
+        final String repo = parts[1].replaceFirst(BackendSupport.REGEX_SUFFIX_DOT_GIT, "").trim();
+        return !owner.isBlank() && !repo.isBlank();
+    }
+
     private boolean isGitRepository(final Path path) {
         try {
             final ProcessBuilder pb = new ProcessBuilder("git", "rev-parse", "--git-dir");
@@ -292,5 +355,12 @@ public class RepoService {
             Log.warnf("Command timed out after %ds (%s)", PROCESS_TIMEOUT_SECONDS, command);
         }
         return false;
+    }
+
+    private @NonNull URL requireNonNullUrl(final URL url, final Path path) {
+        if (url == null) {
+            throw new NotAGithubRepositoryException(path, BackendSupport.ERROR_NO_BROWSABLE_GITHUB_REMOTE);
+        }
+        return url;
     }
 }

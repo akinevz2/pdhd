@@ -84,3 +84,28 @@ Telemetry must be treated as durable historical evidence, not disposable runtime
 - Keep schema evolution additive/backward-compatible.
 - Keep non-destructive ORM/migration behavior in all environments where telemetry history matters.
 - Any automation, migration, or refactor that would remove telemetry history should be treated as a blocking change request and rejected until replaced with a safe migration path.
+
+### 9. Standardize Support-class design for upcoming extension work
+
+For maintainability, treat `*Support` classes as the canonical home for shared literals and policy constants that define backend behavior.
+
+- Use `SchemaKeys` for payload keys only.
+- Use `ToolSupport` for shared tool/API non-key values.
+- Use `BackendSupport` for service/resource policy constants (host names, protocols, regex fragments, stable error text).
+
+Implementation note for planned git-host expansion:
+
+- Keep host-specific rules out of controllers.
+- Add host policy constants in `BackendSupport`.
+- Keep URL validation and selection in `RepoService`.
+- Keep API payload contract stable (`repoUrl` or absent marker), so frontend logic remains simple.
+
+This allows future support for GitLab/Bitbucket/self-hosted forge webpage links without scattering literals or changing frontend behavior.
+
+### 10. Short Revision Summary (2026-03-30)
+
+Today's integration work combined two major streams into the main line: a broad null-safety hardening effort and a frontend usability pass. On the backend side, nullability and error-handling behavior were tightened across API resources, service-layer resolution logic, model classes, and related tests. This included clearer exception boundaries for repository resolution, improved handling of non-git directories during discovery flows, and better consistency in how failures are surfaced to callers.
+
+In parallel, the frontend browser and assistant interaction flows were refined to reduce ambiguity and improve operator feedback. Folder navigation behavior was expanded, file-browser interactions were made more explicit, and UI error messages were adjusted to carry meaningful backend context rather than generic failure text. Repository pop-out behavior was also narrowed so links are attached only when entries qualify as valid project/repository targets under the current policy.
+
+The practical outcome is that the current master branch reflects both reliability-focused backend work and usability-focused frontend work in a single coherent baseline. Discovery and repository-link behavior are now more predictable, path-resolution semantics are clearer, and the supporting documentation has been updated to capture implementation guidance and extension strategy.

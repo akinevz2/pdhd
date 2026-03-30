@@ -11,9 +11,9 @@ import java.util.stream.Stream;
 import org.jspecify.annotations.NonNull;
 
 import ac.uk.sussex.kn253.api.model.*;
-import ac.uk.sussex.kn253.model.*;
-import ac.uk.sussex.kn253.schema.SchemaKeys;
-import ac.uk.sussex.kn253.schema.ToolSupport;
+import ac.uk.sussex.kn253.model.Project;
+import ac.uk.sussex.kn253.model.ProjectKnowledge;
+import ac.uk.sussex.kn253.schema.*;
 import ac.uk.sussex.kn253.services.*;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -285,7 +285,7 @@ public class ProjectApiResource {
                 : workingDirectoryService.resolveAgainstCurrent(pathQuery);
 
         if (!Files.exists(directory) || !Files.isDirectory(directory)) {
-            throw new WebApplicationException("Not a directory", Response.Status.BAD_REQUEST);
+            throw new WebApplicationException(BackendSupport.ERROR_NOT_A_DIRECTORY, Response.Status.BAD_REQUEST);
         }
 
         try (Stream<java.nio.file.Path> stream = Files.list(directory)) {
@@ -307,40 +307,40 @@ public class ProjectApiResource {
             response.put(SchemaKeys.ENTRIES, entries);
             try {
                 response.put(SchemaKeys.REPO_URL, getRepositoryUrl(directory));
-            } catch (final NotAGitRepositoryException e) {
+            } catch (final NotAGitRepositoryException | NotAGithubRepositoryException e) {
                 response.put(SchemaKeys.REPO_URL, ToolSupport.VALUE_REPO_URL_ABSENT);
             }
             return response;
         } catch (final IOException e) {
-            throw new WebApplicationException("Failed to list directory", Response.Status.INTERNAL_SERVER_ERROR);
+            throw new WebApplicationException(BackendSupport.ERROR_FAILED_TO_LIST_DIRECTORY,
+                    Response.Status.INTERNAL_SERVER_ERROR);
         }
     }
 
     private Map<String, Object> toFsEntry(final java.nio.file.Path path) {
         final Map<String, Object> entry = new LinkedHashMap<>();
+        final boolean isDirectory = Files.isDirectory(path);
         entry.put(SchemaKeys.NAME, path.getFileName().toString());
         entry.put(SchemaKeys.PATH, path.toAbsolutePath().normalize().toString());
-        entry.put(SchemaKeys.DIRECTORY, Files.isDirectory(path));
-        try {
-            entry.put(SchemaKeys.REPO_URL, getRepositoryUrl(path));
-        } catch (final NotAGitRepositoryException e) {
+        entry.put(SchemaKeys.DIRECTORY, isDirectory);
+
+        // Only annotate repository links for project/repository root folders.
+        final boolean isRepoRoot = isDirectory && Files.isDirectory(path.resolve(BackendSupport.DIR_GIT));
+        if (isRepoRoot) {
+            try {
+                entry.put(SchemaKeys.REPO_URL, getRepositoryUrl(path));
+            } catch (final NotAGitRepositoryException | NotAGithubRepositoryException e) {
+                entry.put(SchemaKeys.REPO_URL, ToolSupport.VALUE_REPO_URL_ABSENT);
+            }
+        } else {
             entry.put(SchemaKeys.REPO_URL, ToolSupport.VALUE_REPO_URL_ABSENT);
         }
         return entry;
     }
 
-    private URL getRepositoryUrl(final java.nio.file.Path path) throws NotAGitRepositoryException {
-        return repoService.getGitRepository(path)
-                .getOrigins()
-                .stream()
-                .filter(Objects::nonNull)
-                .sorted(Comparator.comparing(origin -> {
-                    final String name = origin.getName();
-                    return "origin".equalsIgnoreCase(name != null ? name : "") ? 0 : 1;
-                }))
-                .map(Origin::getUrl)
-                .findFirst()
-                .orElseThrow(() -> new NotAGitRepositoryException(path));
+    private URL getRepositoryUrl(final java.nio.file.Path path)
+            throws NotAGitRepositoryException, NotAGithubRepositoryException {
+        return repoService.getBrowsableGithubRepositoryUrl(path);
     }
 
     /**
@@ -353,11 +353,11 @@ public class ProjectApiResource {
     public ProjectTreeNodeResponse fsTree(
             @QueryParam("path") final String absolutePath) {
         if (absolutePath == null || absolutePath.isBlank()) {
-            throw new WebApplicationException("Missing query parameter: path", Response.Status.BAD_REQUEST);
+            throw new WebApplicationException(BackendSupport.ERROR_MISSING_QUERY_PATH, Response.Status.BAD_REQUEST);
         }
         final java.nio.file.Path root = java.nio.file.Path.of(absolutePath).toAbsolutePath().normalize();
         if (!Files.exists(root) || !Files.isDirectory(root)) {
-            throw new WebApplicationException("Not a directory", Response.Status.NOT_FOUND);
+            throw new WebApplicationException(BackendSupport.ERROR_NOT_A_DIRECTORY, Response.Status.NOT_FOUND);
         }
         return toNode(root, root, 0);
     }
@@ -372,7 +372,7 @@ public class ProjectApiResource {
     public FileContentResponse fsFile(
             @QueryParam("path") final String absolutePath) {
         if (absolutePath == null || absolutePath.isBlank()) {
-            throw new WebApplicationException("Missing query parameter: path", Response.Status.BAD_REQUEST);
+            throw new WebApplicationException(BackendSupport.ERROR_MISSING_QUERY_PATH, Response.Status.BAD_REQUEST);
         }
         final java.nio.file.Path file = java.nio.file.Path.of(absolutePath).toAbsolutePath().normalize();
         requireFile(file);
@@ -400,7 +400,7 @@ public class ProjectApiResource {
     public Response fsFileRaw(
             @QueryParam("path") final String absolutePath) {
         if (absolutePath == null || absolutePath.isBlank()) {
-            throw new WebApplicationException("Missing query parameter: path", Response.Status.BAD_REQUEST);
+            throw new WebApplicationException(BackendSupport.ERROR_MISSING_QUERY_PATH, Response.Status.BAD_REQUEST);
         }
         final java.nio.file.Path file = java.nio.file.Path.of(absolutePath).toAbsolutePath().normalize();
         requireFile(file);

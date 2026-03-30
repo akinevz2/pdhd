@@ -61,8 +61,13 @@ class ProjectApiResourceTest {
     @Test
     void projectsScanFindsGitReposUnderCurrentWorkingDirectory() throws Exception {
         final Path tempRoot = Files.createTempDirectory("pdhd-scan-");
-        Files.createDirectories(tempRoot.resolve("repo-a/.git"));
-        Files.createDirectories(tempRoot.resolve("nested/repo-b/.git"));
+        final Path repoAPath = tempRoot.resolve("repo-a");
+        final Path repoBPath = tempRoot.resolve("nested/repo-b");
+        Files.createDirectories(repoAPath);
+        Files.createDirectories(repoBPath);
+
+        runCommand(repoAPath, "git", "init");
+        runCommand(repoBPath, "git", "init");
 
         workingDirectoryService.navigateTo(tempRoot.toString());
 
@@ -146,5 +151,16 @@ class ProjectApiResourceTest {
         final Project project = new Project(null, directory, null, null);
         project.persist();
         return project;
+    }
+
+    private static void runCommand(final Path cwd, final String... command) throws Exception {
+        final Process process = new ProcessBuilder(command)
+                .directory(cwd.toFile())
+                .start();
+        final int exit = process.waitFor();
+        if (exit != 0) {
+            final String stderr = new String(process.getErrorStream().readAllBytes());
+            throw new IllegalStateException("Command failed: " + String.join(" ", command) + "\n" + stderr);
+        }
     }
 }

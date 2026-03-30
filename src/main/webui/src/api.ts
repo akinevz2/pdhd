@@ -27,7 +27,7 @@ export async function apiPost<TReq, TRes>(
     timeoutMs,
   );
   if (!response.ok) {
-    throw new Error(`${response.status} ${response.statusText}`);
+    throw await buildHttpError(response);
   }
   if (response.status === 204) {
     return {} as TRes;
@@ -38,9 +38,42 @@ export async function apiPost<TReq, TRes>(
 async function fetchJson<T>(url: string, init: RequestInit): Promise<T> {
   const response = await fetchWithTimeout(url, init);
   if (!response.ok) {
-    throw new Error(`${response.status} ${response.statusText}`);
+    throw await buildHttpError(response);
   }
   return (await response.json()) as T;
+}
+
+async function buildHttpError(response: Response): Promise<Error> {
+  const fallback = `${response.status} ${response.statusText}`.trim();
+  try {
+    const text = (await response.text()).trim();
+    if (!text) {
+      return new Error(fallback || "HTTP request failed");
+    }
+
+    try {
+      const parsed = JSON.parse(text) as {
+        message?: string;
+        details?: string;
+        error?: string;
+      };
+      const detail = (
+        parsed.message ||
+        parsed.details ||
+        parsed.error ||
+        ""
+      ).trim();
+      if (detail) {
+        return new Error(`${fallback}: ${detail}`);
+      }
+    } catch {
+      // Non-JSON error body; use raw text.
+    }
+
+    return new Error(`${fallback}: ${text}`);
+  } catch {
+    return new Error(fallback || "HTTP request failed");
+  }
 }
 
 async function fetchWithTimeout(

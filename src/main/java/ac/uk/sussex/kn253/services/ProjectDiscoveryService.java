@@ -65,9 +65,9 @@ public class ProjectDiscoveryService {
     public void discoverFromCwd() throws IOException {
         final Path cwd = workingDirectoryService.getCurrentWorkingDirectory();
 
-        // Always ensure the CWD itself is registered; explicit failures should
-        // propagate.
-        ensureExists(cwd, false);
+        // Best effort for CWD: continue discovery even when CWD is not itself
+        // a git repository.
+        ensureExists(cwd, true);
 
         // Walk the tree looking for .git directories.
         try (Stream<Path> stream = Files.walk(cwd, SCAN_DEPTH)) {

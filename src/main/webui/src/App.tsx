@@ -505,9 +505,10 @@ export function App() {
           fileContent: reply,
           fileContentMarkdown: true,
         });
-      } catch {
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : "Unknown error";
         setAssistantUnreachable(true);
-        setChatError("Failed to summarize folder contents.");
+        setChatError(`Failed to summarize folder contents: ${detail}`);
         setChatMessages((prev) => {
           const updated = [...prev];
           const lastIdx = updated.length - 1;
@@ -517,12 +518,12 @@ export function App() {
           ) {
             updated[lastIdx] = {
               role: "system",
-              content: `Folder summary failed for: ${folderPath}`,
+              content: `Folder summary failed for: ${folderPath}. ${detail}`,
             };
           } else {
             updated.push({
               role: "system",
-              content: `Folder summary failed for: ${folderPath}`,
+              content: `Folder summary failed for: ${folderPath}. ${detail}`,
             });
           }
           return updated;
@@ -531,7 +532,7 @@ export function App() {
           fileLoading: false,
           fileLoadingFolderSummary: false,
           fileContentMarkdown: false,
-          fileError: "Failed to summarize folder contents.",
+          fileError: `Failed to summarize folder contents: ${detail}`,
         });
       } finally {
         setChatLoading(false);
@@ -577,15 +578,16 @@ export function App() {
         ]);
         setAssistantUnreachable(false);
         setRetryMessage(null);
-      } catch {
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : "Unknown error";
         setAssistantUnreachable(true);
-        setChatError("Failed to contact assistant.");
+        setChatError(`Failed to contact assistant: ${detail}`);
         setRetryMessage(message);
         setChatMessages((prev) => [
           ...prev,
           {
             role: "system",
-            content: "Assistant request failed. Check Ollama configuration.",
+            content: `Assistant request failed. ${detail}`,
           },
         ]);
       } finally {
@@ -788,7 +790,7 @@ export function App() {
                           </button>
                         </>
                       )}
-                      {isBrowsableRepoUrl(entry.repoUrl) && (
+                      {entry.directory && isBrowsableRepoUrl(entry.repoUrl) && (
                         <button
                           className="repo-popout-button browser-row-action"
                           onClick={() => openExternalUrl(entry.repoUrl!)}

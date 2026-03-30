@@ -47,13 +47,14 @@ When started, the CLI shows:
 
 See `docs/frontend.md` for detailed frontend architecture, API integration, state model, and development workflow.
 For assistant tooling internals and report-ready architecture notes, see `docs/tool-calling-architecture.md`.
+For backend constants and extensibility patterns, see `docs/support-classes.md`.
 
 - The top bar shows the current working folder.
 - The left-hand `File Browser` is a compact explorer-style list for the current working folder.
 - Clicking `Refresh` in the file browser calls `/api/fs/list` for the current folder.
 - Clicking `Up` changes the working folder to the parent directory.
 - Clicking a folder row in the file browser navigates into that folder.
-- Directory rows that resolve to a valid GitHub or browsable Git remote show a visible `↗` pop-out button that opens the repository in the browser.
+- Directory rows that resolve to a valid GitHub repository link show a visible `↗` pop-out button that opens the repository in the browser.
 - The project explorer window remains action-oriented:
   - `▸` folder runs a one-shot assistant summary for that folder
   - `●` file opens file content

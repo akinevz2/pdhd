@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.Locale;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -11,6 +12,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import ac.uk.sussex.kn253.model.Project;
 import ac.uk.sussex.kn253.model.ProjectKnowledge;
 import ac.uk.sussex.kn253.schema.SchemaKeys;
+import jakarta.persistence.TransactionRequiredException;
 
 /**
  * Centralized support for caching read tool results to the project knowledge
@@ -41,6 +43,7 @@ public class ReadToolSupport {
     public static final String ERROR_SERIALIZE_PATH_ANALYSIS = "Failed to serialize cached path analysis for ";
     public static final String ERROR_SERIALIZE_FOLDER_MANIFEST = "Failed to serialize cached folder manifest for ";
     public static final String ERROR_PERSISTENCE_UNAVAILABLE_MARKER = "did you forget to annotate your entity with @Entity?";
+    public static final String ERROR_TRANSACTION_REQUIRED_MARKER = "transaction is not active";
 
     public static final String PROJECT_MARKER_POM = "pom.xml";
     public static final String PROJECT_MARKER_GRADLE = "build.gradle";
@@ -265,9 +268,30 @@ public class ReadToolSupport {
     }
 
     private boolean isPersistenceUnavailable(final RuntimeException e) {
+        if (e instanceof TransactionRequiredException || hasCause(e, TransactionRequiredException.class)) {
+            return true;
+        }
+
         final String message = e.getMessage();
-        return e instanceof IllegalStateException
-                && message != null
-                && message.contains(ERROR_PERSISTENCE_UNAVAILABLE_MARKER);
+        if (message != null) {
+            final String lower = message.toLowerCase(Locale.ROOT);
+            if (lower.contains(ERROR_PERSISTENCE_UNAVAILABLE_MARKER.toLowerCase(Locale.ROOT))
+                    || lower.contains(ERROR_TRANSACTION_REQUIRED_MARKER)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private boolean hasCause(final Throwable throwable, final Class<? extends Throwable> type) {
+        Throwable current = throwable == null ? null : throwable.getCause();
+        while (current != null) {
+            if (type.isInstance(current)) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 }
