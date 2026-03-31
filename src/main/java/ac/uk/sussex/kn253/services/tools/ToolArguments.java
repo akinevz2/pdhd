@@ -124,4 +124,12 @@ public final class ToolArguments {
         }
         return Boolean.parseBoolean(String.valueOf(value));
     }
+
+    public static String getString(final Map<String, Object> args, final String key) {
+        final var value = getString(args, key, "");
+        if (value.isBlank()) {
+            throw new IllegalArgumentException("Missing value for argument: " + key);
+        }
+        return value;
+    }
 }

@@ -2,6 +2,7 @@ package ac.uk.sussex.kn253.services;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import org.jboss.logging.Logger;
 import org.junit.jupiter.api.*;
 
 import ac.uk.sussex.kn253.model.OllamaSettings;
@@ -12,6 +13,8 @@ import jakarta.transaction.Transactional;
 
 @QuarkusTest
 class OllamaConfigServiceTest {
+
+    private static final Logger LOG = Logger.getLogger(OllamaConfigServiceTest.class);
 
     @Inject
     OllamaConfigService ollamaConfigService;
@@ -27,6 +30,7 @@ class OllamaConfigServiceTest {
     @Test
     void loadSeedsLangchainSystemPropertiesFromResolvedDefaults() {
         final String baseUrl = OllamaTestSupport.testBaseUrl();
+        LOG.infof("Using Ollama baseUrl in test: %s", baseUrl);
         Assumptions.assumeTrue(
                 OllamaTestSupport.isReachable(baseUrl),
                 () -> "Skipping: workstation Ollama not reachable at " + baseUrl);
@@ -43,11 +47,12 @@ class OllamaConfigServiceTest {
     void saveUpdatesLangchainSystemPropertiesFromPersistedSettings() {
         final OllamaSettings settings = ollamaConfigService.load();
         settings.setBaseUrl("http://localhost:11434");
-        settings.setModelName("llama3.2:latest");
+        settings.setModelName("llama3.1:8b-instruct-q4_K_M");
 
         ollamaConfigService.save(settings);
 
         assertEquals("http://localhost:11434", System.getProperty("quarkus.langchain4j.ollama.base-url"));
-        assertEquals("llama3.2:latest", System.getProperty("quarkus.langchain4j.ollama.chat-model.model-id"));
+        assertEquals("llama3.1:8b-instruct-q4_K_M",
+                System.getProperty("quarkus.langchain4j.ollama.chat-model.model-id"));
     }
 }

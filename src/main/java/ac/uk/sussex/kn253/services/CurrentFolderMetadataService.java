@@ -29,6 +29,9 @@ public class CurrentFolderMetadataService {
     public static final String VALUE_NONE = "none";
     public static final String VALUE_NO_TAGS = "(none)";
     public static final String VALUE_NEXT_READ_PROJECT_KNOWLEDGE = "read_project_knowledge";
+    public static final String VALUE_ASSISTANT_ACTION_POLICY = "When proposing one follow-up action, emit exactly one assistant-action fenced code block instead of plain-text next-steps or further-inspection sections.";
+    public static final String VALUE_ASSISTANT_ACTION_BLOCK_LANGUAGE = "assistant-action";
+    public static final String VALUE_ASSISTANT_ACTION_BLOCK_TEMPLATE = "{\"label\":\"<short button label>\",\"prompt\":\"<single actionable follow-up user prompt>\"}";
 
     @Inject
     WorkingDirectoryService workingDirectoryService;
@@ -57,6 +60,7 @@ public class CurrentFolderMetadataService {
 
         final Map<String, Object> signals = new LinkedHashMap<>();
         signals.put(SchemaKeys.CWD, cwd.toString());
+        addAssistantActionSignals(signals);
 
         if (project == null) {
             signals.put(SchemaKeys.PROJECT, VALUE_NONE);
@@ -86,6 +90,12 @@ public class CurrentFolderMetadataService {
             signals.put(SchemaKeys.NEXT, VALUE_NEXT_READ_PROJECT_KNOWLEDGE);
         }
         return toSignalBlock(METADATA_TITLE, signals);
+    }
+
+    private void addAssistantActionSignals(final Map<String, Object> signals) {
+        signals.put(SchemaKeys.ASSISTANT_ACTION_POLICY, VALUE_ASSISTANT_ACTION_POLICY);
+        signals.put(SchemaKeys.ASSISTANT_ACTION_BLOCK_LANGUAGE, VALUE_ASSISTANT_ACTION_BLOCK_LANGUAGE);
+        signals.put(SchemaKeys.ASSISTANT_ACTION_BLOCK_TEMPLATE, VALUE_ASSISTANT_ACTION_BLOCK_TEMPLATE);
     }
 
     private static String toSignalBlock(final String title, final Map<String, Object> signals) {

@@ -1,14 +1,8 @@
 package ac.uk.sussex.kn253.services.tools;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
-import ac.uk.sussex.kn253.services.EmbeddingService;
-import ac.uk.sussex.kn253.services.ProjectDiscoveryService;
-import ac.uk.sussex.kn253.services.ToolActivityService;
-import ac.uk.sussex.kn253.services.ToolTelemetryService;
-import ac.uk.sussex.kn253.services.WorkingDirectoryService;
+import ac.uk.sussex.kn253.services.*;
 import ac.uk.sussex.kn253.services.tools.macro.ToolMacro;
 import ac.uk.sussex.kn253.services.tools.macro.ToolMacroRegistry;
 import ac.uk.sussex.kn253.services.tools.macro.explore.*;
@@ -24,12 +18,14 @@ import jakarta.inject.Inject;
 /**
  * Single CDI bean that owns and instantiates every {@link ToolMacro}.
  *
- * <p>This class is the canonical place where all tools are constructed. It
+ * <p>
+ * This class is the canonical place where all tools are constructed. It
  * replaces the previous four per-category toolset subclasses
  * ({@code ExploreToolset}, {@code ReadToolset}, {@code WriteToolset},
  * {@code IntrospectToolset}) and the abstract {@code ToolMacroToolset} base.
  *
- * <p>Tool operation categories are derived from {@code ToolOperationType} and
+ * <p>
+ * Tool operation categories are derived from {@code ToolOperationType} and
  * surfaced via {@link #operationCategoryFor(String)} for analytics/telemetry.
  */
 @ApplicationScoped
@@ -48,13 +44,15 @@ public class MacroToolModule implements ToolModule {
      */
     public MacroToolModule(final WorkingDirectoryService workingDirectoryService) {
         this(
-                new ExploreToolSupport(workingDirectoryService, null, null),
-                new IntrospectToolSupport(workingDirectoryService, null, null),
-                new WriteToolSupport(),
-                null);
+                new ExploreToolSupport(workingDirectoryService),
+                new IntrospectToolSupport(workingDirectoryService),
+                new WriteToolSupport());
     }
 
-    /** CDI injection constructor — all service dependencies resolved by the container. */
+    /**
+     * CDI injection constructor — all service dependencies resolved by the
+     * container.
+     */
     @Inject
     public MacroToolModule(
             final WorkingDirectoryService workingDirectoryService,
@@ -67,16 +65,31 @@ public class MacroToolModule implements ToolModule {
                 new ExploreToolSupport(workingDirectoryService, pathSummaryLlmService, projectDiscoveryService),
                 new IntrospectToolSupport(workingDirectoryService, toolActivityService, toolTelemetryService),
                 new WriteToolSupport(),
-                embeddingService != null && embeddingService.isResolvable() ? embeddingService.get() : null);
+                resolveEmbeddingService(embeddingService));
     }
 
-    /** Package-private constructor used in focused tests that supply support objects directly. */
+    private static EmbeddingService resolveEmbeddingService(final Instance<EmbeddingService> embeddingService) {
+        return embeddingService != null && embeddingService.isResolvable() ? embeddingService.get() : null;
+    }
+
+    MacroToolModule(
+            final ExploreToolSupport exploreSupport,
+            final IntrospectToolSupport introspectSupport,
+            final WriteToolSupport writeSupport) {
+        this(exploreSupport, introspectSupport, writeSupport, null);
+    }
+
+    /**
+     * Package-private constructor used in focused tests that supply support objects
+     * directly.
+     */
     MacroToolModule(
             final ExploreToolSupport exploreSupport,
             final IntrospectToolSupport introspectSupport,
             final WriteToolSupport writeSupport,
             final EmbeddingService embeddingService) {
-        this.registry = new ToolMacroRegistry(buildTools(exploreSupport, introspectSupport, writeSupport, embeddingService));
+        this.registry = new ToolMacroRegistry(
+                buildTools(exploreSupport, introspectSupport, writeSupport, embeddingService));
     }
 
     private static List<ToolMacro> buildTools(
@@ -142,7 +155,8 @@ public class MacroToolModule implements ToolModule {
     /**
      * Returns the {@code ToolOperationType} name for {@code toolName}, e.g.
      * {@code "EXPLORE"}, {@code "READ"}, {@code "WRITE"}, {@code "INTROSPECT"}.
-     * Used by {@link ac.uk.sussex.kn253.services.ToolService} for telemetry grouping.
+     * Used by {@link ac.uk.sussex.kn253.services.ToolService} for telemetry
+     * grouping.
      */
     @Override
     public String operationCategoryFor(final String toolName) {

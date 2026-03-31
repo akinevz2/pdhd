@@ -1,7 +1,9 @@
 package ac.uk.sussex.kn253.ollama;
 
+import java.nio.file.Path;
 import java.time.Duration;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Supplier;
 
 import org.jboss.logging.Logger;
@@ -32,8 +34,7 @@ import jakarta.inject.Inject;
  * required.
  *
  * <p>
- * System-prompt construction is delegated to {@link SystemPromptBuilder};
- * text-based tool-call parsing is delegated to {@link ToolCallParser}.
+ * System-prompt construction is delegated to {@link PromptBuilder}.
  *
  * <p>
  * Example usage:
@@ -55,7 +56,6 @@ public class OllamaChatSession {
     private static final int MAX_IDENTICAL_TOOL_CALLS_DEFAULT = 4;
     private static final int MAX_IDENTICAL_TOOL_CALLS_SUMMARIZE = 3;
     private static final int MAX_IDENTICAL_TOOL_CALLS_EXPLORATION = 7;
-
     private final ChatModel chatModel;
     private final String configuredModelName;
     private final ToolService toolService;
@@ -63,8 +63,7 @@ public class OllamaChatSession {
     private final List<ChatMessage> history = new ArrayList<>();
     private String systemPrompt = "You are a helpful assistant.";
     private String toolSystemPrompt = "Use tools only when necessary.";
-    private Supplier<String> cwdSupplier = null;
-    private Supplier<String> requestMetadataSupplier = null;
+    private Supplier<MacroContext> contextSupplier = null;
 
     // -------------------------------------------------------------------------
     // Constructors
@@ -101,7 +100,7 @@ public class OllamaChatSession {
      * Programmatic constructor for use outside CDI (e.g. tests or scripts).
      *
      * @param baseUrl   Ollama base URL (e.g. {@code http://localhost:11434}).
-     * @param modelName model identifier (e.g. {@code llama3.2}).
+     * @param modelName model identifier (e.g. {@code llama3.1:8b-instruct-q4_K_M}).
      */
     public OllamaChatSession(final String baseUrl, final String modelName) {
         this.chatModel = OllamaChatModel.builder()
@@ -154,28 +153,20 @@ public class OllamaChatSession {
     }
 
     /**
-     * Sets a supplier that is called on every conversation turn to inject the
-     * current working directory into the system prompt context.
-     *
-     * @param cwdSupplier supplier returning the current CWD path string.
-     * @return {@code this} for fluent chaining.
+     * Sets a supplier that is called on every conversation turn to provide
+     * macro prompt context.
      */
-    public OllamaChatSession setCwdSupplier(final Supplier<String> cwdSupplier) {
-        this.cwdSupplier = cwdSupplier;
+    public OllamaChatSession setContextSupplier(final Supplier<MacroContext> contextSupplier) {
+        this.contextSupplier = contextSupplier;
         return this;
     }
 
     /**
-     * Sets a supplier that is called on every conversation turn to inject
-     * lightweight metadata about the current folder or project into the system
-     * prompt context.
-     *
-     * @param requestMetadataSupplier supplier returning a formatted metadata block.
-     * @return {@code this} for fluent chaining.
+     * Compatibility wrapper while callers migrate to
+     * {@link #setContextSupplier(Supplier)}.
      */
-    public OllamaChatSession setRequestMetadataSupplier(final Supplier<String> requestMetadataSupplier) {
-        this.requestMetadataSupplier = requestMetadataSupplier;
-        return this;
+    public OllamaChatSession setCwdSupplier(final Supplier<Path> cwdSupplier) {
+        return setContextSupplier(() -> new MacroContext(cwdSupplier.get()));
     }
 
     // -------------------------------------------------------------------------
@@ -190,6 +181,7 @@ public class OllamaChatSession {
      * @return the assistant's text response.
      */
     public String send(final String userText) {
+        initializeConversation(history);
         history.add(UserMessage.from(userText));
         return runConversationLoop(true, history);
     }
@@ -204,6 +196,7 @@ public class OllamaChatSession {
      */
     public String sendOneShot(final String userText) {
         final List<ChatMessage> oneShot = new ArrayList<>();
+        initializeConversation(oneShot);
         oneShot.add(UserMessage.from(userText));
         return runConversationLoop(false, oneShot);
     }
@@ -217,7 +210,9 @@ public class OllamaChatSession {
      * The system message is not included.
      */
     public List<ChatMessage> getHistory() {
-        return Collections.unmodifiableList(history);
+        return history.stream()
+                .filter(message -> !(message instanceof SystemMessage))
+                .toList();
     }
 
     /**
@@ -237,7 +232,7 @@ public class OllamaChatSession {
      * currently in the history.
      */
     public int turnCount() {
-        return history.size() / 2;
+        return getHistory().size() / 2;
     }
 
     // -------------------------------------------------------------------------
@@ -259,93 +254,113 @@ public class OllamaChatSession {
         int identicalToolCallCount = 0;
 
         for (int round = 0; round < MAX_TOOL_ROUNDS; round++) {
-            final List<ChatMessage> messages = new ArrayList<>();
-            final String effectiveSystemPrompt = buildEffectiveSystemPrompt();
-            messages.add(SystemMessage.from(
-                    SystemPromptBuilder.build(effectiveSystemPrompt, toolSystemPrompt, configuredModelName,
-                            toolService)));
-            messages.addAll(workingHistory);
+            if (toolService == null) {
+                LOG.warn("Running conversation loop with no tools accessible to the model");
+            }
+            final List<dev.langchain4j.agent.tool.ToolSpecification> specs = toolService == null ? List.of()
+                    : toolService.toolSpecifications();
 
-            LOG.debugf("Sending %d messages to Ollama (system + %d history entries)",
-                    messages.size(), workingHistory.size());
+            LOG.debugf("Sending %d messages to Ollama", workingHistory.size());
 
-            ChatRequest.Builder requestBuilder = ChatRequest.builder().messages(messages);
-            if (toolService != null && !toolService.toolSpecifications().isEmpty()) {
-                requestBuilder = requestBuilder.toolSpecifications(toolService.toolSpecifications());
+            ChatRequest.Builder requestBuilder = ChatRequest.builder().messages(workingHistory);
+            if (!specs.isEmpty()) {
+                requestBuilder = requestBuilder.toolSpecifications(specs);
             }
 
             final ChatResponse response = chatModel.chat(requestBuilder.build());
             final AiMessage aiMessage = response.aiMessage();
             workingHistory.add(aiMessage);
 
-            List<ToolExecutionRequest> toolRequests = aiMessage.toolExecutionRequests();
+            if (aiMessage.hasToolExecutionRequests()) {
+                final List<ToolExecutionRequest> toolRequests = aiMessage.toolExecutionRequests();
 
-            // Fallback: some models emit tool calls as JSON text rather than using
-            // the structured response format – delegate parsing to ToolCallParser.
-            if ((toolRequests == null || toolRequests.isEmpty()) && toolService != null) {
-                toolRequests = ToolCallParser.parse(aiMessage.text(), toolService);
-            }
+                LOG.debugf("Model requested %d tool calls", toolRequests.size());
 
-            if (toolRequests == null || toolRequests.isEmpty()) {
-                final String text = aiMessage.text();
-                if (text != null && !text.isBlank()) {
-                    return text;
-                } else {
-                    return "Assistant is thinking...";
-                }
-            }
-
-            for (final ToolExecutionRequest toolRequest : toolRequests) {
-                final String signature = toolRequest.name() + "|" + toolRequest.arguments();
-                if (signature.equals(lastToolSignature)) {
-                    identicalToolCallCount++;
-                } else {
-                    lastToolSignature = signature;
-                    identicalToolCallCount = 1;
-                }
-
-                if (identicalToolCallCount >= maxIdenticalToolCalls(toolRequest.name())) {
-                    final String loopGuardResult = "Tool loop guard triggered: repeated identical tool call ('"
-                            + toolRequest.name()
-                            + "'). Synthesize a final response from the current evidence instead of re-calling this tool.";
-                    if (toolActivityService != null) {
-                        toolActivityService.record(toolRequest.name(), toolRequest.arguments(), loopGuardResult);
+                for (final ToolExecutionRequest toolRequest : toolRequests) {
+                    final String signature = toolRequest.name() + "|" + toolRequest.arguments();
+                    if (signature.equals(lastToolSignature)) {
+                        identicalToolCallCount++;
+                    } else {
+                        lastToolSignature = signature;
+                        identicalToolCallCount = 1;
                     }
-                    workingHistory.add(ToolExecutionResultMessage.from(toolRequest, loopGuardResult));
-                    LOG.warnf("Stopped repeated identical tool call loop for tool '%s'", toolRequest.name());
-                    return "Stopped a repeated tool-call loop ('" + toolRequest.name()
-                            + "'). Please retry with a narrower request or explicit target path.";
+
+                    if (identicalToolCallCount >= maxIdenticalToolCalls(toolRequest.name())) {
+                        final String loopGuardResult = "Tool loop guard triggered: repeated identical tool call ('"
+                                + toolRequest.name()
+                                + "'). Synthesize a final response from the current evidence instead of re-calling this tool.";
+                        if (toolActivityService != null) {
+                            toolActivityService.record(toolRequest.name(), toolRequest.arguments(), loopGuardResult);
+                        }
+                        workingHistory.add(ToolExecutionResultMessage.from(toolRequest, loopGuardResult));
+                        LOG.warnf("Stopped repeated identical tool call loop for tool '%s'", toolRequest.name());
+                        return "Stopped a repeated tool-call loop ('" + toolRequest.name()
+                                + "'). Please retry with a narrower request or explicit target path.";
+                    }
+
+                    final String result = toolService.execute(toolRequest, null);
+                    if (toolActivityService != null) {
+                        toolActivityService.record(toolRequest.name(), toolRequest.arguments(), result);
+                    }
+                    workingHistory.add(ToolExecutionResultMessage.from(toolRequest, result));
                 }
 
-                final String result = toolService.execute(toolRequest, null);
-                if (toolActivityService != null) {
-                    toolActivityService.record(toolRequest.name(), toolRequest.arguments(), result);
-                }
-                workingHistory.add(ToolExecutionResultMessage.from(toolRequest, result));
+                // Tool results are now part of the conversation history; the next
+                // outer round asks the model for a fresh assistant message.
+                continue;
             }
+
+            final String text = aiMessage.text();
+            if (text == null || text.isBlank()) {
+                return "Assistant is thinking...";
+            }
+
+            return text;
+
         }
 
         return "Tool execution exceeded maximum rounds without a final response.";
     }
 
+    private void initializeConversation(final List<ChatMessage> workingHistory) {
+        if (!workingHistory.isEmpty()) {
+            return;
+        }
+
+        final String effectiveSystemPrompt = buildEffectiveSystemPrompt();
+        final List<dev.langchain4j.agent.tool.ToolSpecification> specs = toolService == null ? List.of()
+                : toolService.toolSpecifications();
+        workingHistory.add(SystemMessage.from(
+                PromptBuilder.buildMonolithPrompt(
+                        PromptBuilder.PromptRequestType.CONVERSATION,
+                        effectiveSystemPrompt,
+                        toolSystemPrompt,
+                        configuredModelName,
+                        specs)));
+    }
+
     String buildEffectiveSystemPrompt() {
-        final StringBuilder prompt = new StringBuilder(systemPrompt);
 
-        if (cwdSupplier != null) {
-            final String cwd = cwdSupplier.get();
-            if (cwd != null && !cwd.isBlank()) {
-                prompt.append("\n\nCurrent working directory: ").append(cwd);
-            }
+        if (contextSupplier == null) {
+            return systemPrompt;
         }
 
-        if (requestMetadataSupplier != null) {
-            final String metadata = requestMetadataSupplier.get();
-            if (metadata != null && !metadata.isBlank()) {
-                prompt.append("\n\n").append(metadata);
-            }
+        final MacroContext context = contextSupplier.get();
+        if (context == null) {
+            return systemPrompt;
         }
 
-        return prompt.toString();
+        final Path cwd = context.cwd();
+        if (cwd == null) {
+            return systemPrompt;
+        }
+
+        final String cwdText = cwd.toString();
+        if (cwdText.isBlank()) {
+            return systemPrompt;
+        }
+
+        return systemPrompt + "\n\nCurrent working directory: " + cwdText;
     }
 
     private static int maxIdenticalToolCalls(final String toolName) {

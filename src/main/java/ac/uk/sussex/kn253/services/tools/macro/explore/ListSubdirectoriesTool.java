@@ -10,12 +10,14 @@ import dev.langchain4j.model.chat.request.json.JsonStringSchema;
 public class ListSubdirectoriesTool implements ToolMacro {
 
     private final ExploreToolSupport support;
+    private final String PATH_PROPERTY = "path";
     private final ToolSpecification specification = ToolSpecification.builder()
             .name(ToolMacros.LIST_SUBDIRECTORIES.name())
             .description(definition().description())
             .parameters(JsonObjectSchema.builder()
-                    .addProperty("path", JsonStringSchema.builder().description("Directory path to inspect").build())
-                    .required("path")
+                    .addProperty(PATH_PROPERTY,
+                            JsonStringSchema.builder().description("Directory path to inspect").build())
+                    .required(PATH_PROPERTY)
                     .build())
             .build();
 

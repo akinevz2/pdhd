@@ -26,7 +26,7 @@ public final class OllamaTestSupport {
     public static List<String> toolModelMatrix() {
         final String raw = System.getenv().getOrDefault(
                 "OLLAMA_TEST_TOOL_MODELS",
-            "glm-4.7-flash:latest,llama3.2:latest");
+                "glm-4.7-flash:latest,llama3.1:8b-instruct-q4_K_M");
         return Arrays.stream(raw.split(","))
                 .map(String::trim)
                 .filter(s -> !s.isBlank())

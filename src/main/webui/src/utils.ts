@@ -21,6 +21,21 @@ export function isImagePath(path: string): boolean {
   return /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(path);
 }
 
+/** Returns `true` when the path points to a PDF document. */
+export function isPdfPath(path: string): boolean {
+  return /\.pdf$/i.test(path);
+}
+
+/** Builds the raw-file endpoint URL for a project-relative file path. */
+export function rawFileUrl(
+  projectDirectory: string,
+  relativePath: string,
+): string {
+  const absolutePath =
+    projectDirectory.replace(/\\/g, "/") + "/" + relativePath;
+  return `/api/fs/file/raw?path=${encodeURIComponent(absolutePath)}`;
+}
+
 /**
  * Builds the URL for the raw-image endpoint so the browser can render
  * the image directly without fetching base64 content.
@@ -29,9 +44,7 @@ export function rawImageUrl(
   projectDirectory: string,
   relativePath: string,
 ): string {
-  const absolutePath =
-    projectDirectory.replace(/\\/g, "/") + "/" + relativePath;
-  return `/api/fs/file/raw?path=${encodeURIComponent(absolutePath)}`;
+  return rawFileUrl(projectDirectory, relativePath);
 }
 
 /** Returns true when a repository URL can be opened safely in the browser. */

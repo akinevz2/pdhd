@@ -13,6 +13,9 @@ import lombok.*;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class OllamaDeleteRequest {
 
-    /** Fully-qualified model name to delete, e.g. {@code llama3.2:latest}. */
+    /**
+     * Fully-qualified model name to delete, e.g.
+     * {@code llama3.1:8b-instruct-q4_K_M}.
+     */
     private String name;
 }

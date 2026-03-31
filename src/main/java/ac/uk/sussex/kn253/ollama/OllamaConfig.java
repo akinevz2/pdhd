@@ -14,7 +14,7 @@ import io.smallrye.config.*;
  * 
  * <pre>
  *   OLLAMA_BASE_URL=http://my-gpu-box:11434
- *   OLLAMA_MODEL_NAME=llama3.2
+ *   OLLAMA_MODEL_NAME=llama3.1:8b-instruct-q4_K_M
  * </pre>
  */
 @ConfigMapping(prefix = "ollama")
@@ -27,7 +27,7 @@ public interface OllamaConfig {
 
     /** Default model name used when no explicit model is supplied. */
     @WithName("model-name")
-    @WithDefault("llama3.2")
+    @WithDefault("llama3.1:8b-instruct-q4_K_M")
     String modelName();
 
     /** Default embeddings model name used when no explicit model is supplied. */

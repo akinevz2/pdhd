@@ -15,7 +15,6 @@ public class ListFilesRecursiveTool implements ToolMacro {
             .description(definition().description())
             .parameters(JsonObjectSchema.builder()
                     .addProperty("path", JsonStringSchema.builder().description("Directory path to inspect").build())
-                    .required("path")
                     .build())
             .build();
 

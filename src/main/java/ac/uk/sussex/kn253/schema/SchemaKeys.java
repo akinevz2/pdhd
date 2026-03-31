@@ -39,6 +39,9 @@ public final class SchemaKeys {
     public static final String HAS_GIT = "hasGit";
     public static final String TAG_COUNT = "tagCount";
     public static final String HAS_HISTORY = "hasHistory";
+    public static final String ASSISTANT_ACTION_POLICY = "assistantActionPolicy";
+    public static final String ASSISTANT_ACTION_BLOCK_LANGUAGE = "assistantActionBlockLanguage";
+    public static final String ASSISTANT_ACTION_BLOCK_TEMPLATE = "assistantActionBlockTemplate";
 
     public static final String FILE_PATH = "filePath";
     public static final String CONTENT_LENGTH = "contentLength";

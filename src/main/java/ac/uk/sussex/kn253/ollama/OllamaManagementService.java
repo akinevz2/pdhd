@@ -117,7 +117,7 @@ public class OllamaManagementService {
     /**
      * Returns {@code true} if a model with the given name is locally available.
      *
-     * @param modelName fully-qualified model name, e.g. {@code llama3.2:latest}.
+    * @param modelName fully-qualified model name, e.g. {@code llama3.1:8b-instruct-q4_K_M}.
      */
     public boolean isModelAvailable(final String modelName) {
         return listModels().stream()
@@ -151,7 +151,7 @@ public class OllamaManagementService {
      * Pulls a model from the Ollama registry, blocking until the download is
      * complete.
      *
-     * @param modelName model to pull, e.g. {@code llama3.2} or {@code llama3.2:8b}.
+    * @param modelName model to pull, e.g. {@code llama3.1:8b-instruct-q4_K_M}.
      * @return the final {@link OllamaPullStatus}.
      * @throws OllamaException if the pull fails.
      */

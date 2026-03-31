@@ -3,6 +3,7 @@ package ac.uk.sussex.kn253.services.tools.macro;
 import java.util.*;
 
 import dev.langchain4j.agent.tool.ToolSpecification;
+import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
 
 public class ToolMacroRegistry {
 
@@ -32,7 +33,40 @@ public class ToolMacroRegistry {
         if (tool == null) {
             return "Unknown tool: " + toolName;
         }
+        validateRequiredArguments(tool, args == null ? Map.of() : args);
         return tool.execute(args, memoryId);
+    }
+
+    private void validateRequiredArguments(final ToolMacro tool, final Map<String, Object> args) {
+        final ToolSpecification specification = tool.specification();
+        if (specification == null) {
+            return;
+        }
+        final JsonObjectSchema parameters = specification.parameters();
+        if (parameters == null || parameters.required() == null || parameters.required().isEmpty()) {
+            return;
+        }
+
+        final List<String> missing = parameters.required().stream()
+                .filter(requiredKey -> {
+                    if (!args.containsKey(requiredKey)) {
+                        return true;
+                    }
+                    final Object value = args.get(requiredKey);
+                    if (value == null) {
+                        return true;
+                    }
+                    if (value instanceof final String strValue) {
+                        return strValue.isBlank();
+                    }
+                    return false;
+                })
+                .toList();
+
+        if (!missing.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Missing required argument(s) for " + tool.definition().name() + ": " + String.join(", ", missing));
+        }
     }
 
     public String operationType(final String toolName) {

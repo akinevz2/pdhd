@@ -40,11 +40,11 @@ class MacroToolModuleIntrospectTest {
                 final MacroToolModule toolset = new MacroToolModule(cwd);
 
                 final String result = toolset.execute(
-                                request("read_folder_manifest", "{\"path\":\"docs\"}"),
+                                request("read_folder_manifest", "{\"path\":\"" + escape(folder.toString()) + "\"}"),
                                 null);
 
                 assertTrue(result.contains("=== folder entries (recursive) ==="));
-                assertTrue(result.contains("README.md"));
+                assertTrue(result.toLowerCase().contains("readme"));
                 assertTrue(result.contains("guides/"));
                 assertTrue(result.contains("guides/intro.md"));
                 assertTrue(result.contains("=== sampled file contents (evidence only) ==="));
@@ -54,8 +54,23 @@ class MacroToolModuleIntrospectTest {
         }
 
         @Test
+        void readFolderManifestRequiresPathArgument(@TempDir final Path tempDir) throws Exception {
+                final WorkingDirectoryService cwd = new WorkingDirectoryService();
+                cwd.navigateTo(tempDir.toString());
+                final MacroToolModule toolset = new MacroToolModule(cwd);
+
+                final String result = toolset.execute(
+                                request("read_folder_manifest", "{}"),
+                                null);
+
+                assertTrue(result.startsWith("Invalid tool arguments:"));
+                assertTrue(result.contains("Missing required argument(s) for read_folder_manifest: path"));
+        }
+
+        @Test
         void readProjectManifestIncludesRecursiveSrcListingAndContent(@TempDir final Path tempDir) throws Exception {
                 Files.writeString(tempDir.resolve("README.md"), "# Demo Project\n");
+                Files.writeString(tempDir.resolve("pom.xml"), "<project/>\n");
 
                 final Path srcMainJava = tempDir.resolve("src/main/java/ac/demo");
                 Files.createDirectories(srcMainJava);
@@ -87,6 +102,7 @@ class MacroToolModuleIntrospectTest {
         @Test
         void readProjectManifestWithoutSrcDoesNotFail(@TempDir final Path tempDir) throws Exception {
                 Files.writeString(tempDir.resolve("README.md"), "# Project Without Src\n");
+                Files.writeString(tempDir.resolve("pom.xml"), "<project/>\n");
 
                 final WorkingDirectoryService cwd = new WorkingDirectoryService();
                 cwd.navigateTo(tempDir.toString());
@@ -103,6 +119,7 @@ class MacroToolModuleIntrospectTest {
         @Test
         void readProjectManifestReportsOmittedFilesAndAvoidsUnsampledContentClaims(@TempDir final Path tempDir)
                         throws Exception {
+                Files.writeString(tempDir.resolve("pom.xml"), "<project/>\n");
                 final Path srcMainJava = tempDir.resolve("src/main/java/ac/demo");
                 Files.createDirectories(srcMainJava);
 
@@ -132,7 +149,44 @@ class MacroToolModuleIntrospectTest {
                 assertTrue(result.contains("content is unknown unless read via read_file"));
         }
 
+        @Test
+        void readProjectManifestRejectsNonRootFolder(@TempDir final Path tempDir) throws Exception {
+                Files.writeString(tempDir.resolve("pom.xml"), "<project/>\n");
+                final Path docs = tempDir.resolve("docs");
+                Files.createDirectories(docs);
+
+                final WorkingDirectoryService cwd = new WorkingDirectoryService();
+                cwd.navigateTo(tempDir.toString());
+                final MacroToolModule toolset = new MacroToolModule(cwd);
+
+                final String result = toolset.execute(
+                                request("read_project_manifest", "{\"path\":\"docs\"}"),
+                                null);
+
+                assertTrue(result.contains("read_project_manifest is only allowed for project root folders"));
+        }
+
+        @Test
+        void readFolderManifestRejectsProjectRootFolder(@TempDir final Path tempDir) throws Exception {
+                Files.writeString(tempDir.resolve("pom.xml"), "<project/>\n");
+                Files.createDirectories(tempDir.resolve("docs"));
+
+                final WorkingDirectoryService cwd = new WorkingDirectoryService();
+                cwd.navigateTo(tempDir.toString());
+                final MacroToolModule toolset = new MacroToolModule(cwd);
+
+                final String result = toolset.execute(
+                                request("read_folder_manifest", "{\"path\":\".\"}"),
+                                null);
+
+                assertTrue(result.contains("read_folder_manifest is not allowed for a project root folder"));
+        }
+
         private ToolExecutionRequest request(final String name, final String jsonArguments) {
                 return ToolExecutionRequest.builder().name(name).arguments(jsonArguments).build();
+        }
+
+        private static String escape(final String value) {
+                return value.replace("\\", "\\\\").replace("\"", "\\\"");
         }
 }

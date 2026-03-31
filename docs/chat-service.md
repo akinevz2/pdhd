@@ -271,13 +271,12 @@ Models like `llama3.2` have native tool support and can generate structured tool
 - Advantage: Reduced prompt engineering
 - Requirement: Model must support tool specification format
 
-### Text-Based Models
+### Unsupported Models
 
-Models like `qwen2.5-coder` require XML-formatted tool calls parsed from text.
+Models that do not support native structured tool calling are not supported for tool use.
 
-- Mechanism: `ToolCallParser` extracts XML tool calls from model output
-- System prompt includes explicit XML format instructions
-- Fallback: If parsing fails, return text as-is
+- Behaviour: LangChain4j throws an unsupported-feature error when tool specifications are sent to such a model provider
+- UI behaviour: The backend propagates that error and the frontend displays it directly to the user
 
 ### Tool Loop Guard
 

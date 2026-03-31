@@ -27,10 +27,17 @@ import {
   POLL_MS,
   isBrowsableRepoUrl,
   isImagePath,
+  isPdfPath,
   openExternalUrl,
 } from "./utils";
 
 const MARKDOWN_FILE_PATTERN = /\.(md|markdown|mdx)$/i;
+const ASSISTANT_ACTION_BLOCK_PATTERN = /```assistant-action\s*([\s\S]*?)```/gi;
+
+type AssistantActionPayload = {
+  label: string;
+  prompt: string;
+};
 
 export function App() {
   const [browserPath, setBrowserPath] = useState<string>("");
@@ -347,7 +354,7 @@ export function App() {
       projectDirectory: string,
       relativePath: string,
     ) => {
-      if (isImagePath(relativePath)) {
+      if (isImagePath(relativePath) || isPdfPath(relativePath)) {
         updateWindow(windowId, {
           selectedFilePath: relativePath,
           fileLoading: false,
@@ -454,16 +461,6 @@ export function App() {
       setChatLoading(true);
 
       try {
-        const message = [
-          `Summarise the contents of this folder: ${folderPath}`,
-          "First call read_folder_manifest with this exact folder path and use its evidence as the primary source.",
-          "Use read_file only for specific follow-up files if required.",
-          "Use read_project_manifest tool only when the request is explicitly about the whole project.",
-          "Return the final answer as Markdown with short section headings and bullet points.",
-          "Include fenced code blocks for small code examples when relevant.",
-          "Keep the summary concise but useful for a developer.",
-        ].join(" ");
-
         setChatMessages((prev) => [
           ...prev,
           { role: "user", content: `Summarise folder: ${folderPath}` },
@@ -477,9 +474,9 @@ export function App() {
             await new Promise((r) => setTimeout(r, 1000 * 2 ** (attempt - 1)));
           }
           try {
-            result = await apiPost<{ message: string }, AssistantChatResponse>(
-              "/api/chat/oneshot",
-              { message },
+            result = await apiPost<{ path: string }, AssistantChatResponse>(
+              "/api/chat/summarize-folder",
+              { path: folderPath },
               CHAT_TIMEOUT_MS,
             );
             break;
@@ -549,6 +546,29 @@ export function App() {
   );
 
   const [retryMessage, setRetryMessage] = useState<string | null>(null);
+
+  const parseAssistantActionPayload = useCallback(
+    (rawPayload: string): AssistantActionPayload | null => {
+      try {
+        const parsed = JSON.parse(rawPayload) as {
+          label?: unknown;
+          prompt?: unknown;
+        } | null;
+        const label =
+          typeof parsed?.label === "string" ? parsed.label.trim() : "";
+        const prompt =
+          typeof parsed?.prompt === "string" ? parsed.prompt.trim() : "";
+        if (!label || !prompt) {
+          return null;
+        }
+        return { label, prompt };
+      } catch {
+        return null;
+      }
+    },
+    [],
+  );
+
   const sendChatMessage = useCallback(
     async (overrideMessage?: string) => {
       const message = (overrideMessage ?? chatInput).trim();
@@ -581,13 +601,13 @@ export function App() {
       } catch (err) {
         const detail = err instanceof Error ? err.message : "Unknown error";
         setAssistantUnreachable(true);
-        setChatError(`Failed to contact assistant: ${detail}`);
+        setChatError(detail);
         setRetryMessage(message);
         setChatMessages((prev) => [
           ...prev,
           {
             role: "system",
-            content: `Assistant request failed. ${detail}`,
+            content: detail,
           },
         ]);
       } finally {
@@ -595,6 +615,77 @@ export function App() {
       }
     },
     [chatInput, chatLoading],
+  );
+
+  const renderAssistantMarkdown = useCallback(
+    (content: string) => {
+      const parts: React.ReactNode[] = [];
+      const regex = new RegExp(ASSISTANT_ACTION_BLOCK_PATTERN);
+      let start = 0;
+      let index = 0;
+      let match: RegExpExecArray | null;
+
+      while ((match = regex.exec(content)) !== null) {
+        const before = content.slice(start, match.index);
+        if (before.trim()) {
+          parts.push(
+            <ReactMarkdown
+              key={`assistant-md-${index++}`}
+              remarkPlugins={[remarkGfm]}
+            >
+              {before}
+            </ReactMarkdown>,
+          );
+        }
+
+        const payload = parseAssistantActionPayload(match[1] || "");
+        if (payload) {
+          parts.push(
+            <button
+              key={`assistant-action-${index++}`}
+              className="assistant-action-button"
+              disabled={chatLoading}
+              onClick={() => {
+                sendChatMessage(payload.prompt).catch(() => {
+                  // handled in callback
+                });
+              }}
+              title={payload.prompt}
+            >
+              {payload.label}
+            </button>,
+          );
+        } else {
+          parts.push(
+            <ReactMarkdown
+              key={`assistant-md-fallback-${index++}`}
+              remarkPlugins={[remarkGfm]}
+            >
+              {match[0]}
+            </ReactMarkdown>,
+          );
+        }
+
+        start = regex.lastIndex;
+      }
+
+      const tail = content.slice(start);
+      if (tail.trim()) {
+        parts.push(
+          <ReactMarkdown key={`assistant-md-tail`} remarkPlugins={[remarkGfm]}>
+            {tail}
+          </ReactMarkdown>,
+        );
+      }
+
+      if (parts.length === 0) {
+        return (
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+        );
+      }
+      return parts;
+    },
+    [chatLoading, parseAssistantActionPayload, sendChatMessage],
   );
 
   const resetChat = useCallback(async () => {
@@ -923,15 +1014,11 @@ export function App() {
                 </strong>
                 {entry.role === "assistant" ? (
                   <div className="chat-message-markdown">
-                    {entry.content ? (
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                        {entry.content}
-                      </ReactMarkdown>
-                    ) : chatLoading ? (
-                      "▊"
-                    ) : (
-                      ""
-                    )}
+                    {entry.content
+                      ? renderAssistantMarkdown(entry.content)
+                      : chatLoading
+                        ? "▊"
+                        : ""}
                   </div>
                 ) : (
                   <span>{entry.content}</span>

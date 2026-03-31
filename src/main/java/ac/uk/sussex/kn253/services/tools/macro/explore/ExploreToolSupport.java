@@ -92,6 +92,11 @@ public class ExploreToolSupport {
     private final Instance<ProjectDiscoveryService> projectDiscoveryService;
     private final ReadToolSupport readToolSupport;
 
+    // FIXME: TOO MANY NULLS
+    public ExploreToolSupport(final WorkingDirectoryService workingDirectoryService) {
+        this(workingDirectoryService, null, null);
+    }
+
     public ExploreToolSupport(
             final WorkingDirectoryService workingDirectoryService,
             final Instance<PathSummaryLlmService> pathSummaryLlmService,

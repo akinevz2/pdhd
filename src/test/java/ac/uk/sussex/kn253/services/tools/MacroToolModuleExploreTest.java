@@ -176,7 +176,9 @@ class MacroToolModuleExploreTest {
         final String cwd = toolset.execute(request("get_current_working_directory", "{}"), null);
         assertEquals(workspace.toAbsolutePath().normalize().toString(), cwd);
 
-        final String listResult = toolset.execute(request("list_subdirectories", "{}"), null);
+        final String listResult = toolset.execute(
+                request("list_subdirectories", "{\"path\":\"" + escape(workspace) + "\"}"),
+                null);
         assertTrue(listResult.contains("path=" + workspace.toAbsolutePath().normalize()));
         assertTrue(listResult.contains("src"));
     }

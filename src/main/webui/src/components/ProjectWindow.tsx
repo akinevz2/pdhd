@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { WindowState } from "../types";
-import { isImagePath, rawImageUrl } from "../utils";
+import { isImagePath, isPdfPath, rawFileUrl, rawImageUrl } from "../utils";
 import { TreeView } from "./TreeView";
 
 const MARKDOWN_SIGNAL_PATTERN =
@@ -76,6 +76,12 @@ export function ProjectWindow({
     windowState.selectedFilePath &&
     isImagePath(windowState.selectedFilePath);
 
+  const showPdf =
+    !windowState.fileLoading &&
+    !windowState.fileError &&
+    !!windowState.selectedFilePath &&
+    isPdfPath(windowState.selectedFilePath);
+
   const looksLikeMarkdown = !!windowState.fileContent?.match(
     MARKDOWN_SIGNAL_PATTERN,
   );
@@ -83,6 +89,7 @@ export function ProjectWindow({
   const isFolderSummaryPath =
     windowState.selectedFilePath === "." ||
     (!showImage &&
+      !showPdf &&
       !!windowState.selectedFilePath &&
       !windowState.selectedFilePath.includes("."));
 
@@ -90,6 +97,7 @@ export function ProjectWindow({
     !windowState.fileLoading &&
     !windowState.fileError &&
     !showImage &&
+    !showPdf &&
     !!windowState.fileContent &&
     (!!windowState.fileContentMarkdown ||
       looksLikeMarkdown ||
@@ -156,6 +164,21 @@ export function ProjectWindow({
               </div>
             </div>
           )}
+          {showPdf && (
+            <div className="pdf-preview-wrap">
+              <iframe
+                className="pdf-preview"
+                src={rawFileUrl(
+                  windowState.project.directory,
+                  windowState.selectedFilePath!,
+                )}
+                title={windowState.selectedFilePath}
+              />
+              <div className="image-caption">
+                {windowState.selectedFilePath}
+              </div>
+            </div>
+          )}
           {showMarkdown && (
             <div className="file-markdown">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -166,6 +189,7 @@ export function ProjectWindow({
           {!windowState.fileLoading &&
             !windowState.fileError &&
             !showImage &&
+            !showPdf &&
             !showMarkdown && (
               <pre>
                 {windowState.fileContent ||

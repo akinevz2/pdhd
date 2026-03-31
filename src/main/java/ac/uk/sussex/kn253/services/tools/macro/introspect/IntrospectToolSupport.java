@@ -24,13 +24,10 @@ public class IntrospectToolSupport {
 
     private static final Logger LOG = Logger.getLogger(IntrospectToolSupport.class);
 
-    private static final int MAX_FILE_CHARS = 3000;
     private static final int MAX_FOLDER_PATHS = 600;
     private static final int MAX_FOLDER_FILES_WITH_CONTENT = 24;
-    private static final int MAX_FOLDER_FILE_CHARS = 1400;
     private static final int MAX_SOURCE_PATHS = 400;
     private static final int MAX_SOURCE_FILES_WITH_CONTENT = 40;
-    private static final int MAX_SOURCE_FILE_CHARS = 2000;
     private static final int RECENT_TOOL_CALLS = 12;
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final Map<String, Long> CACHE_TTL_SECONDS = Map.of(
@@ -61,39 +58,75 @@ public class IntrospectToolSupport {
     private final ToolActivityService toolActivityService;
     private final ToolTelemetryService toolTelemetryService;
     private final ReadToolSupport readToolSupport;
+    private final FolderManifestShaper folderManifestShaper;
+
+    // FIXME: there are too many nulls here
+    public IntrospectToolSupport(final WorkingDirectoryService workingDirectoryService) {
+        this(workingDirectoryService, null, null, new ReadToolSupport(), new DefaultFolderManifestShaper());
+    }
 
     public IntrospectToolSupport(
             final WorkingDirectoryService workingDirectoryService,
             final ToolActivityService toolActivityService) {
-        this(workingDirectoryService, toolActivityService, null, new ReadToolSupport());
+        this(workingDirectoryService, toolActivityService, null, new ReadToolSupport(),
+                new DefaultFolderManifestShaper());
     }
 
     public IntrospectToolSupport(
             final WorkingDirectoryService workingDirectoryService,
             final ToolActivityService toolActivityService,
             final ToolTelemetryService toolTelemetryService) {
-        this(workingDirectoryService, toolActivityService, toolTelemetryService, new ReadToolSupport());
+        this(workingDirectoryService, toolActivityService, toolTelemetryService, new ReadToolSupport(),
+                new DefaultFolderManifestShaper());
+    }
+
+    public IntrospectToolSupport(
+            final WorkingDirectoryService workingDirectoryService,
+            final ToolActivityService toolActivityService,
+            final ToolTelemetryService toolTelemetryService,
+            final FolderManifestShaper folderManifestShaper) {
+        this(workingDirectoryService, toolActivityService, toolTelemetryService, new ReadToolSupport(),
+                folderManifestShaper);
     }
 
     IntrospectToolSupport(
             final WorkingDirectoryService workingDirectoryService,
             final ToolActivityService toolActivityService,
             final ToolTelemetryService toolTelemetryService,
-            final ReadToolSupport readToolSupport) {
+            final ReadToolSupport readToolSupport,
+            final FolderManifestShaper folderManifestShaper) {
         this.workingDirectoryService = workingDirectoryService;
         this.toolActivityService = toolActivityService;
         this.toolTelemetryService = toolTelemetryService;
         this.readToolSupport = readToolSupport;
+        this.folderManifestShaper = folderManifestShaper;
     }
 
+    /**
+     * Tool-contract adapter. ToolMacro executes with a generic argument map, but
+     * this support class prefers a typed path entrypoint.
+     */
     public String readFolderManifest(final Map<String, Object> args) {
-        final Path dir = resolveDirectoryArg(args, "path");
-        if (dir == null) {
-            return "Not a directory: " + ToolArguments.getString(args, "path", "");
-        }
+        return readFolderManifest(ToolArguments.getString(args, "path", ""));
+    }
 
-        final StringBuilder sb = new StringBuilder();
-        sb.append("Folder directory: ").append(dir).append("\n\n");
+    /**
+     * Builds an evidence-based manifest for a folder path.
+     *
+     * @param rawPath absolute path, or path relative to cwd; blank means cwd
+     * @return formatted manifest output suitable for assistant consumption
+     */
+    public String readFolderManifest(final String rawPath) {
+        // FIXME: this method is doing too much: path resolution, error handling,
+        // manifest shaping, caching. Refactor to smaller methods with clearer
+        // responsibilities.
+        final Path dir = Path.of(rawPath);
+        if (dir == null) {
+            return "Not a directory: " + rawPath;
+        }
+        if (ProjectRootSupport.isProjectRootDirectory(dir)) {
+            return ManifestPromptSupport.READ_FOLDER_MANIFEST_NOT_FOR_ROOT + " path=" + dir;
+        }
 
         final List<Path> allEntries;
         try (Stream<Path> stream = Files.walk(dir)) {
@@ -106,51 +139,14 @@ public class IntrospectToolSupport {
             return "Failed to scan folder recursively for " + dir + ": " + e.getMessage();
         }
 
-        if (allEntries.isEmpty()) {
-            return "Folder directory: " + dir + "\n\nThe folder is empty.";
-        }
-
-        sb.append("=== folder entries (recursive) ===\n");
-        for (final Path entry : allEntries) {
-            final String rel = dir.relativize(entry).toString().replace('\\', '/');
-            sb.append("- ").append(rel);
-            if (Files.isDirectory(entry)) {
-                sb.append("/");
-            }
-            sb.append("\n");
-        }
-
         final List<Path> files = allEntries.stream().filter(Files::isRegularFile).toList();
         final List<Path> sampledFiles = sampleFolderFilesForContent(files);
-        if (!sampledFiles.isEmpty()) {
-            sb.append("\n=== sampled file contents (evidence only) ===\n");
-            sb.append("Only files listed in this section were read for content. ")
-                    .append("For all other files, content is unknown unless read via read_file.\n\n");
-
-            for (final Path file : sampledFiles) {
-                final String rel = dir.relativize(file).toString().replace('\\', '/');
-                sb.append("--- ").append(rel).append(" ---\n");
-                try {
-                    final String content = Files.readString(file, StandardCharsets.UTF_8);
-                    if (content.length() > MAX_FOLDER_FILE_CHARS) {
-                        sb.append(content, 0, MAX_FOLDER_FILE_CHARS).append("\n...(truncated)");
-                    } else {
-                        sb.append(content);
-                    }
-                } catch (final IOException e) {
-                    sb.append("(unreadable: ").append(e.getMessage()).append(")");
-                }
-                sb.append("\n\n");
-            }
-
-            if (files.size() > sampledFiles.size()) {
-                sb.append("Content omitted for ")
-                        .append(files.size() - sampledFiles.size())
-                        .append(" file(s) in this folder tree. Use read_file for exact content when needed.\n");
-            }
-        }
-
-        final String result = sb.toString().trim();
+        final String result = folderManifestShaper.shapeFolderManifest(new FolderManifestShapeInput(
+                dir,
+                allEntries,
+                files,
+                readSampledFileContents(sampledFiles),
+                manifestShapePolicy()));
 
         // Cache the folder manifest result (best effort, don't break on failure)
         try {
@@ -170,39 +166,32 @@ public class IntrospectToolSupport {
         if (dir == null) {
             return "Not a directory: " + ToolArguments.getString(args, "path", "");
         }
+        if (!ProjectRootSupport.isProjectRootDirectory(dir)) {
+            return ManifestPromptSupport.READ_PROJECT_MANIFEST_ONLY_FOR_ROOTS + " path=" + dir;
+        }
 
-        final StringBuilder sb = new StringBuilder();
-        sb.append("Project directory: ").append(dir).append("\n\n");
-
-        boolean found = false;
+        final Map<String, String> manifestContents = new LinkedHashMap<>();
         for (final String filename : MANIFEST_FILENAMES) {
             final Path file = dir.resolve(filename);
             if (!Files.isRegularFile(file)) {
                 continue;
             }
             try {
-                final String content = Files.readString(file, StandardCharsets.UTF_8);
-                sb.append("=== ").append(filename).append(" ===\n");
-                if (content.length() > MAX_FILE_CHARS) {
-                    sb.append(content, 0, MAX_FILE_CHARS).append("\n...(truncated)");
-                } else {
-                    sb.append(content);
-                }
-                sb.append("\n\n");
-                found = true;
+                manifestContents.put(filename, Files.readString(file, StandardCharsets.UTF_8));
             } catch (final IOException e) {
-                sb.append("=== ").append(filename).append(" === (unreadable: ")
-                        .append(e.getMessage()).append(")\n\n");
+                manifestContents.put(filename, "(unreadable: " + e.getMessage() + ")");
             }
         }
 
-        if (!found) {
-            sb.append("No standard project manifest files found in this directory.\n");
-            sb.append("Consider using list_project_entries to see what files are present.");
-        }
-
-        appendSourceSummary(dir, sb);
-        return sb.toString().trim();
+        final SourceSummary sourceSummary = collectSourceSummary(dir);
+        return folderManifestShaper.shapeProjectManifest(new ProjectManifestShapeInput(
+                dir,
+                manifestContents,
+                sourceSummary.sourceRoot(),
+                sourceSummary.sourceFiles(),
+                sourceSummary.sampledSourceContents(),
+                sourceSummary.scanError(),
+                manifestShapePolicy()));
     }
 
     public String readProjectKnowledge(final Map<String, Object> args) {
@@ -389,10 +378,10 @@ public class IntrospectToolSupport {
         return sampled;
     }
 
-    private void appendSourceSummary(final Path dir, final StringBuilder sb) {
+    private SourceSummary collectSourceSummary(final Path dir) {
         final Path srcDir = dir.resolve("src");
         if (!Files.isDirectory(srcDir)) {
-            return;
+            return new SourceSummary(null, List.of(), Map.of(), null);
         }
 
         final List<Path> sourceFiles;
@@ -403,53 +392,38 @@ public class IntrospectToolSupport {
                     .limit(MAX_SOURCE_PATHS)
                     .toList();
         } catch (final IOException e) {
-            sb.append("\n=== src/ (recursive) ===\n");
-            sb.append("Failed to list src recursively: ").append(e.getMessage()).append("\n");
-            return;
-        }
-
-        sb.append("\n=== src/ (recursive) ===\n");
-        if (sourceFiles.isEmpty()) {
-            sb.append("No files found under src/.\n");
-            return;
-        }
-
-        for (final Path file : sourceFiles) {
-            sb.append("- ").append(srcDir.relativize(file).toString().replace('\\', '/')).append("\n");
+            return new SourceSummary(srcDir, List.of(), Map.of(), e.getMessage());
         }
 
         final List<Path> sampledFiles = sampleSourceFilesForContent(sourceFiles);
-        if (sampledFiles.isEmpty()) {
-            return;
-        }
+        return new SourceSummary(srcDir, sourceFiles, readSampledFileContents(sampledFiles), null);
+    }
 
-        sb.append("\n=== src/ sampled file contents (evidence only) ===\n");
-        sb.append("Only files listed in this section were read for content. ")
-                .append("For any file not listed here, content is unknown unless read via read_file.\n\n");
-
-        int sampledCount = 0;
+    private Map<Path, String> readSampledFileContents(final List<Path> sampledFiles) {
+        final Map<Path, String> sampledContents = new LinkedHashMap<>();
         for (final Path file : sampledFiles) {
-            sampledCount++;
-            final String relative = srcDir.relativize(file).toString().replace('\\', '/');
-            sb.append("--- ").append(relative).append(" ---\n");
             try {
-                final String content = Files.readString(file, StandardCharsets.UTF_8);
-                if (content.length() > MAX_SOURCE_FILE_CHARS) {
-                    sb.append(content, 0, MAX_SOURCE_FILE_CHARS).append("\n...(truncated)");
-                } else {
-                    sb.append(content);
-                }
+                sampledContents.put(file, Files.readString(file, StandardCharsets.UTF_8));
             } catch (final IOException e) {
-                sb.append("(unreadable: ").append(e.getMessage()).append(")");
+                sampledContents.put(file, "(unreadable: " + e.getMessage() + ")");
             }
-            sb.append("\n\n");
         }
+        return sampledContents;
+    }
 
-        if (sourceFiles.size() > sampledCount) {
-            sb.append("Content omitted for ")
-                    .append(sourceFiles.size() - sampledCount)
-                    .append(" src file(s). Use read_file for exact content when needed.\n");
-        }
+    private ManifestShapePolicy manifestShapePolicy() {
+        return new ManifestShapePolicy(
+                MAX_FOLDER_PATHS,
+                MAX_FOLDER_FILES_WITH_CONTENT,
+                MAX_SOURCE_PATHS,
+                MAX_SOURCE_FILES_WITH_CONTENT);
+    }
+
+    private record SourceSummary(
+            Path sourceRoot,
+            List<Path> sourceFiles,
+            Map<Path, String> sampledSourceContents,
+            String scanError) {
     }
 
     private List<Path> sampleSourceFilesForContent(final List<Path> sourceFiles) {
@@ -552,4 +526,5 @@ public class IntrospectToolSupport {
     private String formatMs(final double millis) {
         return String.format(Locale.ROOT, "%.2f", millis);
     }
+
 }

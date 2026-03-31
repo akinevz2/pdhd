@@ -2,6 +2,7 @@ package ac.uk.sussex.kn253.services.tools.macro.introspect;
 
 import java.util.Map;
 
+import ac.uk.sussex.kn253.services.tools.ToolArguments;
 import ac.uk.sussex.kn253.services.tools.macro.*;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
@@ -19,6 +20,7 @@ public class ReadFolderManifestTool implements ToolMacro {
                                     .description(
                                             "Folder path to scan recursively (absolute or relative to cwd). If omitted, uses the current working directory.")
                                     .build())
+                    .required("path")
                     .build())
             .build();
 
@@ -38,6 +40,7 @@ public class ReadFolderManifestTool implements ToolMacro {
 
     @Override
     public String execute(final Map<String, Object> args, final Object memoryId) {
-        return support.readFolderManifest(args);
+        // ToolMacro contract is map-based; extract typed path and delegate.
+        return support.readFolderManifest(ToolArguments.require(args, "path"));
     }
 }

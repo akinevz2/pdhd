@@ -600,6 +600,18 @@ pre {
   background: rgba(4, 16, 26, 0.85);
 }
 
+.pdf-preview-wrap {
+  display: grid;
+  gap: 8px;
+}
+
+.pdf-preview {
+  width: 100%;
+  min-height: min(70vh, 520px);
+  border: 1px solid rgba(103, 215, 255, 0.28);
+  background: rgba(4, 16, 26, 0.85);
+}
+
 .image-caption {
   font-size: 12px;
   opacity: 0.9;

@@ -15,7 +15,7 @@ import io.quarkiverse.langchain4j.RegisterAiService;
  *
  * <pre>
  * quarkus.langchain4j.ollama.base-url=http://localhost:11434
- * quarkus.langchain4j.ollama.chat-model.model-id=llama3.2
+ * quarkus.langchain4j.ollama.chat-model.model-id=llama3.1:8b-instruct-q4_K_M
  * </pre>
  *
  * <p>

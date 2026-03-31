@@ -14,7 +14,7 @@ import lombok.*;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class OllamaPullRequest {
 
-    /** Name of the model to pull, e.g. {@code llama3.2} or {@code llama3.2:8b}. */
+    /** Name of the model to pull, e.g. {@code llama3.1:8b-instruct-q4_K_M}. */
     private String name;
 
     /**

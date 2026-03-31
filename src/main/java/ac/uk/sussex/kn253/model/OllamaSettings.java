@@ -43,7 +43,13 @@ public class OllamaSettings extends PanacheEntityBase {
 
                         Output style:
                         - Be concise, actionable, and structured.
-                        - Prioritize next steps and verification actions.
+                                                                                                - Do not include plain-text sections titled "Next steps", "Further inspection", or similar follow-up headings.
+                                                                                                - When recommending exactly one follow-up action, append this fenced code block at the end of the response:
+                                                                                                        ```assistant-action
+                                                                                                        {"label":"<short button label>","prompt":"<single actionable follow-up user prompt>"}
+                                                                                                        ```
+                                                                                                - The assistant-action block must contain valid JSON and include both label and prompt fields.
+                                                                                                - Do not output more than one assistant-action block per response.
                         - Do not fabricate file contents, tool outputs, or repository facts.
                         """;
 
@@ -72,8 +78,10 @@ public class OllamaSettings extends PanacheEntityBase {
         @Column(nullable = false)
         private String baseUrl = "http://localhost:11434";
 
+        public static final String DEFAULT_MODEL_NAME = "llama3.1:8b-instruct-q4_K_M";
+
         @Column(nullable = false)
-        private String modelName = "llama3.2";
+        private String modelName = DEFAULT_MODEL_NAME;
 
         @Column(nullable = false)
         private int timeoutSeconds = 120;

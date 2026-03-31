@@ -6,6 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
+import org.jboss.logging.Logger;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -18,9 +19,12 @@ import dev.langchain4j.data.message.ToolExecutionResultMessage;
 @Tag("ollama-workstation")
 class OllamaToolRequestIntegrationTest {
 
+        private static final Logger LOG = Logger.getLogger(OllamaToolRequestIntegrationTest.class);
+
         @Test
         void assistantUnderstandsRelativeFolderNavigationPrompts(@TempDir final Path tempDir) throws Exception {
                 final String baseUrl = OllamaTestSupport.testBaseUrl();
+                LOG.infof("Using Ollama baseUrl in test: %s", baseUrl);
                 Assumptions.assumeTrue(
                                 OllamaTestSupport.isReachable(baseUrl),
                                 () -> "Skipping: workstation Ollama not reachable at " + baseUrl);
@@ -139,6 +143,7 @@ class OllamaToolRequestIntegrationTest {
         @Test
         void toolRequestRoundTripAgainstGlmAndLlamaModels() {
                 final String baseUrl = OllamaTestSupport.testBaseUrl();
+                LOG.infof("Using Ollama baseUrl in test: %s", baseUrl);
                 Assumptions.assumeTrue(
                                 OllamaTestSupport.isReachable(baseUrl),
                                 () -> "Skipping: workstation Ollama not reachable at " + baseUrl);
