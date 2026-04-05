@@ -17,8 +17,12 @@ import io.smallrye.config.*;
  *   OLLAMA_MODEL_NAME=llama3.1:8b-instruct-q4_K_M
  * </pre>
  */
-@ConfigMapping(prefix = "ollama")
+@ConfigMapping(prefix = "pdhd.ollama")
 public interface OllamaConfig {
+
+    @WithName("enabled")
+    @WithDefault("true")
+    boolean enabled();
 
     /** Base URL of the Ollama HTTP API, e.g. {@code http://localhost:11434}. */
     @WithName("base-url")
@@ -27,7 +31,7 @@ public interface OllamaConfig {
 
     /** Default model name used when no explicit model is supplied. */
     @WithName("model-name")
-    @WithDefault("llama3.1:8b-instruct-q4_K_M")
+    @WithDefault("llama3.1")
     String modelName();
 
     /** Default embeddings model name used when no explicit model is supplied. */
@@ -67,4 +71,10 @@ public interface OllamaConfig {
     @WithName("embedding-dimension")
     @WithDefault("384")
     Integer embeddingDimension();
+
+    /** Docker image name for Ollama, e.g. {@code ollama/ollama:latest}. */
+    @WithName("image")
+    @WithDefault("ollama/ollama:latest")
+    String ollamaImage();
+
 }

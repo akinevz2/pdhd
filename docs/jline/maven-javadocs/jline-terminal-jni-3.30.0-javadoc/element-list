@@ -1,0 +1,6 @@
+org.jline.terminal.impl.jni
+org.jline.terminal.impl.jni.freebsd
+org.jline.terminal.impl.jni.linux
+org.jline.terminal.impl.jni.osx
+org.jline.terminal.impl.jni.solaris
+org.jline.terminal.impl.jni.win

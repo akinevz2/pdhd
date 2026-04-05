@@ -1,12 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { api, apiPost } from "./api";
+import { normalizeToolCallMarkup } from "./assistantActions";
+import { ChatDock } from "./components/ChatDock";
 import { CwdNavigator } from "./components/CwdNavigator";
 import { ProjectWindow } from "./components/ProjectWindow";
 import { TopMenuAndModals } from "./components/TopMenuAndModals";
 import { useHighlightedFiles } from "./hooks/useHighlightedFiles";
 import { useMenuPanels } from "./hooks/useMenuPanels";
+import {
+  ConfigurationMenuButtons,
+  ConfigurationModals,
+} from "./modules/configuration/ConfigurationMenus";
+import { useConfigurationMenus } from "./modules/configuration/useConfigurationMenus";
 import type {
   AssistantChatResponse,
   ChatMessage,
@@ -16,7 +22,6 @@ import type {
   FsListResponse,
   ProjectSummary as ProjectSummaryType,
   ToolActivityItem,
-  ToolActivityResponse,
   ToolTelemetryItem,
   ToolTelemetryResponse,
   TreeNode,
@@ -30,14 +35,37 @@ import {
   isPdfPath,
   openExternalUrl,
 } from "./utils";
+import {
+  emitApiSignal,
+  registerApiSignals,
+  subscribeSignalErrors,
+  type ApiSignalKey,
+} from "./signals";
 
 const MARKDOWN_FILE_PATTERN = /\.(md|markdown|mdx)$/i;
 const ASSISTANT_ACTION_BLOCK_PATTERN = /```assistant-action\s*([\s\S]*?)```/gi;
+const REQUEST_SOURCE_HEADER = "X-Assistant-Request-Source";
+const REQUEST_SOURCE_CHAT_INPUT = "chat-input";
+const REQUEST_SOURCE_ASSISTANT_ACTION_BUTTON = "assistant-action-button";
+const REQUEST_SOURCE_FILE_EXPLORER = "file-explorer";
 
 type AssistantActionPayload = {
   label: string;
   prompt: string;
 };
+
+const SIGNALS = {
+  TOOL_TELEMETRY_GET: "telemetry:get",
+  CWD_GET: "cwd:get",
+  CWD_SET: "cwd:set",
+  FS_LIST: "fs:list",
+  FS_TREE: "fs:tree",
+  FS_FILE: "fs:file",
+  PROJECTS_LIST: "projects:list",
+  CHAT_SEND: "chat:send",
+  CHAT_RESET: "chat:reset",
+  CHAT_SUMMARIZE_FOLDER: "chat:summarizeFolder",
+} as const satisfies Record<string, ApiSignalKey>;
 
 export function App() {
   const [browserPath, setBrowserPath] = useState<string>("");
@@ -46,8 +74,7 @@ export function App() {
   const [browserError, setBrowserError] = useState<string | null>(null);
   const [browserRepoUrl, setBrowserRepoUrl] = useState<string | null>(null);
 
-  const [activityItems, setActivityItems] = useState<ToolActivityItem[]>([]);
-  const [activityError, setActivityError] = useState<string | null>(null);
+  const [activityItems] = useState<ToolActivityItem[]>([]);
 
   const [telemetryOpen, setTelemetryOpen] = useState(false);
   const [telemetryItems, setTelemetryItems] = useState<ToolTelemetryItem[]>([]);
@@ -66,38 +93,96 @@ export function App() {
   const [chatError, setChatError] = useState<string | null>(null);
   const [assistantUnreachable, setAssistantUnreachable] =
     useState<boolean>(false);
+  const lastSignalErrorRef = useRef<{ fingerprint: string; timestamp: number } | null>(null);
   const chatLogRef = useRef<HTMLDivElement | null>(null);
   const chatInputRef = useRef<HTMLTextAreaElement | null>(null);
-  const handledCanvasActionKeysRef = useRef<Set<string>>(new Set());
-  const handledCwdActionKeysRef = useRef<Set<string>>(new Set());
-
   const [windows, setWindows] = useState<WindowState[]>([]);
   const nextWindowId = useRef(1);
   const nextZ = useRef(10);
 
   const menuPanels = useMenuPanels();
+  const configurationMenus = useConfigurationMenus();
 
   const highlightedByProject = useHighlightedFiles(activityItems, windows);
 
-  const loadActivity = useCallback(async (quiet = true) => {
-    try {
-      const data = await api<ToolActivityResponse>(
-        "/api/tool-activity?limit=80",
-      );
-      setActivityItems(data.items || []);
-      setActivityError(null);
-    } catch {
-      if (!quiet) {
-        setActivityError("Failed to load tool activity.");
+  useEffect(() => {
+    registerApiSignals([
+      [SIGNALS.TOOL_TELEMETRY_GET, { method: "GET", endpoint: "/api/tool-telemetry" }],
+      [SIGNALS.CWD_GET, { method: "GET", endpoint: "/api/cwd" }],
+      [SIGNALS.CWD_SET, { method: "POST", endpoint: "/api/cwd" }],
+      [
+        SIGNALS.FS_LIST,
+        {
+          method: "GET",
+          endpoint: (payload: { path: string }) =>
+            `/api/fs/list?path=${encodeURIComponent(payload.path)}`,
+        },
+      ],
+      [
+        SIGNALS.FS_TREE,
+        {
+          method: "GET",
+          endpoint: (payload: { path: string }) =>
+            `/api/fs/tree?path=${encodeURIComponent(payload.path)}`,
+        },
+      ],
+      [
+        SIGNALS.FS_FILE,
+        {
+          method: "GET",
+          endpoint: (payload: { path: string }) =>
+            `/api/fs/file?path=${encodeURIComponent(payload.path)}`,
+        },
+      ],
+      [SIGNALS.PROJECTS_LIST, { method: "GET", endpoint: "/api/projects" }],
+      [SIGNALS.CHAT_SEND, { method: "POST", endpoint: "/api/chat", timeoutMs: CHAT_TIMEOUT_MS }],
+      [SIGNALS.CHAT_RESET, { method: "POST", endpoint: "/api/chat/reset" }],
+      [
+        SIGNALS.CHAT_SUMMARIZE_FOLDER,
+        {
+          method: "POST",
+          endpoint: "/api/chat/summarize-folder",
+          timeoutMs: CHAT_TIMEOUT_MS,
+        },
+      ],
+    ]);
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = subscribeSignalErrors((signalError) => {
+      const fingerprint = `${signalError.signal}:${signalError.message}`;
+      const now = Date.now();
+      const previous = lastSignalErrorRef.current;
+
+      // Avoid flooding chat with repeated poll failures for the same signal.
+      if (
+        previous &&
+        previous.fingerprint === fingerprint &&
+        now - previous.timestamp < 5000
+      ) {
+        return;
       }
-    }
+
+      lastSignalErrorRef.current = { fingerprint, timestamp: now };
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          role: "system",
+          content: `[signal ${signalError.signal}] ${signalError.message}`,
+        },
+      ]);
+    });
+
+    return unsubscribe;
   }, []);
 
   const loadTelemetry = useCallback(async () => {
     setTelemetryLoading(true);
     setTelemetryError(null);
     try {
-      const data = await api<ToolTelemetryResponse>("/api/tool-telemetry");
+      const data = await emitApiSignal<void, ToolTelemetryResponse>(
+        SIGNALS.TOOL_TELEMETRY_GET,
+      );
       setTelemetryItems(data.items || []);
       setTelemetrySummary(data.summary || "");
       setTelemetryGeneratedAt(data.generatedAt || "");
@@ -110,7 +195,7 @@ export function App() {
 
   const loadCwd = useCallback(async () => {
     try {
-      const data = await api<CwdResponse>("/api/cwd");
+      const data = await emitApiSignal<void, CwdResponse>(SIGNALS.CWD_GET);
       setCwd(data.cwd || "");
       setCwdError(null);
     } catch {
@@ -127,8 +212,9 @@ export function App() {
       setBrowserLoading(true);
       setBrowserError(null);
       try {
-        const data = await api<FsListResponse>(
-          `/api/fs/list?path=${encodeURIComponent(targetPath)}`,
+        const data = await emitApiSignal<{ path: string }, FsListResponse>(
+          SIGNALS.FS_LIST,
+          { path: targetPath },
         );
         setBrowserPath(data.path || targetPath);
         setBrowserEntries(data.entries || []);
@@ -147,35 +233,31 @@ export function App() {
     async (path: string) => {
       setCwdUpdating(true);
       try {
-        const data = await apiPost<{ path: string }, CwdResponse>("/api/cwd", {
-          path,
-        });
+        const data = await emitApiSignal<{ path: string }, CwdResponse>(
+          SIGNALS.CWD_SET,
+          { path },
+        );
         setCwd(data.cwd || "");
         setCwdError(null);
         await loadBrowser(data.cwd || path);
-        await loadActivity(false);
       } catch {
         setCwdError("Failed to update working folder");
       } finally {
         setCwdUpdating(false);
       }
     },
-    [loadActivity, loadBrowser],
+    [loadBrowser],
   );
 
   useEffect(() => {
-    loadActivity(false);
     loadCwd();
     const timer = window.setInterval(() => {
-      loadActivity(true).catch(() => {
-        // polling errors are non-fatal
-      });
       loadCwd().catch(() => {
         // polling errors are non-fatal
       });
     }, POLL_MS);
     return () => window.clearInterval(timer);
-  }, [loadActivity, loadCwd]);
+  }, [loadCwd]);
 
   useEffect(() => {
     if (!cwd) {
@@ -224,8 +306,9 @@ export function App() {
   const loadTreeForWindow = useCallback(
     async (windowId: number, directory: string) => {
       try {
-        const tree = await api<TreeNode>(
-          `/api/fs/tree?path=${encodeURIComponent(directory)}`,
+        const tree = await emitApiSignal<{ path: string }, TreeNode>(
+          SIGNALS.FS_TREE,
+          { path: directory },
         );
         updateWindow(windowId, {
           tree,
@@ -246,7 +329,9 @@ export function App() {
     async (path: string) => {
       const target = path || cwd;
       if (!target) return;
-      const projects = await api<ProjectSummaryType[]>("/api/projects");
+      const projects = await emitApiSignal<void, ProjectSummaryType[]>(
+        SIGNALS.PROJECTS_LIST,
+      );
       const match = projects
         .filter(
           (p) =>
@@ -279,74 +364,6 @@ export function App() {
     [cwd, windows, focusWindow, loadTreeForWindow],
   );
 
-  useEffect(() => {
-    if (!activityItems.length) {
-      return;
-    }
-
-    for (const item of activityItems) {
-      if (item.toolName !== "open_workspace_canvas") {
-        continue;
-      }
-
-      const actionKey = `${item.timestamp}|${item.argumentsJson}`;
-      if (handledCanvasActionKeysRef.current.has(actionKey)) {
-        continue;
-      }
-      handledCanvasActionKeysRef.current.add(actionKey);
-
-      let requestedPath = "";
-      try {
-        const parsed = JSON.parse(item.argumentsJson || "{}") as {
-          path?: string;
-        };
-        requestedPath = (parsed.path || "").trim();
-      } catch {
-        requestedPath = "";
-      }
-
-      const targetPath = requestedPath || cwd;
-      if (!targetPath) {
-        continue;
-      }
-
-      openInCanvas(targetPath).catch(() => {
-        // Non-fatal: tool request is best-effort.
-      });
-    }
-  }, [activityItems, cwd, openInCanvas]);
-
-  useEffect(() => {
-    if (!activityItems.length) {
-      return;
-    }
-
-    let shouldReloadCwd = false;
-    for (const item of activityItems) {
-      if (
-        item.toolName !== "change_working_directory" &&
-        item.toolName !== "navigate_tool"
-      ) {
-        continue;
-      }
-
-      const actionKey = `${item.timestamp}|${item.argumentsJson}`;
-      if (handledCwdActionKeysRef.current.has(actionKey)) {
-        continue;
-      }
-      handledCwdActionKeysRef.current.add(actionKey);
-
-      // Always reload cwd from backend state rather than replaying tool-event
-      // payloads, which may be historical and stale by the time they are polled.
-      shouldReloadCwd = true;
-    }
-
-    if (shouldReloadCwd) {
-      loadCwd().catch(() => {
-        // surfaced by cwd state
-      });
-    }
-  }, [activityItems, loadBrowser, loadCwd]);
 
   const openFile = useCallback(
     async (
@@ -376,8 +393,9 @@ export function App() {
       const absolutePath =
         projectDirectory.replace(/\\/g, "/") + "/" + relativePath;
       try {
-        const file = await api<FileContentResponse>(
-          `/api/fs/file?path=${encodeURIComponent(absolutePath)}`,
+        const file = await emitApiSignal<{ path: string }, FileContentResponse>(
+          SIGNALS.FS_FILE,
+          { path: absolutePath },
         );
         updateWindow(windowId, {
           fileLoading: false,
@@ -401,7 +419,9 @@ export function App() {
   const openFileInCanvas = useCallback(
     async (filePath: string) => {
       if (!filePath) return;
-      const projects = await api<ProjectSummaryType[]>("/api/projects");
+      const projects = await emitApiSignal<void, ProjectSummaryType[]>(
+        SIGNALS.PROJECTS_LIST,
+      );
       const match = projects
         .filter(
           (p) =>
@@ -474,10 +494,14 @@ export function App() {
             await new Promise((r) => setTimeout(r, 1000 * 2 ** (attempt - 1)));
           }
           try {
-            result = await apiPost<{ path: string }, AssistantChatResponse>(
-              "/api/chat/summarize-folder",
+            result = await emitApiSignal<{ path: string }, AssistantChatResponse>(
+              SIGNALS.CHAT_SUMMARIZE_FOLDER,
               { path: folderPath },
-              CHAT_TIMEOUT_MS,
+              {
+                headers: {
+                  [REQUEST_SOURCE_HEADER]: REQUEST_SOURCE_FILE_EXPLORER,
+                },
+              },
             );
             break;
           } catch (err) {
@@ -506,25 +530,6 @@ export function App() {
         const detail = err instanceof Error ? err.message : "Unknown error";
         setAssistantUnreachable(true);
         setChatError(`Failed to summarize folder contents: ${detail}`);
-        setChatMessages((prev) => {
-          const updated = [...prev];
-          const lastIdx = updated.length - 1;
-          if (
-            updated[lastIdx]?.role === "assistant" &&
-            !updated[lastIdx].content
-          ) {
-            updated[lastIdx] = {
-              role: "system",
-              content: `Folder summary failed for: ${folderPath}. ${detail}`,
-            };
-          } else {
-            updated.push({
-              role: "system",
-              content: `Folder summary failed for: ${folderPath}. ${detail}`,
-            });
-          }
-          return updated;
-        });
         updateWindow(windowId, {
           fileLoading: false,
           fileLoadingFolderSummary: false,
@@ -570,7 +575,10 @@ export function App() {
   );
 
   const sendChatMessage = useCallback(
-    async (overrideMessage?: string) => {
+    async (
+      overrideMessage?: string,
+      source: string = REQUEST_SOURCE_CHAT_INPUT,
+    ) => {
       const message = (overrideMessage ?? chatInput).trim();
       if (!message || chatLoading) {
         return;
@@ -588,10 +596,14 @@ export function App() {
       }, 0);
 
       try {
-        const result = await apiPost<
-          { message: string },
-          AssistantChatResponse
-        >("/api/chat", { message }, CHAT_TIMEOUT_MS);
+        const result = await emitApiSignal<{ message: string }, AssistantChatResponse>(
+          SIGNALS.CHAT_SEND,
+          { message },
+          {
+            timeoutMs: CHAT_TIMEOUT_MS,
+            headers: { [REQUEST_SOURCE_HEADER]: source },
+          },
+        );
         setChatMessages((prev) => [
           ...prev,
           { role: "assistant", content: result.reply || "" },
@@ -603,13 +615,6 @@ export function App() {
         setAssistantUnreachable(true);
         setChatError(detail);
         setRetryMessage(message);
-        setChatMessages((prev) => [
-          ...prev,
-          {
-            role: "system",
-            content: detail,
-          },
-        ]);
       } finally {
         setChatLoading(false);
       }
@@ -619,14 +624,15 @@ export function App() {
 
   const renderAssistantMarkdown = useCallback(
     (content: string) => {
+      const normalizedContent = normalizeToolCallMarkup(content);
       const parts: React.ReactNode[] = [];
       const regex = new RegExp(ASSISTANT_ACTION_BLOCK_PATTERN);
       let start = 0;
       let index = 0;
       let match: RegExpExecArray | null;
 
-      while ((match = regex.exec(content)) !== null) {
-        const before = content.slice(start, match.index);
+      while ((match = regex.exec(normalizedContent)) !== null) {
+        const before = normalizedContent.slice(start, match.index);
         if (before.trim()) {
           parts.push(
             <ReactMarkdown
@@ -646,7 +652,10 @@ export function App() {
               className="assistant-action-button"
               disabled={chatLoading}
               onClick={() => {
-                sendChatMessage(payload.prompt).catch(() => {
+                sendChatMessage(
+                  payload.prompt,
+                  REQUEST_SOURCE_ASSISTANT_ACTION_BUTTON,
+                ).catch(() => {
                   // handled in callback
                 });
               }}
@@ -669,7 +678,7 @@ export function App() {
         start = regex.lastIndex;
       }
 
-      const tail = content.slice(start);
+      const tail = normalizedContent.slice(start);
       if (tail.trim()) {
         parts.push(
           <ReactMarkdown key={`assistant-md-tail`} remarkPlugins={[remarkGfm]}>
@@ -680,7 +689,7 @@ export function App() {
 
       if (parts.length === 0) {
         return (
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{normalizedContent}</ReactMarkdown>
         );
       }
       return parts;
@@ -690,7 +699,7 @@ export function App() {
 
   const resetChat = useCallback(async () => {
     try {
-      await apiPost<{}, unknown>("/api/chat/reset", {});
+      await emitApiSignal<Record<string, never>, unknown>(SIGNALS.CHAT_RESET, {});
       setChatMessages([]);
       setChatError(null);
     } catch {
@@ -708,9 +717,31 @@ export function App() {
     <>
       <main id="app-shell">
         <TopMenuAndModals
-          ollamaLoading={menuPanels.ollamaLoading}
-          onOpenOllamaConfig={menuPanels.openOllamaConfig}
-          onOpenSystemPrompt={menuPanels.openSystemPrompt}
+          menuButtons={
+            <ConfigurationMenuButtons
+              configLoading={configurationMenus.configLoading}
+              onOpenConfiguration={configurationMenus.openConfiguration}
+            />
+          }
+          modalContent={
+            <ConfigurationModals
+              configOpen={configurationMenus.configOpen}
+              configForm={configurationMenus.configForm}
+              configFields={configurationMenus.configFields}
+              configError={configurationMenus.configError}
+              configSaving={configurationMenus.configSaving}
+              currentProvider={configurationMenus.currentProvider}
+              supportsManagedModels={configurationMenus.supportsManagedModels}
+              availableModels={configurationMenus.availableModels}
+              modelsLoading={configurationMenus.modelsLoading}
+              setConfigOpen={configurationMenus.setConfigOpen}
+              setConfigForm={configurationMenus.setConfigForm}
+              refreshModels={configurationMenus.refreshModels}
+              pullModel={configurationMenus.pullModel}
+              deleteModel={configurationMenus.deleteModel}
+              saveConfiguration={configurationMenus.saveConfiguration}
+            />
+          }
           onOpenDebug={() => menuPanels.setDebugOpen(true)}
           onOpenTelemetry={() => {
             setTelemetryOpen(true);
@@ -719,28 +750,6 @@ export function App() {
             });
           }}
           onExit={menuPanels.handleExit}
-          ollamaOpen={menuPanels.ollamaOpen}
-          ollamaForm={menuPanels.ollamaForm}
-          ollamaFields={menuPanels.ollamaFields}
-          ollamaError={menuPanels.ollamaError}
-          availableModels={menuPanels.availableModels}
-          modelsLoading={menuPanels.modelsLoading}
-          setOllamaOpen={menuPanels.setOllamaOpen}
-          setOllamaForm={menuPanels.setOllamaForm}
-          fetchModels={menuPanels.fetchModels}
-          saveOllamaConfig={menuPanels.saveOllamaConfig}
-          ollamaSaving={menuPanels.ollamaSaving}
-          promptOpen={menuPanels.promptOpen}
-          promptDraft={menuPanels.promptDraft}
-          promptError={menuPanels.promptError}
-          promptDefault={menuPanels.promptDefault}
-          toolPromptDraft={menuPanels.toolPromptDraft}
-          toolPromptDefault={menuPanels.toolPromptDefault}
-          setPromptOpen={menuPanels.setPromptOpen}
-          setPromptDraft={menuPanels.setPromptDraft}
-          setToolPromptDraft={menuPanels.setToolPromptDraft}
-          saveSystemPrompt={menuPanels.saveSystemPrompt}
-          promptSaving={menuPanels.promptSaving}
           debugOpen={menuPanels.debugOpen}
           setDebugOpen={menuPanels.setDebugOpen}
           cwd={cwd}
@@ -928,6 +937,12 @@ export function App() {
               onOpenFolderSummary={(path) =>
                 openFolderSummary(win.id, win.project.directory, path)
               }
+              onAssistantAction={(prompt) => {
+                sendChatMessage(prompt, REQUEST_SOURCE_ASSISTANT_ACTION_BUTTON).catch(() => {
+                  // handled in callback
+                });
+              }}
+              assistantActionDisabled={chatLoading}
             />
           ))}
         </section>
@@ -941,134 +956,25 @@ export function App() {
           </div>
 
           <div id="activity">
-            {activityError && <p>{activityError}</p>}
-            {!activityError && activityItems.length === 0 && (
-              <p>No tool activity yet.</p>
-            )}
-            {!activityError &&
-              activityItems
-                .slice()
-                .reverse()
-                .slice(0, 40)
-                .map((event, index) => (
-                  <div
-                    className="activity-item"
-                    key={`${event.timestamp}-${event.toolName}-${index}`}
-                  >
-                    <div>
-                      <strong>{event.toolName}</strong>{" "}
-                      <small>
-                        {new Date(event.timestamp).toLocaleTimeString()}
-                      </small>
-                    </div>
-                    <div>
-                      {(event.requestedFiles || []).join(", ") ||
-                        "no file paths"}
-                    </div>
-                  </div>
-                ))}
+            <p>Tool activity feed has been removed from the backend.</p>
           </div>
         </section>
 
-        <section className="chat-dock panel">
-          <div className="toolbar">
-            <strong>Assistant Chat</strong>
-            <button onClick={() => resetChat()} disabled={chatLoading}>
-              Reset
-            </button>
-          </div>
-
-          {assistantUnreachable && (
-            <div className="assistant-unreachable-notice">
-              <span>
-                Assistant is unreachable - check that Ollama is running and the
-                model is loaded.
-              </span>
-              <button
-                className="notice-dismiss"
-                onClick={() => setAssistantUnreachable(false)}
-                aria-label="Dismiss"
-              >
-                X
-              </button>
-            </div>
-          )}
-
-          <div className="chat-log" ref={chatLogRef}>
-            {chatMessages.length === 0 && (
-              <p className="chat-empty">
-                Ask the assistant about this project.
-              </p>
-            )}
-            {chatMessages.map((entry, idx) => (
-              <div
-                key={`${entry.role}-${idx}`}
-                className={`chat-row ${entry.role}`}
-              >
-                <strong>
-                  {entry.role === "user"
-                    ? "You"
-                    : entry.role === "assistant"
-                      ? "Assistant"
-                      : "System"}
-                </strong>
-                {entry.role === "assistant" ? (
-                  <div className="chat-message-markdown">
-                    {entry.content
-                      ? renderAssistantMarkdown(entry.content)
-                      : chatLoading
-                        ? "▊"
-                        : ""}
-                  </div>
-                ) : (
-                  <span>{entry.content}</span>
-                )}
-              </div>
-            ))}
-            {chatLoading && (
-              <div className="chat-row assistant">Assistant is thinking...</div>
-            )}
-          </div>
-
-          <div className="chat-compose">
-            <textarea
-              ref={chatInputRef}
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              placeholder="Type a message..."
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  sendChatMessage().catch(() => {
-                    // handled in callback
-                  });
-                }
-              }}
-              disabled={chatLoading}
-            />
-            <button
-              onClick={() => {
-                sendChatMessage().catch(() => {
-                  // handled in callback
-                });
-              }}
-              disabled={chatLoading || !chatInput.trim()}
-            >
-              Send
-            </button>
-            {retryMessage && (
-              <button
-                className="retry-button"
-                onClick={() => sendChatMessage(retryMessage)}
-                disabled={chatLoading}
-                style={{ marginLeft: 8 }}
-              >
-                Retry
-              </button>
-            )}
-          </div>
-          {chatError && <p className="chat-error">{chatError}</p>}
-        </section>
+        <ChatDock
+          assistantUnreachable={assistantUnreachable}
+          chatMessages={chatMessages}
+          chatLoading={chatLoading}
+          chatInput={chatInput}
+          chatError={chatError}
+          retryMessage={retryMessage}
+          chatLogRef={chatLogRef}
+          chatInputRef={chatInputRef}
+          setAssistantUnreachable={setAssistantUnreachable}
+          setChatInput={setChatInput}
+          sendChatMessage={sendChatMessage}
+          resetChat={resetChat}
+          renderAssistantMarkdown={renderAssistantMarkdown}
+        />
       </main>
     </>
   );

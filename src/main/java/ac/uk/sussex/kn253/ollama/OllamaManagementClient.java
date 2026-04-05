@@ -2,7 +2,6 @@ package ac.uk.sussex.kn253.ollama;
 
 import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
 
-import ac.uk.sussex.kn253.ollama.model.*;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
@@ -16,7 +15,7 @@ import jakarta.ws.rs.core.Response;
  * Register this client in your properties:
  *
  * <pre>
- * quarkus.rest-client.ollama-management.url=${ollama.base-url}
+ * quarkus.rest-client.pdhd.ollama.management.url=${pdhd.ollama.base-url}
  * </pre>
  *
  * <p>
@@ -32,7 +31,7 @@ import jakarta.ws.rs.core.Response;
  * <a href="https://github.com/ollama/ollama/blob/main/docs/api.md">
  * Ollama REST API</a>.
  */
-@RegisterRestClient(configKey = "ollama-management")
+@RegisterRestClient(configKey = "pdhd.ollama.management")
 @Path("/api")
 @Produces(MediaType.APPLICATION_JSON)
 public interface OllamaManagementClient {
