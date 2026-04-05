@@ -9,6 +9,16 @@ export async function api<T>(url: string): Promise<T> {
 }
 
 /**
+ * Makes an authenticated GET request with an optional timeout override.
+ */
+export async function apiWithTimeout<T>(
+  url: string,
+  timeoutMs?: number,
+): Promise<T> {
+  return fetchJson<T>(url, { method: "GET" }, timeoutMs);
+}
+
+/**
  * Makes a POST request with a JSON body and parses the JSON response.
  * Returns an empty object for 204 No Content responses.
  */
@@ -36,8 +46,12 @@ export async function apiPost<TReq, TRes>(
   return (await response.json()) as TRes;
 }
 
-async function fetchJson<T>(url: string, init: RequestInit): Promise<T> {
-  const response = await fetchWithTimeout(url, init);
+async function fetchJson<T>(
+  url: string,
+  init: RequestInit,
+  timeoutMs?: number,
+): Promise<T> {
+  const response = await fetchWithTimeout(url, init, timeoutMs);
   if (!response.ok) {
     throw await buildHttpError(response);
   }

@@ -1,10 +1,10 @@
-import React, { useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Components } from "react-markdown";
 import { normalizeToolCallMarkup } from "../assistantActions";
 import type { WindowState } from "../types";
 import { isImagePath, isPdfPath, rawFileUrl, rawImageUrl } from "../utils";
+import { Window } from "./Window";
 
 const MARKDOWN_SIGNAL_PATTERN =
   /(^|\n)\s{0,3}#{1,6}\s|(^|\n)\s*[-*+]\s|(^|\n)\s*\d+\.\s|```|\[[^\]]+\]\([^\)]+\)/m;
@@ -14,7 +14,7 @@ type AssistantActionPayload = {
   prompt: string;
 };
 
-export type ProjectWindowProps = {
+export type PaneWindowProps = {
   windowState: WindowState;
   onClose: () => void;
   onFocus: () => void;
@@ -25,14 +25,8 @@ export type ProjectWindowProps = {
   assistantActionDisabled?: boolean;
 };
 
-/**
- * A floating, draggable explorer window for a single project.
- *
- * Renders a file-tree pane on the left and a content preview pane on the
- * right.  Drag state is tracked in a ref (not state) to avoid re-renders on
- * every mouse-move event.
- */
-export function ProjectWindow({
+/** A pane-style window with tree on left and preview on right. */
+export function PaneWindow({
   windowState,
   onClose,
   onFocus,
@@ -41,43 +35,7 @@ export function ProjectWindow({
   onOpenFolderSummary,
   onAssistantAction,
   assistantActionDisabled = false,
-}: ProjectWindowProps) {
-  const dragRef = useRef<{
-    active: boolean;
-    startX: number;
-    startY: number;
-    originX: number;
-    originY: number;
-  }>({ active: false, startX: 0, startY: 0, originX: 0, originY: 0 });
-
-  useEffect(() => {
-    const onMouseMove = (e: MouseEvent) => {
-      if (!dragRef.current.active) return;
-      const x = dragRef.current.originX + (e.clientX - dragRef.current.startX);
-      const y = dragRef.current.originY + (e.clientY - dragRef.current.startY);
-      onMove(x, y);
-    };
-    const onMouseUp = () => {
-      dragRef.current.active = false;
-    };
-
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onMouseUp);
-    return () => {
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup", onMouseUp);
-    };
-  }, [onMove]);
-
-  const beginDrag = (e: React.MouseEvent) => {
-    onFocus();
-    dragRef.current.active = true;
-    dragRef.current.startX = e.clientX;
-    dragRef.current.startY = e.clientY;
-    dragRef.current.originX = windowState.x;
-    dragRef.current.originY = windowState.y;
-  };
-
+}: PaneWindowProps) {
   const showImage =
     !windowState.fileLoading &&
     !windowState.fileError &&
@@ -170,22 +128,15 @@ export function ProjectWindow({
   );
 
   return (
-    <section
-      className="window-card window"
-      style={{
-        left: windowState.x,
-        top: windowState.y,
-        zIndex: windowState.z,
-      }}
-      onMouseDown={() => onFocus()}
+    <Window
+      title={windowState.project.directory}
+      x={windowState.x}
+      y={windowState.y}
+      z={windowState.z}
+      onClose={onClose}
+      onFocus={onFocus}
+      onMove={onMove}
     >
-      <div className="title-bar win-title" onMouseDown={beginDrag}>
-        <div className="title-bar-text">{windowState.project.directory}</div>
-        <div className="title-bar-controls">
-          <button aria-label="Close" onClick={onClose} />
-        </div>
-      </div>
-
       <div className="win-body">
         <aside className="tree-pane">
           {windowState.entriesLoading && <div>Loading...</div>}
@@ -280,6 +231,6 @@ export function ProjectWindow({
             )}
         </article>
       </div>
-    </section>
+    </Window>
   );
 }

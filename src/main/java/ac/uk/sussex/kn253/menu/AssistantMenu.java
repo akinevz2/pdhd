@@ -91,7 +91,7 @@ public class AssistantMenu implements Runnable {
             final String input;
             try {
                 input = prompter.prompt();
-            } catch (final UserInterruptException e) {
+            } catch (final UserInterruptException | EndOfFileException e) {
                 break;
             }
 

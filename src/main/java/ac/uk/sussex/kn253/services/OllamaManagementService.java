@@ -10,7 +10,6 @@ import java.util.function.Consumer;
 import java.util.logging.Logger;
 
 import org.eclipse.microprofile.rest.client.RestClientBuilder;
-import org.eclipse.microprofile.rest.client.inject.RestClient;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -54,10 +53,6 @@ public class OllamaManagementService {
     private static final Logger LOG = Logger.getLogger(OllamaManagementService.class.getName());
 
     @Inject
-    @RestClient
-    OllamaManagementClient client;
-
-    @Inject
     OllamaConfig config;
 
     @Inject
@@ -72,7 +67,7 @@ public class OllamaManagementService {
      */
     public boolean isHealthy() {
         try {
-            final Response response = client.health();
+            final Response response = getClient(config.baseUrl()).health();
             final boolean ok = response.getStatus() == 200;
             LOG.fine(
                     () -> String.format("Ollama health check: %s (HTTP %d)", ok ? "OK" : "FAIL", response.getStatus()));
@@ -108,7 +103,7 @@ public class OllamaManagementService {
      */
     public Optional<String> getVersion() {
         try {
-            return Optional.ofNullable(client.version());
+            return Optional.ofNullable(getClient(config.baseUrl()).version());
         } catch (final Exception e) {
             LOG.warning(() -> String.format("Could not retrieve Ollama version: %s", e.getMessage()));
             return Optional.empty();
@@ -147,7 +142,7 @@ public class OllamaManagementService {
      */
     public List<OllamaRunningModel> listRunningModels() {
         try {
-            final var response = client.listRunningModels();
+            final var response = getClient(config.baseUrl()).listRunningModels();
             return response.getModels() != null ? response.getModels() : Collections.emptyList();
         } catch (final Exception e) {
             LOG.severe(() -> String.format("Failed to list running Ollama models: %s", e.getMessage()));
@@ -357,12 +352,19 @@ public class OllamaManagementService {
         return ensureModelAvailable(config.modelName());
     }
 
-    private OllamaManagementClient getClient(final String baseUrl) {
-        if (baseUrl == null || baseUrl.isBlank()) {
-            return client;
+    OllamaManagementClient getClient(final String baseUrl) {
+        final String resolvedBaseUrl = (baseUrl == null || baseUrl.isBlank())
+                ? config.baseUrl()
+                : baseUrl.trim();
+        if (resolvedBaseUrl == null || resolvedBaseUrl.isBlank()) {
+            throw new IllegalStateException("Ollama base URL is not configured");
         }
+        return buildClient(resolvedBaseUrl);
+    }
+
+    OllamaManagementClient buildClient(final String resolvedBaseUrl) {
         return RestClientBuilder.newBuilder()
-                .baseUri(URI.create(baseUrl.trim()))
+                .baseUri(URI.create(resolvedBaseUrl))
                 .build(OllamaManagementClient.class);
     }
 }

@@ -25,6 +25,9 @@ public class ProjectFolder extends PanacheEntityBase {
     @JoinColumn(nullable = true)
     private GitFolder gitRepository;
 
+    @Column(name = "open_in_canvas", nullable = false)
+    private boolean loaded;
+
     public String getDirectory() {
         return directory;
     }
@@ -47,5 +50,13 @@ public class ProjectFolder extends PanacheEntityBase {
 
     public void setGitRepository(final GitFolder gitRepository) {
         this.gitRepository = gitRepository;
+    }
+
+    public boolean isLoaded() {
+        return loaded;
+    }
+
+    public void setLoaded(final boolean loaded) {
+        this.loaded = loaded;
     }
 }

@@ -1,5 +1,32 @@
 # Known Issues and Observations
 
+## Runtime Reliability Notes (2026-04-05)
+
+### Resolved: Ollama REST Client CDI Injection Failure in CLI Flow
+
+**Symptom**: Runtime error while entering configuration actions:
+
+`IllegalArgumentException: Unable to determine the proper baseUrl/baseUri...`
+
+**Cause**: Startup-time `@RestClient` injection was brittle in menu/CLI call paths where runtime base URL and extension wiring could drift.
+
+**Current State**:
+
+- `OllamaManagementService` now resolves/builds clients dynamically from base URL at call time.
+- Missing/blank URL is treated as invalid and fails fast in client resolution.
+
+**Verification**:
+
+- Added unit coverage in `src/test/java/ac/uk/sussex/kn253/services/OllamaManagementServiceTest.java` for provided URL use, fallback behavior, and missing-config behavior.
+
+### Remaining Gap: Documentation Deliverables
+
+The documentation plan still references deliverables that are not yet present as first-class docs:
+
+- `quick-start.md`
+- `developer-guide.md`
+- Dedicated API contract/spec publication
+
 ## Folder Summary Tool Evidence Leakage
 
 **Issue**: When calling `read_folder_manifest` to generate folder summaries, the tool returns evidence-tagged content (e.g., "=== sampled file contents (evidence only) ===") that is intended as internal AI reasoning context. However, when this evidence reaches the LLM for folder summarization, the model may reproduce or reference this scaffolding text directly in the final response, which then appears in the frontend UI.

@@ -8,11 +8,13 @@ export type ChatDockProps = {
   chatInput: string;
   chatError: string | null;
   retryMessage: string | null;
+  cwdRetryPending: boolean;
   chatLogRef: React.RefObject<HTMLDivElement>;
   chatInputRef: React.RefObject<HTMLTextAreaElement>;
   setAssistantUnreachable: (value: boolean) => void;
   setChatInput: (value: string) => void;
   sendChatMessage: (overrideMessage?: string, source?: string) => Promise<void>;
+  retryCwdGet: () => Promise<void>;
   resetChat: () => Promise<void>;
   renderAssistantMarkdown: (content: string) => React.ReactNode;
 };
@@ -24,11 +26,13 @@ export function ChatDock({
   chatInput,
   chatError,
   retryMessage,
+  cwdRetryPending,
   chatLogRef,
   chatInputRef,
   setAssistantUnreachable,
   setChatInput,
   sendChatMessage,
+  retryCwdGet,
   resetChat,
   renderAssistantMarkdown,
 }: ChatDockProps) {
@@ -122,6 +126,20 @@ export function ChatDock({
             style={{ marginLeft: 8 }}
           >
             Retry
+          </button>
+        )}
+        {cwdRetryPending && (
+          <button
+            className="retry-button"
+            onClick={() => {
+              retryCwdGet().catch(() => {
+                // handled in callback
+              });
+            }}
+            disabled={chatLoading}
+            style={{ marginLeft: 8 }}
+          >
+            Confirm CWD Retry
           </button>
         )}
       </div>

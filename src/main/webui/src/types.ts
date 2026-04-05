@@ -3,15 +3,10 @@ export type ProjectSummary = {
   id: number;
   directory: string;
   hasGitRepository: boolean;
+  loaded: boolean;
 };
 
-/** A node in a project's file-tree response. */
-export type TreeNode = {
-  name: string;
-  relativePath: string;
-  directory: boolean;
-  children: TreeNode[];
-};
+
 
 /** A single tool-call trace emitted by the AI assistant. */
 export type ToolActivityItem = {
@@ -47,6 +42,11 @@ export type ToolTelemetryResponse = {
 export type FileContentResponse = {
   filePath: string;
   content: string;
+  mimeType: string;
+  language: string;
+  requiresPdfViewer: boolean;
+  requiresImageViewer: boolean;
+  requiresMarkdownViewer: boolean;
 };
 
 /** Response from the CWD API endpoints. */
@@ -118,15 +118,30 @@ export type ChatMessage = {
 export type WindowState = {
   id: number;
   project: ProjectSummary;
-  treeLoading: boolean;
-  treeError?: string;
-  tree?: TreeNode;
+  entriesLoading: boolean;
+  entriesError?: string;
+  entries?: FsBrowserEntry[];
   selectedFilePath?: string;
   fileContent?: string;
   fileContentMarkdown?: boolean;
   fileLoading?: boolean;
   fileLoadingFolderSummary?: boolean;
   fileError?: string;
+  x: number;
+  y: number;
+  z: number;
+};
+
+/** Runtime state for a standalone file preview window. */
+export type FileWindowState = {
+  id: number;
+  filePath: string;
+  title: string;
+  loading: boolean;
+  content?: string;
+  language?: string;
+  mimeType?: string;
+  error?: string;
   x: number;
   y: number;
   z: number;

@@ -4,9 +4,9 @@ import remarkGfm from "remark-gfm";
 import { normalizeToolCallMarkup } from "./assistantActions";
 import { ChatDock } from "./components/ChatDock";
 import { CwdNavigator } from "./components/CwdNavigator";
-import { ProjectWindow } from "./components/ProjectWindow";
+import { FileWindow } from "./components/FileWindow";
+import { PaneWindow } from "./components/PaneWindow";
 import { TopMenuAndModals } from "./components/TopMenuAndModals";
-import { useHighlightedFiles } from "./hooks/useHighlightedFiles";
 import { useMenuPanels } from "./hooks/useMenuPanels";
 import {
   ConfigurationMenuButtons,
@@ -17,6 +17,7 @@ import type {
   AssistantChatResponse,
   ChatMessage,
   CwdResponse,
+  FileWindowState,
   FileContentResponse,
   FsBrowserEntry,
   FsListResponse,
@@ -24,7 +25,6 @@ import type {
   ToolActivityItem,
   ToolTelemetryItem,
   ToolTelemetryResponse,
-  TreeNode,
   WindowState,
 } from "./types";
 import {
@@ -48,6 +48,8 @@ const REQUEST_SOURCE_HEADER = "X-Assistant-Request-Source";
 const REQUEST_SOURCE_CHAT_INPUT = "chat-input";
 const REQUEST_SOURCE_ASSISTANT_ACTION_BUTTON = "assistant-action-button";
 const REQUEST_SOURCE_FILE_EXPLORER = "file-explorer";
+const CWD_GET_TIMEOUT_MS = 2_000;
+const CWD_GET_MAX_RETRIES = 1;
 
 type AssistantActionPayload = {
   label: string;
@@ -59,9 +61,11 @@ const SIGNALS = {
   CWD_GET: "cwd:get",
   CWD_SET: "cwd:set",
   FS_LIST: "fs:list",
-  FS_TREE: "fs:tree",
   FS_FILE: "fs:file",
-  PROJECTS_LIST: "projects:list",
+  FS_GIT_OPEN: "fs:git:open",
+  FS_PROJECT: "fs:project",
+  FS_PROJECT_LOAD: "fs:project:load",
+  FS_PROJECT_UNLOAD: "fs:project:unload",
   CHAT_SEND: "chat:send",
   CHAT_RESET: "chat:reset",
   CHAT_SUMMARIZE_FOLDER: "chat:summarizeFolder",
@@ -86,6 +90,7 @@ export function App() {
   const [cwd, setCwd] = useState<string>("");
   const [cwdError, setCwdError] = useState<string | null>(null);
   const [cwdUpdating, setCwdUpdating] = useState(false);
+  const [cwdRetryPending, setCwdRetryPending] = useState(false);
 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState<string>("");
@@ -97,18 +102,20 @@ export function App() {
   const chatLogRef = useRef<HTMLDivElement | null>(null);
   const chatInputRef = useRef<HTMLTextAreaElement | null>(null);
   const [windows, setWindows] = useState<WindowState[]>([]);
+  const [fileWindows, setFileWindows] = useState<FileWindowState[]>([]);
   const nextWindowId = useRef(1);
   const nextZ = useRef(10);
 
   const menuPanels = useMenuPanels();
   const configurationMenus = useConfigurationMenus();
 
-  const highlightedByProject = useHighlightedFiles(activityItems, windows);
-
   useEffect(() => {
     registerApiSignals([
       [SIGNALS.TOOL_TELEMETRY_GET, { method: "GET", endpoint: "/api/tool-telemetry" }],
-      [SIGNALS.CWD_GET, { method: "GET", endpoint: "/api/cwd" }],
+      [
+        SIGNALS.CWD_GET,
+        { method: "GET", endpoint: "/api/cwd", timeoutMs: CWD_GET_TIMEOUT_MS },
+      ],
       [SIGNALS.CWD_SET, { method: "POST", endpoint: "/api/cwd" }],
       [
         SIGNALS.FS_LIST,
@@ -119,14 +126,6 @@ export function App() {
         },
       ],
       [
-        SIGNALS.FS_TREE,
-        {
-          method: "GET",
-          endpoint: (payload: { path: string }) =>
-            `/api/fs/tree?path=${encodeURIComponent(payload.path)}`,
-        },
-      ],
-      [
         SIGNALS.FS_FILE,
         {
           method: "GET",
@@ -134,7 +133,17 @@ export function App() {
             `/api/fs/file?path=${encodeURIComponent(payload.path)}`,
         },
       ],
-      [SIGNALS.PROJECTS_LIST, { method: "GET", endpoint: "/api/projects" }],
+      [
+        SIGNALS.FS_GIT_OPEN,
+        {
+          method: "GET",
+          endpoint: (payload: { path: string }) =>
+            `/api/fs/git/open?path=${encodeURIComponent(payload.path)}`,
+        },
+      ],
+      [SIGNALS.FS_PROJECT, { method: "GET", endpoint: "/api/fs/project" }],
+      [SIGNALS.FS_PROJECT_LOAD, { method: "POST", endpoint: "/api/fs/project/load" }],
+      [SIGNALS.FS_PROJECT_UNLOAD, { method: "POST", endpoint: "/api/fs/project/unload" }],
       [SIGNALS.CHAT_SEND, { method: "POST", endpoint: "/api/chat", timeoutMs: CHAT_TIMEOUT_MS }],
       [SIGNALS.CHAT_RESET, { method: "POST", endpoint: "/api/chat/reset" }],
       [
@@ -194,13 +203,33 @@ export function App() {
   }, []);
 
   const loadCwd = useCallback(async () => {
-    try {
-      const data = await emitApiSignal<void, CwdResponse>(SIGNALS.CWD_GET);
-      setCwd(data.cwd || "");
-      setCwdError(null);
-    } catch {
-      setCwdError("Failed to resolve working folder");
+    let attempts = 0;
+    while (attempts <= CWD_GET_MAX_RETRIES) {
+      try {
+        const data = await emitApiSignal<void, CwdResponse>(SIGNALS.CWD_GET);
+        setCwd(data.cwd || "");
+        setCwdError(null);
+        setCwdRetryPending(false);
+        return;
+      } catch {
+        attempts += 1;
+      }
     }
+
+    setCwdError("Failed to resolve working folder");
+    setCwdRetryPending((wasPending) => {
+      if (!wasPending) {
+        setChatMessages((prev) => [
+          ...prev,
+          {
+            role: "system",
+            content:
+              "Working folder lookup failed after retry. Confirm to try one more attempt.",
+          },
+        ]);
+      }
+      return true;
+    });
   }, []);
 
   const loadBrowser = useCallback(
@@ -290,8 +319,23 @@ export function App() {
     );
   }, []);
 
-  const closeWindow = useCallback((id: number) => {
+  const closeWindow = useCallback(async (id: number, projectId: number) => {
     setWindows((prev) => prev.filter((w) => w.id !== id));
+    if (projectId <= 0) {
+      return;
+    }
+    try {
+      await emitApiSignal<{ id: number }, { status: string }>(
+        SIGNALS.FS_PROJECT_UNLOAD,
+        { id: projectId },
+      );
+    } catch {
+      // non-fatal: local close should still succeed
+    }
+  }, []);
+
+  const closeFileWindow = useCallback((id: number) => {
+    setFileWindows((prev) => prev.filter((w) => w.id !== id));
   }, []);
 
   const updateWindow = useCallback(
@@ -303,22 +347,22 @@ export function App() {
     [],
   );
 
-  const loadTreeForWindow = useCallback(
+  const loadEntriesForWindow = useCallback(
     async (windowId: number, directory: string) => {
       try {
-        const tree = await emitApiSignal<{ path: string }, TreeNode>(
-          SIGNALS.FS_TREE,
+        const response = await emitApiSignal<{ path: string }, FsListResponse>(
+          SIGNALS.FS_LIST,
           { path: directory },
         );
         updateWindow(windowId, {
-          tree,
-          treeLoading: false,
-          treeError: undefined,
+          entries: response.entries,
+          entriesLoading: false,
+          entriesError: undefined,
         });
       } catch {
         updateWindow(windowId, {
-          treeLoading: false,
-          treeError: "Failed to load project tree.",
+          entriesLoading: false,
+          entriesError: "Failed to load folder contents.",
         });
       }
     },
@@ -330,7 +374,7 @@ export function App() {
       const target = path || cwd;
       if (!target) return;
       const projects = await emitApiSignal<void, ProjectSummaryType[]>(
-        SIGNALS.PROJECTS_LIST,
+        SIGNALS.FS_PROJECT,
       );
       const match = projects
         .filter(
@@ -340,11 +384,19 @@ export function App() {
             target.startsWith(p.directory + "\\"),
         )
         .sort((a, b) => b.directory.length - a.directory.length)[0];
-      if (!match) return;
-      const existing = windows.find((w) => w.project.id === match.id);
+
+      const project: ProjectSummaryType =
+        match ?? {
+          id: -(Math.abs(target.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0)) + 1),
+          directory: target,
+          hasGitRepository: false,
+          loaded: false,
+        };
+
+      const existing = windows.find((w) => w.project.directory === project.directory);
       if (existing) {
         focusWindow(existing.id);
-        setWorkingFolder(match.directory).catch(() => {});
+        setWorkingFolder(project.directory).catch(() => {});
         return;
       }
       const winId = ++nextWindowId.current;
@@ -352,17 +404,150 @@ export function App() {
         ...prev,
         {
           id: winId,
-          project: match,
-          treeLoading: true,
+          project,
+          entriesLoading: true,
           x: 60 + (winId % 6) * 30,
           y: 40 + (winId % 6) * 30,
           z: ++nextZ.current,
         },
       ]);
-      await loadTreeForWindow(winId, match.directory);
+      if (project.id > 0) {
+        try {
+          await emitApiSignal<{ id: number }, { status: string }>(
+            SIGNALS.FS_PROJECT_LOAD,
+            { id: project.id },
+          );
+        } catch {
+          // non-fatal: keep opening window even if persistence update fails
+        }
+      }
+      await loadEntriesForWindow(winId, project.directory);
     },
-    [cwd, windows, focusWindow, loadTreeForWindow],
+    [cwd, windows, focusWindow, loadEntriesForWindow],
   );
+
+  const restoredOpenProjectsRef = useRef(false);
+
+  useEffect(() => {
+    if (restoredOpenProjectsRef.current) {
+      return;
+    }
+    restoredOpenProjectsRef.current = true;
+
+    const restoreOpenProjects = async () => {
+      try {
+        const projects = await emitApiSignal<void, ProjectSummaryType[]>(
+          SIGNALS.FS_PROJECT,
+        );
+        const openProjects = projects.filter((p) => p.loaded);
+        for (const project of openProjects) {
+          const winId = ++nextWindowId.current;
+          setWindows((prev) => {
+            if (prev.some((w) => w.project.id === project.id)) {
+              return prev;
+            }
+            return [
+              ...prev,
+              {
+                id: winId,
+                project,
+                entriesLoading: true,
+                x: 60 + (winId % 6) * 30,
+                y: 40 + (winId % 6) * 30,
+                z: ++nextZ.current,
+              },
+            ];
+          });
+          await loadEntriesForWindow(winId, project.directory);
+        }
+      } catch {
+        // non-fatal during startup restoration
+      }
+    };
+
+    restoreOpenProjects().catch(() => {
+      // surfaced as signal errors if needed
+    });
+  }, [loadEntriesForWindow]);
+
+  const openFileWindow = useCallback(async (filePath: string) => {
+    const id = ++nextWindowId.current;
+    const title = filePath.split(/[\\/]/).pop() || filePath;
+    setFileWindows((prev) => [
+      ...prev,
+      {
+        id,
+        filePath,
+        title,
+        loading: true,
+        x: 80 + (id % 6) * 24,
+        y: 70 + (id % 6) * 24,
+        z: ++nextZ.current,
+      },
+    ]);
+
+    try {
+      const file = await emitApiSignal<{ path: string }, FileContentResponse>(
+        SIGNALS.FS_FILE,
+        { path: filePath },
+      );
+      setFileWindows((prev) =>
+        prev.map((w) =>
+          w.id === id
+            ? {
+                ...w,
+                loading: false,
+                content: file.content,
+                language: file.language,
+                mimeType: file.mimeType,
+                error: undefined,
+              }
+            : w,
+        ),
+      );
+    } catch {
+      setFileWindows((prev) =>
+        prev.map((w) =>
+          w.id === id
+            ? { ...w, loading: false, error: "Failed to read file." }
+            : w,
+        ),
+      );
+    }
+  }, []);
+
+  const focusFileWindow = useCallback((id: number) => {
+    setFileWindows((prev) =>
+      prev.map((w) =>
+        w.id === id
+          ? {
+              ...w,
+              z: ++nextZ.current,
+            }
+          : w,
+      ),
+    );
+  }, []);
+
+  const moveFileWindow = useCallback((id: number, x: number, y: number) => {
+    setFileWindows((prev) =>
+      prev.map((w) => (w.id === id ? { ...w, x, y } : w)),
+    );
+  }, []);
+
+  const openGitRepo = useCallback(async (path: string) => {
+    try {
+      const data = await emitApiSignal<{ path: string }, { repoUrl: string }>(
+        SIGNALS.FS_GIT_OPEN,
+        { path },
+      );
+      if (data.repoUrl) {
+        openExternalUrl(data.repoUrl);
+      }
+    } catch {
+      setBrowserError("Failed to resolve GitHub repository URL.");
+    }
+  }, []);
 
 
   const openFile = useCallback(
@@ -414,49 +599,6 @@ export function App() {
       }
     },
     [updateWindow],
-  );
-
-  const openFileInCanvas = useCallback(
-    async (filePath: string) => {
-      if (!filePath) return;
-      const projects = await emitApiSignal<void, ProjectSummaryType[]>(
-        SIGNALS.PROJECTS_LIST,
-      );
-      const match = projects
-        .filter(
-          (p) =>
-            filePath.startsWith(p.directory + "/") ||
-            filePath.startsWith(p.directory + "\\"),
-        )
-        .sort((a, b) => b.directory.length - a.directory.length)[0];
-      if (!match) return;
-      const relativePath = filePath
-        .slice(match.directory.length)
-        .replace(/^[\/\\]/, "");
-      let winId: number;
-      const existing = windows.find((w) => w.project.id === match.id);
-      if (existing) {
-        focusWindow(existing.id);
-        setWorkingFolder(match.directory).catch(() => {});
-        winId = existing.id;
-      } else {
-        winId = ++nextWindowId.current;
-        setWindows((prev) => [
-          ...prev,
-          {
-            id: winId,
-            project: match,
-            treeLoading: true,
-            x: 60 + (winId % 6) * 30,
-            y: 40 + (winId % 6) * 30,
-            z: ++nextZ.current,
-          },
-        ]);
-        await loadTreeForWindow(winId, match.directory);
-      }
-      await openFile(winId, match.directory, relativePath);
-    },
-    [cwd, windows, focusWindow, setWorkingFolder, loadTreeForWindow, openFile],
   );
 
   const openFolderSummary = useCallback(
@@ -551,6 +693,14 @@ export function App() {
   );
 
   const [retryMessage, setRetryMessage] = useState<string | null>(null);
+
+  const retryCwdGet = useCallback(async () => {
+    if (!cwdRetryPending) {
+      return;
+    }
+    setCwdRetryPending(false);
+    await loadCwd();
+  }, [cwdRetryPending, loadCwd]);
 
   const parseAssistantActionPayload = useCallback(
     (rawPayload: string): AssistantActionPayload | null => {
@@ -827,7 +977,7 @@ export function App() {
                   {/* Filing system entries */}
                   {browserEntries.map((entry) => (
                     <div key={entry.path} className="browser-row">
-                      {entry.directory ? (
+                      {entry.directory && entry.name !== ".git" ? (
                         <>
                           <button
                             className="browser-row-main"
@@ -851,22 +1001,21 @@ export function App() {
                           <button
                             className="browser-row-action explore-button"
                             onClick={() => {
-                              openInCanvas(entry.path).catch(() => {});
+                              setWorkingFolder(entry.path).catch(() => {
+                                // handled in setWorkingFolder
+                              });
                             }}
-                            title={`Open ${entry.name} in explorer`}
-                            aria-label={`Open ${entry.name} in explorer`}
+                            title={`Open ${entry.name}`}
+                            aria-label={`Open ${entry.name}`}
                           >
                             →
                           </button>
                         </>
-                      ) : (
+                      ) : entry.directory && entry.name === ".git" ? (
                         <>
                           <button
                             className="browser-row-main browser-row-main-static"
                             title={entry.path}
-                            onClick={() => {
-                              openFileInCanvas(entry.path).catch(() => {});
-                            }}
                           >
                             <span
                               className="browser-row-icon browser-row-icon-file"
@@ -881,12 +1030,32 @@ export function App() {
                           <button
                             className="browser-row-action explore-button"
                             onClick={() => {
-                              openFileInCanvas(entry.path).catch(() => {});
+                              openGitRepo(entry.path).catch(() => {});
                             }}
-                            title={`Open ${entry.name} in explorer`}
-                            aria-label={`Open ${entry.name} in explorer`}
+                            title={`Open repository for ${entry.name}`}
+                            aria-label={`Open repository for ${entry.name}`}
                           >
                             →
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            className="browser-row-main browser-row-main-static"
+                            title={entry.path}
+                            onClick={() => {
+                              openFileWindow(entry.path).catch(() => {});
+                            }}
+                          >
+                            <span
+                              className="browser-row-icon browser-row-icon-file"
+                              aria-hidden="true"
+                            >
+                              •
+                            </span>
+                            <span className="browser-row-name">
+                              {entry.name}
+                            </span>
                           </button>
                         </>
                       )}
@@ -921,14 +1090,10 @@ export function App() {
 
         <section className="window-host panel">
           {windows.map((win) => (
-            <ProjectWindow
+            <PaneWindow
               key={win.id}
               windowState={win}
-              highlighted={
-                highlightedByProject.get(win.project.directory) ||
-                new Set<string>()
-              }
-              onClose={() => closeWindow(win.id)}
+              onClose={() => closeWindow(win.id, win.project.id)}
               onFocus={() => focusWindow(win.id)}
               onMove={(x, y) => moveWindow(win.id, x, y)}
               onOpenFile={(path) =>
@@ -943,6 +1108,15 @@ export function App() {
                 });
               }}
               assistantActionDisabled={chatLoading}
+            />
+          ))}
+          {fileWindows.map((fileWin) => (
+            <FileWindow
+              key={`file-${fileWin.id}`}
+              windowState={fileWin}
+              onClose={() => closeFileWindow(fileWin.id)}
+              onFocus={() => focusFileWindow(fileWin.id)}
+              onMove={(x, y) => moveFileWindow(fileWin.id, x, y)}
             />
           ))}
         </section>
@@ -967,11 +1141,13 @@ export function App() {
           chatInput={chatInput}
           chatError={chatError}
           retryMessage={retryMessage}
+          cwdRetryPending={cwdRetryPending}
           chatLogRef={chatLogRef}
           chatInputRef={chatInputRef}
           setAssistantUnreachable={setAssistantUnreachable}
           setChatInput={setChatInput}
           sendChatMessage={sendChatMessage}
+          retryCwdGet={retryCwdGet}
           resetChat={resetChat}
           renderAssistantMarkdown={renderAssistantMarkdown}
         />

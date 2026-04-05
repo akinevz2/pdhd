@@ -1,4 +1,4 @@
-import { api, apiPost } from "./api";
+import { api, apiPost, apiWithTimeout } from "./api";
 
 export type ApiSignalKey = `${string}:${string}`;
 
@@ -83,6 +83,10 @@ export async function emitApiSignal<TPayload, TResult>(
   const endpoint = resolveEndpoint(definition.endpoint, payload);
   try {
     if (definition.method === "GET") {
+      const timeoutMs = options?.timeoutMs ?? definition.timeoutMs;
+      if (typeof timeoutMs === "number") {
+        return await apiWithTimeout<TResult>(endpoint, timeoutMs);
+      }
       return await api<TResult>(endpoint);
     }
 
