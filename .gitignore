@@ -1,3 +1,5 @@
+#Javascript
+node_modules/
 #Maven
 target/
 pom.xml.tag
@@ -43,3 +45,4 @@ nb-configuration.xml
 /.quarkus/cli/plugins/
 # TLS Certificates
 .certs/
+
