@@ -6,7 +6,6 @@ import java.util.List;
 import org.jline.prompt.*;
 import org.jline.reader.UserInterruptException;
 import org.jline.terminal.Terminal;
-import org.jline.terminal.TerminalBuilder;
 
 import ac.uk.sussex.kn253.menu.*;
 import ac.uk.sussex.kn253.services.ModelConfigService;
@@ -14,7 +13,6 @@ import ac.uk.sussex.kn253.services.OllamaManagementService;
 import io.quarkus.picocli.runtime.annotations.TopCommand;
 import io.quarkus.runtime.Quarkus;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.inject.Produces;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import picocli.CommandLine;
@@ -63,9 +61,12 @@ public class MainMenu implements Runnable {
     @Inject
     OllamaManagementService ollamaManagementService;
 
+    @Inject
+    @Named("mainTerminal")
+    Terminal terminal;
+
     private void initializeRuntime() throws IOException {
         ensureCommandLineInitialized();
-        terminal = getTerminal();
         eagerInitializeInteractiveServices();
     }
 
@@ -82,6 +83,7 @@ public class MainMenu implements Runnable {
     public void run() {
         try {
             initializeRuntime();
+            TerminalUi.clearScreen(terminal);
             runMenuLoop();
         } catch (final IOException e) {
             throw new RuntimeException("Main menu initialization failed", e);
@@ -119,21 +121,7 @@ public class MainMenu implements Runnable {
     public static final String DESCRIPTION = "Project Definition Hierarchy Discovery";
     public static final String NAME = "pdhd";
 
-    private Terminal terminal;
     private CommandLine commandLine;
-
-    @Named("mainTerminal")
-    @Produces
-    public Terminal getTerminal() {
-        if (terminal == null) {
-            try {
-                terminal = TerminalBuilder.builder().dumb(true).system(true).build();
-            } catch (final IOException e) {
-                throw new IllegalStateException("Failed to initialize terminal", e);
-            }
-        }
-        return terminal;
-    }
 
     private void ensureCommandLineInitialized() {
         if (commandLine != null) {
@@ -166,12 +154,14 @@ public class MainMenu implements Runnable {
                 yield SelectorOutcome.KEEP_RUNNING;
             }
             case "configure" -> {
+                TerminalUi.clearScreen(terminal);
                 executeSubcommandOrFail("configure");
                 terminal.writer().println(RETURN_TO_MAIN_MENU);
                 terminal.writer().flush();
                 yield SelectorOutcome.KEEP_RUNNING;
             }
             case "debug" -> {
+                TerminalUi.clearScreen(terminal);
                 executeSubcommandOrFail("debug");
                 terminal.writer().println(RETURN_TO_MAIN_MENU);
                 terminal.writer().flush();
@@ -179,6 +169,7 @@ public class MainMenu implements Runnable {
             }
             case "webui" -> {
                 // Launch browser and keep Quarkus running for HTTP endpoints.
+                TerminalUi.clearScreen(terminal);
                 executeSubcommandOrFail("webui");
                 terminal.writer().println(RETURN_TO_MAIN_MENU);
                 terminal.writer().flush();

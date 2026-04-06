@@ -8,11 +8,9 @@ import java.util.List;
 import org.jline.prompt.*;
 import org.jline.reader.UserInterruptException;
 import org.jline.terminal.Terminal;
-import org.jline.terminal.TerminalBuilder;
 import org.jline.utils.AttributedString;
 
 import ac.uk.sussex.kn253.repository.*;
-import io.quarkus.arc.Arc;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -54,35 +52,22 @@ public class DebugMenu implements Runnable {
             .ofPattern("yyyy-MM-dd HH:mm:ss")
             .withZone(ZoneId.systemDefault());
 
+    private final Terminal terminal;
+
     @Inject
-    @Named("mainTerminal")
-    Terminal terminal;
+    DebugMenu(@Named("mainTerminal") final Terminal terminal) {
+        this.terminal = terminal;
+    }
 
     @Override
     public void run() {
         try {
-            resolveDependencies();
+            TerminalUi.clearScreen(terminal);
             menu();
         } catch (final UserInterruptException e) {
             Log.info("Exiting debug menu...");
         } catch (final Exception e) {
             throw new RuntimeException("Debug menu failed", e);
-        }
-    }
-
-    private void resolveDependencies() {
-        if (terminal != null) {
-            return;
-        }
-        final Terminal resolved = Arc.container().instance(Terminal.class).orElse(null);
-        if (resolved != null) {
-            terminal = resolved;
-            return;
-        }
-        try {
-            terminal = TerminalBuilder.builder().dumb(true).system(true).build();
-        } catch (final IOException e) {
-            throw new IllegalStateException("Failed to initialize terminal", e);
         }
     }
 

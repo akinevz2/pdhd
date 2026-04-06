@@ -12,14 +12,12 @@ import java.util.stream.Collectors;
 import org.jline.prompt.*;
 import org.jline.reader.UserInterruptException;
 import org.jline.terminal.Terminal;
-import org.jline.terminal.TerminalBuilder;
 import org.jline.utils.*;
 
 import ac.uk.sussex.kn253.repository.LLMSettings;
 import ac.uk.sussex.kn253.repository.OllamaModelInfo;
 import ac.uk.sussex.kn253.services.ModelConfigService;
 import ac.uk.sussex.kn253.services.OllamaManagementService;
-import io.quarkus.arc.Arc;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -52,20 +50,24 @@ public class OllamaConfigMenu implements Runnable {
         private static final String STATUS_INVALID_SELECTION = "Invalid selection.";
     }
 
-    @Inject
-    @Named("mainTerminal")
-    Terminal terminal;
+    private final Terminal terminal;
+    private final OllamaManagementService ollamaManagementService;
+    private final ModelConfigService modelConfigService;
 
     @Inject
-    OllamaManagementService ollamaManagementService;
-
-    @Inject
-    ModelConfigService modelConfigService;
+    OllamaConfigMenu(
+            @Named("mainTerminal") final Terminal terminal,
+            final OllamaManagementService ollamaManagementService,
+            final ModelConfigService modelConfigService) {
+        this.terminal = terminal;
+        this.ollamaManagementService = ollamaManagementService;
+        this.modelConfigService = modelConfigService;
+    }
 
     @Override
     public void run() {
         try {
-            resolveDependencies();
+            TerminalUi.clearScreen(terminal);
             menu();
         } catch (final UserInterruptException e) {
             Log.info("Exiting configuration menu...");
@@ -74,35 +76,6 @@ public class OllamaConfigMenu implements Runnable {
         } finally {
             if (terminal != null) {
                 terminal.writer().println();
-            }
-        }
-    }
-
-    private void resolveDependencies() {
-        if (terminal == null) {
-            final Terminal resolvedTerminal = Arc.container().instance(Terminal.class).orElse(null);
-            if (resolvedTerminal != null) {
-                terminal = resolvedTerminal;
-            } else {
-                try {
-                    terminal = TerminalBuilder.builder().dumb(true).system(true).build();
-                } catch (final IOException e) {
-                    throw new IllegalStateException("Failed to initialize terminal", e);
-                }
-            }
-        }
-
-        if (ollamaManagementService == null) {
-            ollamaManagementService = Arc.container().instance(OllamaManagementService.class).orElse(null);
-            if (ollamaManagementService == null) {
-                throw new IllegalStateException("OllamaManagementService bean unavailable");
-            }
-        }
-
-        if (modelConfigService == null) {
-            modelConfigService = Arc.container().instance(ModelConfigService.class).orElse(null);
-            if (modelConfigService == null) {
-                throw new IllegalStateException("ModelConfigService bean unavailable");
             }
         }
     }

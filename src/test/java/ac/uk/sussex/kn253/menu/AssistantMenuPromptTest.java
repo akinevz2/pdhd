@@ -12,14 +12,14 @@ class AssistantMenuPromptTest {
     }
 
     @Test
-    void formatUserPromptPrependsModelName() {
-        assertEquals("llama3.2:/w/d/u/2/pdhd user> ",
-                AssistantMenu.formatUserPrompt("llama3.2", "/workspaces/development/uni/2025-project/pdhd"));
+    void formatUserPromptShowsOnlyPath() {
+        assertEquals("/w/d/u/2/pdhd > ",
+                AssistantMenu.formatUserPrompt("/workspaces/development/uni/2025-project/pdhd"));
     }
 
     @Test
-    void formatUserPromptFallsBackWhenModelMissing() {
-        assertEquals("assistant:/w/d/u/2/pdhd user> ",
-                AssistantMenu.formatUserPrompt(" ", "/workspaces/development/uni/2025-project/pdhd"));
+    void formatUserPromptFallsBackWhenPathMissing() {
+        assertEquals("? > ",
+                AssistantMenu.formatUserPrompt(" "));
     }
 }

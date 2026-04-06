@@ -2,6 +2,11 @@
 
 PDHD is a Quarkus application for exploring local projects with a web UI and an Ollama-powered assistant.
 
+## Versioning Note
+
+During the rewrite phase of this application, the working schema/version marker was `0.99.0`.
+This explicitly denotes a pre-release stabilization cycle before the first stable `1.0.0` release.
+
 ## Prerequisites
 
 - Java 25
@@ -48,6 +53,7 @@ When started, the CLI shows:
 See `docs/frontend.md` for detailed frontend architecture, API integration, state model, and development workflow.
 For assistant tooling internals and report-ready architecture notes, see `docs/tool-calling-architecture.md`.
 For backend constants and extensibility patterns, see `docs/support-classes.md`.
+For the assistant TUI behaviour specification and pre-rewrite architecture review, see `docs/assistant-menu-rewrite-spec.md`.
 
 - The top bar shows the current working folder.
 - The left-hand `File Browser` is a compact explorer-style list for the current working folder.
