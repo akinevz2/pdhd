@@ -34,6 +34,15 @@ public class ToolTelemetryRecord extends PanacheEntityBase {
     @Column(name = "error_class")
     public String errorClass;
 
+    @Column(name = "input_payload", columnDefinition = "TEXT")
+    public String inputPayload;
+
+    @Column(name = "output_payload", columnDefinition = "TEXT")
+    public String outputPayload;
+
+    @Column(name = "success", nullable = false)
+    public boolean success;
+
     @Column(name = "argument_validation_failure", nullable = false)
     public boolean argumentValidationFailure;
 

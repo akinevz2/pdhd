@@ -11,8 +11,7 @@ import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
 import org.jline.utils.AttributedString;
 
-import ac.uk.sussex.kn253.repository.ProjectKnowledge;
-import ac.uk.sussex.kn253.repository.ToolTelemetryRecord;
+import ac.uk.sussex.kn253.repository.*;
 import io.quarkus.arc.Arc;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -34,11 +33,11 @@ public class DebugMenu implements Runnable {
     }
 
     public enum MenuOption {
+        EXIT("Exit menu"),
         TELEMETRY("List telemetry records"),
         KNOWLEDGE("List project knowledge"),
         RESET("Reset knowledge base"),
-        STATUS("Show RAG status"),
-        EXIT("Exit menu");
+        STATUS("Show RAG status");
 
         private final String label;
 
@@ -133,21 +132,47 @@ public class DebugMenu implements Runnable {
         final List<ToolTelemetryRecord> records = ToolTelemetryRecord
                 .find("ORDER BY recordedAt DESC")
                 .list();
-        if (records.isEmpty()) {
+        final List<ModelCallTelemetryRecord> modelRecords = ModelCallTelemetryRecord
+                .find("ORDER BY recordedAt DESC")
+                .list();
+        if (records.isEmpty() && modelRecords.isEmpty()) {
             writer.println(Status.STATUS_NO_TELEMETRY);
             return;
         }
 
-        writer.println("Telemetry records (newest first):");
+        writer.println("Tool telemetry records (newest first):");
+        if (records.isEmpty()) {
+            writer.println("- <none>");
+        }
         for (final ToolTelemetryRecord record : records) {
-            writer.printf("- id=%d time=%s tool=%s module=%s durationMs=%.3f error=%s argValidationFailure=%s%n",
+            writer.printf(
+                    "- id=%d time=%s tool=%s module=%s success=%s durationMs=%.3f error=%s argValidationFailure=%s%n",
                     record.id,
                     TS_FORMAT.format(java.time.Instant.ofEpochMilli(record.recordedAt)),
                     safe(record.toolName),
                     safe(record.moduleName),
+                    record.success,
                     record.durationNanos / 1_000_000.0,
                     safe(record.errorClass),
                     record.argumentValidationFailure);
+        }
+
+        writer.println("Model call telemetry records (newest first):");
+        if (modelRecords.isEmpty()) {
+            writer.println("- <none>");
+        }
+        for (final ModelCallTelemetryRecord record : modelRecords) {
+            writer.printf(
+                    "- id=%d time=%s model=%s success=%s durationMs=%.3f requestTokens=%d responseTokens=%d cwd=%s error=%s%n",
+                    record.id,
+                    TS_FORMAT.format(java.time.Instant.ofEpochMilli(record.recordedAt)),
+                    safe(record.modelName),
+                    record.success,
+                    record.durationNanos / 1_000_000.0,
+                    record.requestTokenCount,
+                    record.responseTokenCount,
+                    safe(record.currentWorkingDirectory),
+                    safe(record.errorClass));
         }
     }
 

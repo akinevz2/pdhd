@@ -4,10 +4,13 @@ import java.io.IOException;
 import java.util.List;
 
 import org.jline.prompt.*;
+import org.jline.reader.UserInterruptException;
 import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
 
 import ac.uk.sussex.kn253.menu.*;
+import ac.uk.sussex.kn253.services.ModelConfigService;
+import ac.uk.sussex.kn253.services.OllamaManagementService;
 import io.quarkus.picocli.runtime.annotations.TopCommand;
 import io.quarkus.runtime.Quarkus;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -54,9 +57,25 @@ public class MainMenu implements Runnable {
     @Inject
     ExitCommand exitCommand;
 
+    @Inject
+    ModelConfigService modelConfigService;
+
+    @Inject
+    OllamaManagementService ollamaManagementService;
+
     private void initializeRuntime() throws IOException {
         ensureCommandLineInitialized();
         terminal = getTerminal();
+        eagerInitializeInteractiveServices();
+    }
+
+    private void eagerInitializeInteractiveServices() {
+        try {
+            final var settings = modelConfigService.load();
+            ollamaManagementService.warmUpClient(settings.getBaseUrl());
+        } catch (final Exception ignored) {
+            // Keep startup resilient; failures are surfaced by normal menu actions.
+        }
     }
 
     @Override
@@ -72,12 +91,17 @@ public class MainMenu implements Runnable {
     private void runMenuLoop() {
         try {
             while (true) {
+                if (Thread.currentThread().isInterrupted()) {
+                    break;
+                }
                 final SelectorOutcome outcome = runInteractiveSelector();
                 if (outcome == SelectorOutcome.SHUTDOWN) {
                     break;
                 }
                 // KEEP_RUNNING means a submenu returned and we should re-display main menu.
             }
+        } catch (final UserInterruptException e) {
+            // Interruption-triggered cancellation should end the menu loop quietly.
         } catch (final IOException e) {
             throw new RuntimeException("Main menu loop failed", e);
         }

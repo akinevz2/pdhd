@@ -35,13 +35,13 @@ public record Menu(Prompter prompter, Supplier<List<AttributedString>> headerSup
                 .name("ollama-config-menu")
                 .message("Edit " + settingName);
         final var entryList = new ArrayList<>(callbacks.keySet());
+        MenuOption.exitOption(listPrompt);
         for (final var option : entryList) {
             listPrompt
                     .newItem(option.code())
                     .text(option.label())
                     .add();
         }
-        MenuOption.exitOption(listPrompt);
         listPrompt.addPrompt();
 
         final PromptResult<? extends Prompt> result = prompter

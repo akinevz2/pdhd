@@ -1,7 +1,9 @@
 package ac.uk.sussex.kn253.menu;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.Objects;
+import java.util.function.Supplier;
 
 import org.jline.reader.*;
 import org.jline.terminal.Terminal;
@@ -9,10 +11,10 @@ import org.jline.terminal.TerminalBuilder;
 import org.jline.utils.AttributedStringBuilder;
 import org.jline.utils.AttributedStyle;
 
-import ac.uk.sussex.kn253.services.AssistantService;
-import ac.uk.sussex.kn253.services.ModelConfigService;
+import ac.uk.sussex.kn253.services.*;
 import io.quarkus.arc.Arc;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.context.control.RequestContextController;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import picocli.CommandLine.Command;
@@ -45,13 +47,34 @@ public class AssistantMenu implements Runnable {
     @Inject
     ModelConfigService modelConfigService;
 
+    @Inject
+    AssistantWorkingDirectoryService assistantWorkingDirectoryService;
+
+    @Inject
+    RequestContextController requestContextController;
+
+    @Inject
+    TelemetryService telemetryService;
+
     @Override
     public void run() {
-        resolveDependencies();
-        final var lineReader = LineReaderBuilder.builder().terminal(terminal).build();
-        final var writer = new PrintAboveWriter(lineReader);
-        final var prompter = new AssistantPrompt(lineReader, writer, resolveAssistantRole());
-        conversationLoop(prompter);
+        final boolean activated = requestContextController.activate();
+        try {
+            resolveDependencies();
+            final var lineReader = LineReaderBuilder.builder().terminal(terminal).build();
+            final var writer = new PrintAboveWriter(lineReader);
+            final String modelName = resolveModelName();
+            final var prompter = new AssistantPrompt(
+                    lineReader,
+                    writer,
+                    resolveAssistantRole(modelName),
+                    () -> formatUserPrompt(modelName, assistantWorkingDirectoryService.getCurrentWorkingDirectory()));
+            conversationLoop(prompter, modelName);
+        } finally {
+            if (activated) {
+                requestContextController.deactivate();
+            }
+        }
     }
 
     private void resolveDependencies() {
@@ -74,17 +97,37 @@ public class AssistantMenu implements Runnable {
                 throw new IllegalStateException("ModelConfigService bean unavailable");
             }
         }
+        if (assistantWorkingDirectoryService == null) {
+            assistantWorkingDirectoryService = Arc.container().instance(AssistantWorkingDirectoryService.class)
+                    .orElse(null);
+            if (assistantWorkingDirectoryService == null) {
+                throw new IllegalStateException("AssistantWorkingDirectoryService bean unavailable");
+            }
+        }
+        if (telemetryService == null) {
+            telemetryService = Arc.container().instance(TelemetryService.class).orElse(null);
+            if (telemetryService == null) {
+                throw new IllegalStateException("TelemetryService bean unavailable");
+            }
+        }
     }
 
-    private String resolveAssistantRole() {
+    private String resolveModelName() {
         final var settings = modelConfigService.load();
         if (settings == null || settings.getModelName() == null || settings.getModelName().isBlank()) {
-            return ASSISTANT_ROLE_FALLBACK;
+            return "assistant";
         }
-        return "assistant(" + settings.getModelName().trim() + ")> ";
+        return settings.getModelName().trim();
     }
 
-    private void conversationLoop(final AssistantPrompt prompter) {
+    private String resolveAssistantRole(final String modelName) {
+        if (modelName == null || modelName.isBlank() || "assistant".equals(modelName)) {
+            return ASSISTANT_ROLE_FALLBACK;
+        }
+        return "assistant(" + modelName + ")> ";
+    }
+
+    private void conversationLoop(final AssistantPrompt prompter, final String modelName) {
         prompter.output("Assistant ready. Type 'exit' to return.",
                 new ModelStatistics(ModelStatus.WRITING, 0.0d, 0, 0));
         while (true) {
@@ -106,12 +149,30 @@ public class AssistantMenu implements Runnable {
 
             prompter.output(null, new ModelStatistics(ModelStatus.THINKING, 0.0d, 0, 0));
             final long started = System.nanoTime();
-            final String response = assistantService.chat(trimmed);
-            final long elapsedMillis = Math.max(1L, (System.nanoTime() - started) / 1_000_000L);
-            final int tokens = estimateTokens(response);
-            final double tps = tokens / (elapsedMillis / 1000.0d);
-            prompter.output(response,
-                    new ModelStatistics(ModelStatus.WRITING, tps, tokens, elapsedMillis));
+            String response = null;
+            RuntimeException failure = null;
+            try {
+                response = assistantService.chat(trimmed);
+                final long elapsedMillis = Math.max(1L, (System.nanoTime() - started) / 1_000_000L);
+                final int tokens = estimateTokens(response);
+                final double tps = tokens / (elapsedMillis / 1000.0d);
+                prompter.output(response,
+                        new ModelStatistics(ModelStatus.WRITING, tps, tokens, elapsedMillis));
+            } catch (final RuntimeException e) {
+                failure = e;
+                throw e;
+            } finally {
+                final long durationNanos = Math.max(0L, System.nanoTime() - started);
+                telemetryService.recordModelCall(
+                        modelName,
+                        assistantWorkingDirectoryService.getCurrentWorkingDirectory(),
+                        trimmed,
+                        response,
+                        estimateTokens(trimmed),
+                        estimateTokens(response),
+                        durationNanos,
+                        failure == null ? null : failure.getClass().getName());
+            }
         }
         prompter.clearStatusLine();
         prompter.output("Returning to menu...", null);
@@ -124,10 +185,50 @@ public class AssistantMenu implements Runnable {
         return text.trim().split("\\s+").length;
     }
 
-    public record AssistantPrompt(LineReader lineReader, PrintAboveWriter writer, String assistantRole) {
+    static String formatUserPrompt(final String modelName, final String currentWorkingDirectory) {
+        final String normalizedModelName = (modelName == null || modelName.isBlank()) ? "assistant" : modelName;
+        return normalizedModelName + ":" + shortenPath(currentWorkingDirectory) + " " + USER_ROLE;
+    }
+
+    static String shortenPath(final String path) {
+        if (path == null || path.isBlank()) {
+            return "?";
+        }
+
+        try {
+            final Path normalizedPath = Path.of(path).normalize();
+            final int nameCount = normalizedPath.getNameCount();
+            if (nameCount == 0) {
+                final Path rootOnly = normalizedPath.getRoot();
+                return rootOnly == null ? "/" : rootOnly.toString();
+            }
+
+            final StringBuilder result = new StringBuilder();
+            final Path root = normalizedPath.getRoot();
+            if (root != null) {
+                result.append(root.toString());
+            }
+
+            for (int i = 0; i < nameCount; i++) {
+                if (result.length() > 0 && result.charAt(result.length() - 1) != '/') {
+                    result.append('/');
+                }
+                final String segment = normalizedPath.getName(i).toString();
+                final String value = i == nameCount - 1 ? segment : segment.substring(0, 1);
+                result.append(value);
+            }
+
+            return result.toString();
+        } catch (final RuntimeException ex) {
+            return path;
+        }
+    }
+
+    public record AssistantPrompt(LineReader lineReader, PrintAboveWriter writer, String assistantRole,
+            Supplier<String> userPromptSupplier) {
 
         public String prompt() {
-            return lineReader.readLine(USER_ROLE);
+            return lineReader.readLine(userPromptSupplier.get());
         }
 
         public void output(final String text, final ModelStatistics stats) {

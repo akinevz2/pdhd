@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>ac.uk.sussex.kn253</groupId>
     <artifactId>pdhd</artifactId>
-    <version>0.99.10</version>
+    <version>0.99.17</version>
     <packaging>quarkus</packaging>
 
     <properties>

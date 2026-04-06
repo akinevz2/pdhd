@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Proxy;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
@@ -18,7 +19,7 @@ class OllamaManagementServiceTest {
     @Test
     void isHealthyUsesProvidedBaseUrl() {
         final TestableOllamaManagementService service = newService("http://configured-host:11434",
-                clientReturningHealth(200));
+                clientReturningModels(List.of()));
 
         assertTrue(service.isHealthy("http://override-host:11434"));
         assertEquals("http://override-host:11434", service.lastResolvedBaseUrl);
@@ -40,7 +41,7 @@ class OllamaManagementServiceTest {
     @Test
     void isHealthyFallsBackToConfiguredBaseUrlWhenArgumentBlank() {
         final TestableOllamaManagementService service = newService("http://configured-host:11434",
-                clientReturningHealth(200));
+                clientReturningModels(List.of()));
 
         assertTrue(service.isHealthy(" "));
         assertTrue(service.isHealthy());
@@ -60,22 +61,9 @@ class OllamaManagementServiceTest {
         service.config = configWithBaseUrl(baseUrl);
         service.objectMapper = new ObjectMapper().findAndRegisterModules();
         service.clientToReturn = client;
+        service.healthStatusByBaseUrl.put("http://override-host:11434", 200);
+        service.healthStatusByBaseUrl.put("http://configured-host:11434", 200);
         return service;
-    }
-
-    private static OllamaManagementClient clientReturningHealth(final int status) {
-        return (OllamaManagementClient) Proxy.newProxyInstance(
-                OllamaManagementClient.class.getClassLoader(),
-                new Class<?>[] { OllamaManagementClient.class },
-                (proxy, method, args) -> {
-                    if ("health".equals(method.getName())) {
-                        return jakarta.ws.rs.core.Response.status(status).build();
-                    }
-                    if (method.getReturnType().equals(boolean.class)) {
-                        return false;
-                    }
-                    return null;
-                });
     }
 
     private static OllamaManagementClient clientReturningModels(final List<OllamaModelInfo> models) {
@@ -133,6 +121,13 @@ class OllamaManagementServiceTest {
     private static final class TestableOllamaManagementService extends OllamaManagementService {
         private String lastResolvedBaseUrl;
         private OllamaManagementClient clientToReturn;
+        private final Map<String, Integer> healthStatusByBaseUrl = new java.util.HashMap<>();
+
+        @Override
+        int probeHealthStatus(final String normalizedBaseUrl) throws Exception {
+            lastResolvedBaseUrl = normalizedBaseUrl;
+            return healthStatusByBaseUrl.getOrDefault(normalizedBaseUrl, 500);
+        }
 
         @Override
         OllamaManagementClient buildClient(final String resolvedBaseUrl) {

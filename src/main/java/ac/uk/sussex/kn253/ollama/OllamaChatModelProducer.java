@@ -2,6 +2,8 @@ package ac.uk.sussex.kn253.ollama;
 
 import static dev.langchain4j.model.chat.Capability.RESPONSE_FORMAT_JSON_SCHEMA;
 
+import ac.uk.sussex.kn253.services.ModelConfigService;
+import dev.langchain4j.http.client.jdk.JdkHttpClientBuilder;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.ollama.OllamaChatModel;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -19,6 +21,9 @@ public class OllamaChatModelProducer {
     @Inject
     OllamaConfig config;
 
+    @Inject
+    ModelConfigService modelConfigService;
+
     /**
      * Produces the primary ChatModel bean used by @RegisterAiService.
      * Enables RESPONSE_FORMAT_JSON_SCHEMA capability so that return types with
@@ -29,9 +34,18 @@ public class OllamaChatModelProducer {
     @Produces
     @ApplicationScoped
     public ChatModel produceChatModel() {
+        final var settings = modelConfigService.load();
+        final String baseUrl = settings.getBaseUrl() == null || settings.getBaseUrl().isBlank()
+                ? config.baseUrl()
+                : settings.getBaseUrl();
+        final String modelName = settings.getModelName() == null || settings.getModelName().isBlank()
+                ? config.modelName()
+                : settings.getModelName();
+
         return OllamaChatModel.builder()
-                .baseUrl(config.baseUrl())
-                .modelName(config.modelName())
+                .baseUrl(baseUrl)
+                .modelName(modelName)
+                .httpClientBuilder(new JdkHttpClientBuilder())
                 .temperature(config.temperature())
                 .numPredict(config.numPredict())
                 .numCtx(config.numCtx())

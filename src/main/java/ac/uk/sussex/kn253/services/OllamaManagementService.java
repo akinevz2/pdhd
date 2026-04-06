@@ -66,16 +66,7 @@ public class OllamaManagementService {
      * Returns {@code true} if the Ollama server responds with HTTP 200.
      */
     public boolean isHealthy() {
-        try {
-            final Response response = getClient(config.baseUrl()).health();
-            final boolean ok = response.getStatus() == 200;
-            LOG.fine(
-                    () -> String.format("Ollama health check: %s (HTTP %d)", ok ? "OK" : "FAIL", response.getStatus()));
-            return ok;
-        } catch (final Exception e) {
-            LOG.warning(() -> String.format("Ollama health check failed: %s", e.getMessage()));
-            return false;
-        }
+        return isHealthy(config.baseUrl());
     }
 
     /**
@@ -84,17 +75,42 @@ public class OllamaManagementService {
      */
     public boolean isHealthy(final String baseUrl) {
         try {
-            final Response response = getClient(baseUrl).health();
-            final boolean ok = response.getStatus() == 200;
+            final String resolvedBaseUrl = (baseUrl == null || baseUrl.isBlank()) ? config.baseUrl() : baseUrl;
+            final String normalizedBaseUrl = normalizeBaseUrl(resolvedBaseUrl);
+            final int statusCode = probeHealthStatus(normalizedBaseUrl);
+            final boolean ok = statusCode == 200;
             LOG.fine(() -> String.format("Ollama health check for %s: %s (HTTP %d)",
-                    baseUrl,
+                    normalizedBaseUrl,
                     ok ? "OK" : "FAIL",
-                    response.getStatus()));
+                    statusCode));
             return ok;
         } catch (final Exception e) {
             LOG.warning(() -> String.format("Ollama health check failed for %s: %s", baseUrl, e.getMessage()));
             return false;
         }
+    }
+
+    int probeHealthStatus(final String normalizedBaseUrl) throws Exception {
+        final String endpoint = normalizedBaseUrl.endsWith("/")
+                ? normalizedBaseUrl + "api/tags"
+                : normalizedBaseUrl + "/api/tags";
+        final HttpRequest request = HttpRequest.newBuilder(URI.create(endpoint))
+                .GET()
+                .build();
+        final HttpResponse<Void> response = HttpClient.newHttpClient()
+                .send(request, HttpResponse.BodyHandlers.discarding());
+        return response.statusCode();
+    }
+
+    private String normalizeBaseUrl(final String baseUrl) {
+        if (baseUrl == null || baseUrl.isBlank()) {
+            throw new IllegalArgumentException("Ollama base URL is not configured");
+        }
+        final String trimmed = baseUrl.trim();
+        if (trimmed.endsWith("/")) {
+            return trimmed.substring(0, trimmed.length() - 1);
+        }
+        return trimmed;
     }
 
     /**
@@ -350,6 +366,19 @@ public class OllamaManagementService {
      */
     public boolean ensureDefaultModelAvailable() {
         return ensureModelAvailable(config.modelName());
+    }
+
+    /**
+     * Eagerly initializes Ollama client construction paths to avoid first-use
+     * latency spikes during interactive menu actions.
+     */
+    public void warmUpClient(final String baseUrl) {
+        try {
+            getClient(baseUrl);
+            objectMapper.getTypeFactory();
+        } catch (final Exception e) {
+            LOG.fine(() -> String.format("Ollama client warm-up skipped: %s", e.getMessage()));
+        }
     }
 
     OllamaManagementClient getClient(final String baseUrl) {

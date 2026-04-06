@@ -2,7 +2,7 @@ package ac.uk.sussex.kn253.resources;
 
 import java.util.Map;
 
-import ac.uk.sussex.kn253.services.StateManagementService;
+import ac.uk.sussex.kn253.services.RuntimeManagementService;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
@@ -19,12 +19,12 @@ import jakarta.ws.rs.core.Response;
 public class MenuApiResource {
 
     @Inject
-    StateManagementService stateManagement;
+    RuntimeManagementService runtimeManagementService;
 
     @POST
     @Path("/exit")
     public Response exitApplication() {
-        stateManagement.requestShutdown();
+        runtimeManagementService.requestShutdown();
         return Response.accepted(Map.of("status", "shutting_down")).build();
     }
 }

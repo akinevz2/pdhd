@@ -9,7 +9,7 @@ import dev.langchain4j.model.output.structured.Description;
  */
 @Description("Whether a file requires a specific type of support")
 public record SupportResponse(
-        @Description("Whether the file requires this type of support") boolean required,
+                @Description("Whether the file requires this type of support") boolean required,
 
-        @Description("Brief explanation for the decision") String reasoning) {
+                @Description("Brief explanation for the decision") String reasoning) {
 }

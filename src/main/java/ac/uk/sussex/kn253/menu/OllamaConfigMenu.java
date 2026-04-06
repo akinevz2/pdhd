@@ -35,6 +35,7 @@ public class OllamaConfigMenu implements Runnable {
     public static class Status {
         private static final String STATUS_UNCHANGED = "No changes made.";
         private static final String STATUS_PROVIDER_UPDATED = "Provider updated to %s.";
+        private static final String STATUS_PROVIDER_UNAVAILABLE = "Provider %s is currently unavailable.";
         private static final String STATUS_BASE_URL_UPDATED = "Base URL updated.";
         private static final String STATUS_BASE_URL_SAVED_WITH_WARNING = "Base URL saved, but connectivity checks failed.";
         private static final String STATUS_BASE_URL_INVALID = "Invalid base URL. Use host:port or http(s)://host:port.";
@@ -144,13 +145,13 @@ public class OllamaConfigMenu implements Runnable {
         final Menu menu = new Menu(prompter, this::buildMenuHeader, "Ollama Configuration");
 
         final Map<MenuOption, MenuCallback> callbacks = new LinkedHashMap<>();
-        callbacks.put(UPDATE_PROVIDER, () -> updateProvider(prompter));
         callbacks.put(REFRESH_MODEL_CACHE, this::refreshModelCache);
         callbacks.put(UPDATE_BASE_URL, () -> updateBaseUrl(prompter));
         callbacks.put(UPDATE_MODEL, () -> updateModel(prompter));
         callbacks.put(UPDATE_EMBEDDING_MODEL, () -> updateEmbeddingModel(prompter));
         callbacks.put(PULL_MODEL, () -> pullModel(prompter));
         callbacks.put(DELETE_MODEL, () -> deleteModel(prompter));
+        callbacks.put(UPDATE_PROVIDER, () -> updateProvider(prompter));
 
         menu.call(callbacks);
     }
@@ -246,14 +247,20 @@ public class OllamaConfigMenu implements Runnable {
             return;
         }
         final String trimmed = modelName.trim();
+        final var settings = modelConfigService.load();
+        final String baseUrl = settings.getBaseUrl();
         writer.println("Starting pull: " + trimmed);
         writer.flush();
         try {
+            if (!checkConnectivity(baseUrl, writer)) {
+                writer.flush();
+                return;
+            }
             final int width = terminal.getWidth();
-            final var finalStatus = ollamaManagementService.pullModelStreaming(null, trimmed, event -> {
+            final var finalStatus = ollamaManagementService.pullModelStreaming(baseUrl, trimmed, event -> {
                 final var bar = new OllamaPullStatusBar(
                         trimmed, event.getStatus(), event.getCompleted(), event.getTotal(), width);
-                writer.print("\r" + bar.render().get(1).toAnsi());
+                writer.print("\r\u001B[2K" + bar.render().get(1).toAnsi());
                 writer.flush();
             });
             writer.println();
@@ -271,8 +278,17 @@ public class OllamaConfigMenu implements Runnable {
 
     private void updateEmbeddingModel(final Prompter prompter) throws IOException {
         final var writer = terminal.writer();
+        final String toggleSelection = "TOGGLE_EMBEDDING";
+        final var currentSettings = modelConfigService.load();
+        final boolean embeddingsDisabled = currentSettings.getEmbeddingModelName() == null
+                || currentSettings.getEmbeddingModelName().isBlank();
+
         final Map<ModelMenuSelection, String> selectionMap = new LinkedHashMap<>();
-        selectionMap.put(new ModelMenuSelection("Disable embeddings", "DISABLE_EMBEDDING"), "");
+        selectionMap.put(
+                new ModelMenuSelection(
+                        embeddingsDisabled ? "Enable embeddings" : "Disable embeddings",
+                        toggleSelection),
+                toggleSelection);
         for (final var model : modelConfigService.getCachedModels()) {
             final String name = model.runtimeName();
             if (name != null && !name.isBlank()) {
@@ -282,6 +298,43 @@ public class OllamaConfigMenu implements Runnable {
         final var menu = new Menu(prompter, "Update Embedding Model", "embedding model");
         menu.call(confirm(fromSelection(selectionMap), embeddingModel -> {
             final var settings = modelConfigService.load();
+
+            if (toggleSelection.equals(embeddingModel)) {
+                final String currentEmbeddingModel = settings.getEmbeddingModelName();
+                if (currentEmbeddingModel == null || currentEmbeddingModel.isBlank()) {
+                    final String fallbackEmbeddingModel = modelConfigService.getCachedModels().stream()
+                            .map(OllamaModelInfo::runtimeName)
+                            .filter(Objects::nonNull)
+                            .filter(name -> !name.isBlank())
+                            .filter(name -> name.toLowerCase(Locale.ROOT).contains("embed"))
+                            .findFirst()
+                            .orElseGet(() -> modelConfigService.getCachedModels().stream()
+                                    .map(OllamaModelInfo::runtimeName)
+                                    .filter(Objects::nonNull)
+                                    .filter(name -> !name.isBlank())
+                                    .findFirst()
+                                    .orElse(null));
+
+                    if (fallbackEmbeddingModel == null || fallbackEmbeddingModel.isBlank()) {
+                        writer.println(Status.STATUS_NO_MODELS);
+                        writer.flush();
+                        return;
+                    }
+
+                    settings.setEmbeddingModelName(fallbackEmbeddingModel);
+                    modelConfigService.save(settings);
+                    writer.println(String.format(Status.STATUS_EMBEDDING_MODEL_UPDATED, fallbackEmbeddingModel));
+                    writer.flush();
+                    return;
+                }
+
+                settings.setEmbeddingModelName("");
+                modelConfigService.save(settings);
+                writer.println(Status.STATUS_EMBEDDING_MODEL_DISABLED);
+                writer.flush();
+                return;
+            }
+
             settings.setEmbeddingModelName(embeddingModel);
             modelConfigService.save(settings);
             if (embeddingModel.isBlank()) {
@@ -298,6 +351,7 @@ public class OllamaConfigMenu implements Runnable {
         final var settings = modelConfigService.load();
         final String baseUrl = settings.getBaseUrl();
         if (!checkConnectivity(baseUrl, writer)) {
+            writer.println(Status.STATUS_BASE_URL_UNRESOLVED);
             writer.flush();
             return;
         }
@@ -473,14 +527,25 @@ public class OllamaConfigMenu implements Runnable {
         final var listPrompt = builder.createListPrompt()
                 .name("provider-select")
                 .message("Select provider:");
-        for (final var p : LLMSettings.Provider.values()) {
-            listPrompt.newItem(p.name()).text(p.name()).add();
-        }
+        listPrompt.newItem(LLMSettings.Provider.OLLAMA.name()).text(LLMSettings.Provider.OLLAMA.name()).add();
+
+        final String disabledOpenAi = new AttributedStringBuilder()
+                .style(AttributedStyle.DEFAULT.faint())
+                .append(LLMSettings.Provider.OPENAI.name() + " (disabled)")
+                .style(AttributedStyle.DEFAULT)
+                .toAnsi();
+        listPrompt.newItem("OPENAI_DISABLED").text(disabledOpenAi).add();
+
         listPrompt.addPrompt();
         final var result = prompter
                 .prompt(List.of(new AttributedString("Update Provider")), builder.build())
                 .get("provider-select");
         if (!(result instanceof final ListResult lr)) {
+            return;
+        }
+        if ("OPENAI_DISABLED".equals(lr.getSelectedId())) {
+            writer.println(String.format(Status.STATUS_PROVIDER_UNAVAILABLE, LLMSettings.Provider.OPENAI.name()));
+            writer.flush();
             return;
         }
         try {
