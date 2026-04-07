@@ -16,9 +16,9 @@ class FiletypeKnowledgeServiceTest {
     // -------------------------------------------------------------------------
     // Helpers
 
-    private static FiletypeKnowledgeService serviceWith(final AssistantService assistant) {
+    private static FiletypeKnowledgeService serviceWith(final SubagentService subagentService) {
         final FiletypeKnowledgeService svc = new FiletypeKnowledgeService();
-        svc.assistantService = assistant;
+        svc.subagentService = subagentService;
         return svc;
     }
 
@@ -26,12 +26,8 @@ class FiletypeKnowledgeServiceTest {
      * Assistant that always says "required" for the given support type question
      * keyword.
      */
-    private static AssistantService assistantRequiring(final String... keywords) {
-        return new AssistantService() {
-            @Override
-            public String chat(final String userMessage) {
-                throw new UnsupportedOperationException();
-            }
+    private static SubagentService assistantRequiring(final String... keywords) {
+        return new SubagentService() {
 
             @Override
             public SupportResponse requiresSupport(final String fileName, final String supportType) {
@@ -51,12 +47,8 @@ class FiletypeKnowledgeServiceTest {
     }
 
     /** Assistant that always throws when queried. */
-    private static AssistantService throwingAssistant() {
-        return new AssistantService() {
-            @Override
-            public String chat(final String userMessage) {
-                throw new UnsupportedOperationException();
-            }
+    private static SubagentService throwingAssistant() {
+        return new SubagentService() {
 
             @Override
             public SupportResponse requiresSupport(final String fileName, final String supportType) {

@@ -186,7 +186,7 @@ export function ProjectWindow({
         </div>
       </div>
 
-      <div className="win-body">
+      <div className="win-body with-tree">
         <aside className="tree-pane">
           {windowState.entriesLoading && <div>Loading...</div>}
           {!windowState.entriesLoading && windowState.entriesError && (

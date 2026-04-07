@@ -86,7 +86,9 @@ public class CwdService {
         if (!Files.isDirectory(normalized)) {
             throw badRequest("Path is not a directory: " + normalized);
         }
-        cwdResolvedEvents.fire(new CwdResolvedEvent(rawPath, normalized.toString()));
+        if (cwdResolvedEvents != null) {
+            cwdResolvedEvents.fire(new CwdResolvedEvent(rawPath, normalized.toString()));
+        }
         return normalized;
     }
 

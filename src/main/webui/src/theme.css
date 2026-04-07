@@ -500,9 +500,13 @@ button:active {
 
 .win-body {
   display: grid;
-  grid-template-columns: 38% 62%;
+  grid-template-columns: minmax(0, 1fr);
   height: calc(100% - 30px);
   min-height: 0;
+}
+
+.win-body.with-tree {
+  grid-template-columns: 38% 62%;
 }
 
 .tree-pane,

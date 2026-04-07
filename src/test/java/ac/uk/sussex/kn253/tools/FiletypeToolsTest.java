@@ -7,22 +7,21 @@ import java.nio.file.Path;
 
 import org.junit.jupiter.api.Test;
 
-import ac.uk.sussex.kn253.events.CwdResolvedEvent;
-import ac.uk.sussex.kn253.services.AssistantWorkingDirectoryService;
+import ac.uk.sussex.kn253.services.CwdService;
 
 class FiletypeToolsTest {
 
     @Test
-    void bashFileUsesAssistantWorkingDirectoryForRelativePaths() throws Exception {
+    void bashFileUsesCwdServiceForRelativePaths() throws Exception {
         final Path dir = Files.createTempDirectory("pdhd-filetype-cwd-");
         final Path file = dir.resolve("sample.txt");
         Files.writeString(file, "hello");
 
-        final AssistantWorkingDirectoryService cwdService = new AssistantWorkingDirectoryService();
-        cwdService.onCwdResolved(new CwdResolvedEvent(".", dir.toString()));
+        final CwdService cwdService = new CwdService();
+        cwdService.setCurrentWorkingDirectory(dir.toString());
 
         final FiletypeTools tools = new FiletypeTools();
-        tools.assistantWorkingDirectoryService = cwdService;
+        tools.cwdService = cwdService;
 
         final String mimeType = tools.bashFile("sample.txt").toLowerCase();
 

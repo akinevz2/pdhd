@@ -43,6 +43,7 @@ import {
 } from "./signals";
 
 const MARKDOWN_FILE_PATTERN = /\.(md|markdown|mdx)$/i;
+const README_FILE_PATTERN = /^readme(\.(md|markdown|mdx|txt))?$/i;
 const ASSISTANT_ACTION_BLOCK_PATTERN = /```assistant-action\s*([\s\S]*?)```/gi;
 const REQUEST_SOURCE_HEADER = "X-Assistant-Request-Source";
 const REQUEST_SOURCE_CHAT_INPUT = "chat-input";
@@ -572,7 +573,7 @@ export function App() {
         selectedFilePath: relativePath,
         fileLoading: true,
         fileLoadingFolderSummary: false,
-        fileContentMarkdown: MARKDOWN_FILE_PATTERN.test(relativePath),
+        fileContentMarkdown: MARKDOWN_FILE_PATTERN.test(relativePath) || README_FILE_PATTERN.test(relativePath),
         fileError: undefined,
       });
       const absolutePath =
@@ -586,7 +587,7 @@ export function App() {
           fileLoading: false,
           fileLoadingFolderSummary: false,
           fileContent: file.content,
-          fileContentMarkdown: MARKDOWN_FILE_PATTERN.test(relativePath),
+          fileContentMarkdown: MARKDOWN_FILE_PATTERN.test(relativePath) || README_FILE_PATTERN.test(relativePath),
           fileError: undefined,
         });
       } catch {

@@ -1,7 +1,8 @@
 package ac.uk.sussex.kn253.services;
 
 import java.nio.file.Path;
-import java.util.*;
+import java.util.EnumSet;
+import java.util.Set;
 
 import dev.langchain4j.model.chat.ChatModel;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -32,7 +33,7 @@ public class FiletypeKnowledgeService {
     }
 
     @Inject
-    AssistantService assistantService;
+    SubagentService subagentService;
 
     @Inject
     ChatModel chatModel;
@@ -57,7 +58,7 @@ public class FiletypeKnowledgeService {
         final Set<SupportType> needed = EnumSet.noneOf(SupportType.class);
         for (final SupportType supportType : SupportType.values()) {
             try {
-                final SupportResponse response = assistantService.requiresSupport(
+                final SupportResponse response = subagentService.requiresSupport(
                         path.toString(),
                         supportType.getQuestion());
                 if (response.required()) {

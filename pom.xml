@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>ac.uk.sussex.kn253</groupId>
     <artifactId>pdhd</artifactId>
-    <version>0.99.21</version>
+    <version>0.99.37</version>
     <packaging>quarkus</packaging>
 
     <properties>
@@ -14,7 +14,6 @@
         <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
         <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
         <quarkus.platform.version>3.31.3</quarkus.platform.version>
-        <jline.version>4.0.0</jline.version>
         <skipITs>true</skipITs>
         <surefire-plugin.version>3.5.4</surefire-plugin.version>
     </properties>
@@ -86,21 +85,6 @@
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-hibernate-orm-panache</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.jline</groupId>
-            <artifactId>jline-picocli</artifactId>
-            <version>${jline.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.jline</groupId>
-            <artifactId>jline-shell</artifactId>
-            <version>${jline.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.jline</groupId>
-            <artifactId>jline-prompt</artifactId>
-            <version>${jline.version}</version>
         </dependency>
 
         <!-- Quarkus LangChain4j model providers -->

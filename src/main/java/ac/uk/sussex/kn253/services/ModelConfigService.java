@@ -45,6 +45,10 @@ public class ModelConfigService {
                 .orElseGet(this::createDefaults);
     }
 
+    public LLMSettings getCurrentSettings() {
+        return load();
+    }
+
     /**
      * Merges the given settings back into the database.
      */

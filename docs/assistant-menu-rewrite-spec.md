@@ -6,6 +6,12 @@ This document defines the expected behaviour of the terminal assistant menu and 
 
 It is intended to be the baseline for a `1.0.0`-ready assistant TUI implementation.
 
+Current branch status:
+
+- The active assistant path now uses a single main-terminal `LineReader` plus `printAbove` for transcript output.
+- The old multi-stream `ChatTUI` direction is no longer the primary implementation path.
+- Framed viewport rendering and mouse-wheel scrolling are deferred follow-up work rather than requirements for the first single-terminal landing.
+
 ## Expected Behaviour
 
 ### Entry And Exit
@@ -24,17 +30,16 @@ It is intended to be the baseline for a `1.0.0`-ready assistant TUI implementati
 
 ### Conversation View
 
-- The assistant conversation is rendered inside a bordered viewport.
-- The viewport must wrap long lines to the available content width.
-- The viewport footer shows status information when available.
-- The viewport preserves a transcript of prior user and assistant messages for the current session.
+- The first single-terminal implementation renders conversation history above the prompt with `printAbove`.
+- Transcript lines must wrap to the available terminal width.
+- The transcript preserves prior user, assistant, status, and error lines for the current session.
+- A bordered viewport remains a valid future enhancement, but it is not required for the first landing.
 
 ### Scrolling
 
-- The transcript is scrollable with mouse wheel events when the terminal supports mouse tracking.
-- Wheel up scrolls older transcript entries into view.
-- Wheel down returns toward the latest transcript entries.
-- New assistant or user messages reset the viewport to the bottom.
+- Native terminal scrollback is the active scrolling mechanism for the first single-terminal implementation.
+- Internal transcript state must remain suitable for a future richer viewport or scrollback emulation layer.
+- Mouse-wheel scrolling inside a custom assistant viewport is deferred follow-up work.
 
 ### Status And Progress
 
@@ -75,27 +80,27 @@ It is intended to be the baseline for a `1.0.0`-ready assistant TUI implementati
   - Applies terminal clearing on some menu transitions.
 
 - `AssistantMenu`
-  - Activates request context.
-  - Resolves CDI dependencies.
-  - Creates the `LineReader` used for the assistant prompt.
-  - Runs the main conversation loop.
+  - Owns the assistant session controller logic.
+  - Builds the prompt from the current working directory.
+  - Runs the main conversation loop on the main terminal.
 
-- `AssistantPrompt`
-  - Adapts the `LineReader` prompt to the assistant view.
-  - Handles mouse widget registration and scroll events.
-  - Delegates conversation rendering to `ConversationFrame`.
+- `AssistantTranscript`
+  - Stores the canonical ordered transcript entries for the current session.
+  - Has no terminal ownership.
 
-- `ConversationFrame`
-  - Stores transcript lines.
-  - Owns the bordered viewport rendering.
-  - Owns the helper-specific dumb terminal bridge.
-  - Owns the frame redraw path.
+- `AssistantTranscriptRenderer`
+  - Formats transcript entries into wrapped JLine attributed lines.
+  - Does deterministic formatting only.
 
-- `AssistantService`
+- `AssistantTerminalAdapter`
+  - Owns the single main-terminal `LineReader`.
+  - Uses `printAbove` to display transcript lines above the active prompt.
+
+- `ChatService`
   - Pure chat service boundary.
   - Returns a plain `String` response for each user request.
 
-- `AssistantWorkingDirectoryService`
+- `CwdService`
   - Provides the current cwd for prompt rendering and telemetry.
 
 - `TelemetryService`
@@ -134,9 +139,7 @@ Impact:
 Recommended direction:
 
 - Choose one terminal authority for the assistant rewrite.
-- Either:
-  1. the assistant owns a single dedicated terminal abstraction end-to-end, or
-  2. the assistant renders into the main terminal and removes the synthetic terminal bridge.
+- The current implementation follows that recommendation by rendering into the main terminal and removing the synthetic terminal bridge from the active assistant path.
 
 ### Finding 3
 
@@ -193,28 +196,31 @@ Recommended direction:
 
 The rewrite should aim for these top-level types:
 
-- `AssistantSessionController`
+- `AssistantMenu`
   - Runs the conversation loop.
-  - Talks to `AssistantService`, `TelemetryService`, and cwd/model providers.
+  - Talks to `ChatService`, `TelemetryService`, and cwd/model providers.
 
 - `AssistantTranscript`
   - Canonical in-memory conversation model.
   - No terminal logic.
 
-- `AssistantViewport`
-  - Pure viewport math: wrapping, visible range, scroll position, footer state.
-
-- `AssistantRenderer`
-  - Converts transcript plus viewport state into JLine attributed output.
+- `AssistantTranscriptRenderer`
+  - Converts transcript entries into wrapped JLine attributed output.
 
 - `AssistantTerminalAdapter`
-  - Encapsulates terminal clear, scrollback preservation, mouse support, and prompt wiring.
+  - Encapsulates prompt wiring, `printAbove`, and session startup behaviour on the main terminal.
+
+Deferred follow-up types:
+
+- `AssistantViewport`
+  - Pure viewport math for any future framed or scrollable transcript implementation.
 
 ## Rewrite Acceptance Criteria
 
 - No nested class should need to emulate its own terminal unless that terminal is the sole interaction surface.
 - Transcript state must have one source of truth.
-- Rendering must be deterministic from transcript plus viewport state.
-- Prompt handling and frame rendering must be testable without running the real assistant model.
+- Rendering must be deterministic from transcript plus viewport state or entry formatting rules.
+- Prompt handling and transcript rendering must be testable without running the real assistant model.
 - Exceptions and warnings must remain visible in terminal scrollback.
-- Mouse-wheel scrolling must remain supported when the terminal supports it.
+- The first landing may rely on native terminal scrollback instead of a custom viewport.
+- Mouse-wheel scrolling remains a follow-up requirement for any future custom assistant viewport.

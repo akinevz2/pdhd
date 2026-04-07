@@ -33,7 +33,12 @@ public class FsApiResource {
 
     public record FileContentResponse(
             String filePath,
-            String content) {
+            String content,
+            String mimeType,
+            String language,
+            boolean requiresPdfViewer,
+            boolean requiresImageViewer,
+            boolean requiresMarkdownViewer) {
     }
 
     public record RepoUrlResponse(String repoUrl) {
@@ -97,9 +102,23 @@ public class FsApiResource {
 
         try {
             final String content = Files.readString(target, StandardCharsets.UTF_8);
+            final String fileName = target.getFileName().toString();
+            final String mimeType = getMimeType(fileName);
+            final String language = getLanguage(fileName);
+            final boolean isPdf = "application/pdf".equals(mimeType);
+            final boolean isImage = mimeType != null && mimeType.startsWith("image/");
+            final String lowerFileName = fileName.toLowerCase();
+            final boolean isMarkdown = lowerFileName.endsWith(".md") || lowerFileName.endsWith(".markdown")
+                    || lowerFileName.startsWith("readme");
+
             return new FileContentResponse(
                     target.toString(),
-                    content);
+                    content,
+                    mimeType,
+                    language,
+                    isPdf,
+                    isImage,
+                    isMarkdown);
         } catch (final IOException e) {
             throw new WebApplicationException("Failed to read file: " + target,
                     Response.Status.INTERNAL_SERVER_ERROR);
@@ -218,6 +237,88 @@ public class FsApiResource {
         } catch (final IOException e) {
             return Optional.empty();
         }
+    }
+
+    private String getMimeType(final String fileName) {
+        if (fileName == null)
+            return "text/plain";
+        final String lower = fileName.toLowerCase();
+
+        if (lower.endsWith(".pdf"))
+            return "application/pdf";
+        if (lower.endsWith(".jpg") || lower.endsWith(".jpeg"))
+            return "image/jpeg";
+        if (lower.endsWith(".png"))
+            return "image/png";
+        if (lower.endsWith(".gif"))
+            return "image/gif";
+        if (lower.endsWith(".svg"))
+            return "image/svg+xml";
+        if (lower.endsWith(".json"))
+            return "application/json";
+        if (lower.endsWith(".xml"))
+            return "application/xml";
+        if (lower.endsWith(".html") || lower.endsWith(".htm"))
+            return "text/html";
+        if (lower.endsWith(".css"))
+            return "text/css";
+        if (lower.endsWith(".js") || lower.endsWith(".jsx"))
+            return "application/javascript";
+        if (lower.endsWith(".ts") || lower.endsWith(".tsx"))
+            return "application/typescript";
+        if (lower.endsWith(".java"))
+            return "text/plain";
+        if (lower.endsWith(".py"))
+            return "text/plain";
+        if (lower.endsWith(".md") || lower.endsWith(".markdown"))
+            return "text/markdown";
+
+        return "text/plain";
+    }
+
+    private String getLanguage(final String fileName) {
+        if (fileName == null)
+            return "plaintext";
+        final String lower = fileName.toLowerCase();
+
+        if (lower.endsWith(".json"))
+            return "json";
+        if (lower.endsWith(".xml"))
+            return "xml";
+        if (lower.endsWith(".html") || lower.endsWith(".htm"))
+            return "html";
+        if (lower.endsWith(".css"))
+            return "css";
+        if (lower.endsWith(".js"))
+            return "javascript";
+        if (lower.endsWith(".jsx"))
+            return "jsx";
+        if (lower.endsWith(".ts"))
+            return "typescript";
+        if (lower.endsWith(".tsx"))
+            return "tsx";
+        if (lower.endsWith(".java"))
+            return "java";
+        if (lower.endsWith(".py"))
+            return "python";
+        if (lower.endsWith(".java"))
+            return "java";
+        if (lower.endsWith(".md") || lower.endsWith(".markdown"))
+            return "markdown";
+        if (lower.endsWith(".sql"))
+            return "sql";
+        if (lower.endsWith(".yaml") || lower.endsWith(".yml"))
+            return "yaml";
+        if (lower.endsWith(".properties"))
+            return "properties";
+        if (lower.endsWith(".sh"))
+            return "bash";
+        if (lower.endsWith(".gradle"))
+            return "gradle";
+        if (lower.endsWith(".pom") || lower.endsWith("pom.xml"))
+            return "xml";
+
+        return "plaintext";
     }
 
     private Optional<String> normalizeGitRemoteToBrowsableUrl(final String rawUrl) {

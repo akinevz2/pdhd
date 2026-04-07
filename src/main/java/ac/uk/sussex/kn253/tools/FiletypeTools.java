@@ -2,7 +2,7 @@ package ac.uk.sussex.kn253.tools;
 
 import java.io.File;
 
-import ac.uk.sussex.kn253.services.AssistantWorkingDirectoryService;
+import ac.uk.sussex.kn253.services.CwdService;
 import ac.uk.sussex.kn253.services.TelemetryService;
 import dev.langchain4j.agent.tool.Tool;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -12,7 +12,7 @@ import jakarta.inject.Inject;
 public class FiletypeTools {
 
     @Inject
-    AssistantWorkingDirectoryService assistantWorkingDirectoryService;
+    CwdService cwdService;
 
     @Inject
     TelemetryService telemetryService;
@@ -31,9 +31,9 @@ public class FiletypeTools {
                 throw new IllegalArgumentException("filePath must not be blank");
             }
             final ProcessBuilder processBuilder = new ProcessBuilder(args);
-            final String workingDirectory = assistantWorkingDirectoryService == null
+            final String workingDirectory = cwdService == null
                     ? null
-                    : assistantWorkingDirectoryService.getCurrentWorkingDirectory();
+                    : cwdService.getCurrentWorkingDirectory();
             if (workingDirectory != null && !workingDirectory.isBlank()) {
                 processBuilder.directory(new File(workingDirectory));
             }

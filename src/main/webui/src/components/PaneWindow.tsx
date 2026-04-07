@@ -137,7 +137,7 @@ export function PaneWindow({
       onFocus={onFocus}
       onMove={onMove}
     >
-      <div className="win-body">
+      <div className="win-body with-tree">
         <aside className="tree-pane">
           {windowState.entriesLoading && <div>Loading...</div>}
           {!windowState.entriesLoading && windowState.entriesError && (

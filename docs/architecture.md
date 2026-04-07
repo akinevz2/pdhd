@@ -35,16 +35,16 @@ The application is a Quarkus Picocli CLI tool that runs an AI-powered developer 
 
 ## Package Map
 
-| Package | Purpose |
-|---|---|
-| `ac.uk.sussex.kn253` | Root: entry point, `MainMenu` |
-| `ac.uk.sussex.kn253.menu` | All TUI components: menus, adapters, renderers |
-| `ac.uk.sussex.kn253.events` | CDI event records for cross-component signalling |
-| `ac.uk.sussex.kn253.services` | Application-scoped business logic and CDI producers |
-| `ac.uk.sussex.kn253.ollama` | REST client and data types for the Ollama HTTP API |
-| `ac.uk.sussex.kn253.repository` | JPA entities and database access |
-| `ac.uk.sussex.kn253.resources` | JAX-RS REST endpoints (web UI back-end) |
-| `ac.uk.sussex.kn253.tools` | LangChain4j tool-calling implementations |
+| Package                         | Purpose                                             |
+| ------------------------------- | --------------------------------------------------- |
+| `ac.uk.sussex.kn253`            | Root: entry point, `MainMenu`                       |
+| `ac.uk.sussex.kn253.menu`       | All TUI components: menus, adapters, renderers      |
+| `ac.uk.sussex.kn253.events`     | CDI event records for cross-component signalling    |
+| `ac.uk.sussex.kn253.services`   | Application-scoped business logic and CDI producers |
+| `ac.uk.sussex.kn253.ollama`     | REST client and data types for the Ollama HTTP API  |
+| `ac.uk.sussex.kn253.repository` | JPA entities and database access                    |
+| `ac.uk.sussex.kn253.resources`  | JAX-RS REST endpoints (web UI back-end)             |
+| `ac.uk.sussex.kn253.tools`      | LangChain4j tool-calling implementations            |
 
 ---
 
@@ -228,14 +228,14 @@ Each subcommand is `@ApplicationScoped` with full constructor injection. The `Ma
 
 ## Services Layer
 
-| Service | Scope | Responsibility |
-|---|---|---|
-| `TerminalLifecycleService` | `@ApplicationScoped` | Produces `@Named("mainTerminal")` Terminal; `@PreDestroy` teardown |
-| `AssistantService` | `@ApplicationScoped` | LangChain4j AI chat orchestration |
-| `ModelConfigService` | `@ApplicationScoped` | Reads/writes model configuration (Panache) |
-| `OllamaManagementService` | `@ApplicationScoped` | Ollama REST operations (list, pull, delete, etc.) |
-| `TelemetryService` | `@ApplicationScoped` | Records model call metrics |
-| `AssistantWorkingDirectoryService` | `@ApplicationScoped` | Tracks current working directory for context |
-| `CwdService` | (scoped) | Shared cwd state for REST + CLI layers |
-| `WebUiService` | `@ApplicationScoped` | Manages embedded web UI lifecycle |
-| `RuntimeManagementService` | `@ApplicationScoped` | Application shutdown utilities |
+| Service                            | Scope                | Responsibility                                                     |
+| ---------------------------------- | -------------------- | ------------------------------------------------------------------ |
+| `TerminalLifecycleService`         | `@ApplicationScoped` | Produces `@Named("mainTerminal")` Terminal; `@PreDestroy` teardown |
+| `AssistantService`                 | `@ApplicationScoped` | LangChain4j AI chat orchestration                                  |
+| `ModelConfigService`               | `@ApplicationScoped` | Reads/writes model configuration (Panache)                         |
+| `OllamaManagementService`          | `@ApplicationScoped` | Ollama REST operations (list, pull, delete, etc.)                  |
+| `TelemetryService`                 | `@ApplicationScoped` | Records model call metrics                                         |
+| `AssistantWorkingDirectoryService` | `@ApplicationScoped` | Tracks current working directory for context                       |
+| `CwdService`                       | (scoped)             | Shared cwd state for REST + CLI layers                             |
+| `WebUiService`                     | `@ApplicationScoped` | Manages embedded web UI lifecycle                                  |
+| `RuntimeManagementService`         | `@ApplicationScoped` | Application shutdown utilities                                     |

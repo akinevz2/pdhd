@@ -2,16 +2,21 @@ SHELL := /bin/sh
 
 MVNW := ./mvnw
 
-.PHONY: help version bump-version package run release release-copilot-commit
+.PHONY: help clean version bump-version package run release release-copilot-commit
 
 help:
 	@echo "Targets:"
+	@echo "  make clean         - remove stale release runner jars from target"
 	@echo "  make version       - print current project version from pom.xml"
 	@echo "  make bump-version  - bump patch version (x.y.z -> x.y.(z+1))"
 	@echo "  make package       - build runner jar (skip tests)"
 	@echo "  make run           - run the built runner jar for current version"
 	@echo "  make release                 - bump version, package, and run"
 	@echo "  make release-copilot-commit  - stage all changes and use gh copilot to commit"
+
+clean:
+	@find target -maxdepth 1 -type f -name 'pdhd-*-runner.jar' -delete
+	@echo "Removed stale release jars from target/"
 
 version:
 	@$(MVNW) -q -DforceStdout help:evaluate -Dexpression=project.version

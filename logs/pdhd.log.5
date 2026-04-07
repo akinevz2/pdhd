@@ -1,53 +1,660 @@
-2026-04-05 22:39:24,015 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[71660] ERROR [ac.uk.sus.kn2.men.OllamaConfigMenu] (main) Failed to pull model llama3.2: ac.uk.sussex.kn253.ollama.OllamaException: Failed to pull model 'llama3.2'
-	at ac.uk.sussex.kn253.services.OllamaManagementService.pullModelStreaming(OllamaManagementService.java:294)
-	at ac.uk.sussex.kn253.services.OllamaManagementService_ClientProxy.pullModelStreaming(Unknown Source)
-	at ac.uk.sussex.kn253.menu.OllamaConfigMenu.pullModel(OllamaConfigMenu.java:253)
-	at ac.uk.sussex.kn253.menu.OllamaConfigMenu.lambda$8(OllamaConfigMenu.java:152)
-	at ac.uk.sussex.kn253.menu.Menu.dispatch(Menu.java:67)
-	at ac.uk.sussex.kn253.menu.Menu.call(Menu.java:27)
-	at ac.uk.sussex.kn253.menu.OllamaConfigMenu.menu(OllamaConfigMenu.java:155)
-	at ac.uk.sussex.kn253.menu.OllamaConfigMenu.run(OllamaConfigMenu.java:68)
-	at ac.uk.sussex.kn253.menu.OllamaConfigMenu_ClientProxy.run(Unknown Source)
-	at picocli.CommandLine.executeUserObject(CommandLine.java:2045)
-	at picocli.CommandLine.access$1500(CommandLine.java:148)
-	at picocli.CommandLine$RunLast.executeUserObjectOfLastSubcommandWithSameParent(CommandLine.java:2469)
-	at picocli.CommandLine$RunLast.handle(CommandLine.java:2461)
-	at picocli.CommandLine$RunLast.handle(CommandLine.java:2423)
-	at picocli.CommandLine$AbstractParseResultHandler.execute(CommandLine.java:2277)
-	at picocli.CommandLine$RunLast.execute(CommandLine.java:2425)
-	at picocli.CommandLine.execute(CommandLine.java:2174)
-	at ac.uk.sussex.kn253.MainMenu.executeSubcommandOrFail(MainMenu.java:172)
-	at ac.uk.sussex.kn253.MainMenu.runInteractiveSelector(MainMenu.java:145)
-	at ac.uk.sussex.kn253.MainMenu.runMenuLoop(MainMenu.java:75)
-	at ac.uk.sussex.kn253.MainMenu.run(MainMenu.java:66)
-	at ac.uk.sussex.kn253.MainMenu_ClientProxy.run(Unknown Source)
-	at picocli.CommandLine.executeUserObject(CommandLine.java:2045)
-	at picocli.CommandLine.access$1500(CommandLine.java:148)
-	at picocli.CommandLine$RunLast.executeUserObjectOfLastSubcommandWithSameParent(CommandLine.java:2469)
-	at picocli.CommandLine$RunLast.handle(CommandLine.java:2461)
-	at picocli.CommandLine$RunLast.handle(CommandLine.java:2423)
-	at picocli.CommandLine$AbstractParseResultHandler.execute(CommandLine.java:2277)
-	at picocli.CommandLine$RunLast.execute(CommandLine.java:2425)
-	at io.quarkus.picocli.runtime.PicocliRunner$EventExecutionStrategy.execute(PicocliRunner.java:26)
-	at picocli.CommandLine.execute(CommandLine.java:2174)
-	at io.quarkus.picocli.runtime.PicocliRunner.run(PicocliRunner.java:40)
-	at io.quarkus.runtime.ApplicationLifecycleManager.run(ApplicationLifecycleManager.java:141)
-	at io.quarkus.runtime.Quarkus.run(Quarkus.java:79)
-	at io.quarkus.runtime.Quarkus.run(Quarkus.java:50)
-	at io.quarkus.runner.GeneratedMain.main(Unknown Source)
-Caused by: java.net.ConnectException: Connection refused
-	at java.net.http/jdk.internal.net.http.HttpClientImpl.send(HttpClientImpl.java:1044)
-	at java.net.http/jdk.internal.net.http.HttpClientFacade.send(HttpClientFacade.java:133)
-	at ac.uk.sussex.kn253.services.OllamaManagementService.pullModelStreaming(OllamaManagementService.java:266)
-	... 35 more
-Caused by: java.net.ConnectException: Connection refused
-	at java.base/sun.nio.ch.Net.pollConnect(Native Method)
-	at java.base/sun.nio.ch.Net.pollConnectNow(Net.java:642)
-	at java.base/sun.nio.ch.SocketChannelImpl.finishConnect(SocketChannelImpl.java:1043)
-	at java.net.http/jdk.internal.net.http.PlainHttpConnection$ConnectEvent.handle(PlainHttpConnection.java:134)
-	at java.net.http/jdk.internal.net.http.HttpClientImpl$SelectorManager.handleEvent(HttpClientImpl.java:1610)
-	at java.net.http/jdk.internal.net.http.HttpClientImpl$SelectorManager.lambda$run$3(HttpClientImpl.java:1555)
-	at java.base/java.util.ArrayList.forEach(ArrayList.java:1612)
-	at java.net.http/jdk.internal.net.http.HttpClientImpl$SelectorManager.run(HttpClientImpl.java:1555)
-	at java.base/java.lang.VirtualThread.run(VirtualThread.java:475)
-
+2026-04-07 04:27:16,433 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setTemperature(double)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 106 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:16,437 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumPredict(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 110 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:16,437 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumCtx(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 114 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:16,438 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 204 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:16,440 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 205 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:16,440 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 206 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:16,441 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTimeoutSeconds()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 233 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:16,442 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 234 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:16,443 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 235 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:16,443 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 236 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:18,563 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setTemperature(double)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 106 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:18,564 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumPredict(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 110 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:18,564 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumCtx(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 114 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:18,565 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 204 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:18,565 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 205 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:18,566 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 206 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:18,567 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTimeoutSeconds()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 233 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:18,568 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 234 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:18,568 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 235 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:18,569 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 236 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:20,701 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setTemperature(double)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 106 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:20,701 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumPredict(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 110 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:20,704 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumCtx(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 114 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:20,704 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 204 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:20,705 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 205 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:20,705 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 206 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:20,706 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTimeoutSeconds()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 233 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:20,707 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 234 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:20,709 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 235 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:20,710 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 236 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:23,023 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setTemperature(double)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 106 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:23,025 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumPredict(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 110 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:23,026 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumCtx(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 114 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:23,028 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 204 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:23,029 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 205 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:23,030 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 206 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:23,031 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTimeoutSeconds()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 233 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:23,032 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 234 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:23,033 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 235 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:23,034 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 236 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:25,118 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setTemperature(double)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 106 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:25,119 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumPredict(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 110 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:25,120 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumCtx(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 114 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:25,122 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 204 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:25,123 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 205 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:25,124 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 206 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:25,124 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTimeoutSeconds()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 233 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:25,125 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 234 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:25,126 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 235 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:25,127 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 236 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:26,939 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setTemperature(double)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 106 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:26,940 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumPredict(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 110 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:26,941 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumCtx(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 114 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:26,941 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 204 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:26,941 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 205 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:26,942 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 206 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:26,942 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTimeoutSeconds()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 233 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:26,943 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 234 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:26,944 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 235 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:26,944 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 236 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:28,968 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setTemperature(double)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 106 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:28,969 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumPredict(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 110 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:28,970 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumCtx(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 114 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:28,970 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 204 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:28,971 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 205 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:28,972 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 206 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:28,972 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTimeoutSeconds()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 233 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:28,973 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 234 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:28,975 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 235 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:28,976 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 236 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:30,964 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setTemperature(double)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 106 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:30,964 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumPredict(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 110 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:30,965 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumCtx(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 114 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:30,966 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 204 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:30,966 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 205 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:30,967 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 206 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:30,967 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTimeoutSeconds()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 233 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:30,967 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 234 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:30,968 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 235 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:30,969 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 236 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:32,972 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setTemperature(double)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 106 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:32,973 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumPredict(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 110 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:32,973 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumCtx(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 114 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:32,974 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 204 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:32,974 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 205 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:32,976 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 206 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:32,977 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTimeoutSeconds()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 233 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:32,978 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 234 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:32,978 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 235 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:32,979 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 236 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:34,976 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setTemperature(double)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 106 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:34,977 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumPredict(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 110 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:34,978 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumCtx(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 114 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:34,978 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 204 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:34,979 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 205 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:34,979 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 206 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:34,980 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTimeoutSeconds()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 233 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:34,980 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 234 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:34,981 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 235 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:34,981 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 236 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:36,991 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setTemperature(double)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 106 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:36,991 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumPredict(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 110 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:36,992 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumCtx(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 114 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:36,992 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 204 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:36,993 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 205 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:36,993 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 206 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:36,994 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTimeoutSeconds()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 233 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:36,995 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 234 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:36,995 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 235 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:36,995 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 236 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:38,996 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setTemperature(double)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 106 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:38,996 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumPredict(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 110 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:38,997 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumCtx(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 114 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:38,997 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 204 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:38,998 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 205 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:38,998 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 206 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:38,998 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTimeoutSeconds()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 233 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:38,999 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 234 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:38,999 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 235 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:39,000 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 236 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:41,010 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setTemperature(double)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 106 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:41,011 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumPredict(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 110 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:41,011 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumCtx(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 114 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:41,012 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 204 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:41,013 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 205 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:41,013 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 206 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:41,014 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTimeoutSeconds()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 233 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:41,014 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 234 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:41,015 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 235 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:41,015 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 236 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:43,031 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setTemperature(double)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 106 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:43,032 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumPredict(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 110 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:43,033 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumCtx(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 114 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:43,033 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 204 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:43,034 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 205 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:43,034 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 206 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:43,035 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTimeoutSeconds()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 233 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:43,036 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 234 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:43,037 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 235 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:43,037 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 236 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:45,043 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setTemperature(double)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 106 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:45,044 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumPredict(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 110 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:45,045 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumCtx(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 114 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:45,045 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 204 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:45,046 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 205 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:45,046 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 206 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:45,046 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTimeoutSeconds()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 233 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:45,047 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 234 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:45,047 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 235 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:45,048 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 236 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:47,051 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setTemperature(double)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 106 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:47,052 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumPredict(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 110 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:47,052 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumCtx(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 114 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:47,053 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 204 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:47,053 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 205 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:47,054 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 206 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:47,054 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTimeoutSeconds()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 233 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:47,054 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 234 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:47,055 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 235 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:47,055 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 236 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:49,089 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setTemperature(double)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 106 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:49,090 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumPredict(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 110 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:49,091 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumCtx(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 114 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:49,091 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 204 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:49,091 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 205 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:49,092 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 206 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:49,092 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTimeoutSeconds()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 233 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:49,092 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 234 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:49,092 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 235 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:49,093 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 236 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:51,060 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setTemperature(double)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 106 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:51,061 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumPredict(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 110 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:51,061 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumCtx(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 114 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:51,061 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 204 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:51,062 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 205 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:51,062 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 206 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:51,062 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTimeoutSeconds()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 233 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:51,062 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 234 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:51,063 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 235 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:51,063 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 236 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:53,079 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setTemperature(double)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 106 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:53,079 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumPredict(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 110 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:53,080 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumCtx(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 114 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:53,080 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 204 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:53,080 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 205 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:53,081 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 206 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:53,081 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTimeoutSeconds()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 233 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:53,082 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 234 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:53,082 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 235 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:53,082 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 236 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:55,220 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setTemperature(double)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 106 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:55,221 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumPredict(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 110 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:55,221 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumCtx(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 114 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:55,222 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 204 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:55,222 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 205 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:55,223 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 206 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:55,223 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTimeoutSeconds()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 233 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:55,223 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 234 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:55,224 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 235 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:55,224 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 236 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:57,253 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setTemperature(double)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 106 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:57,253 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumPredict(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 110 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:57,254 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumCtx(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 114 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:57,254 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 204 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:57,254 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 205 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:57,254 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 206 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:57,255 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTimeoutSeconds()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 233 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:57,255 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 234 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:57,255 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 235 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:57,256 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 236 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:59,265 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setTemperature(double)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 106 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:59,266 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumPredict(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 110 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:59,266 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method setNumCtx(int)
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 114 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:59,267 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 204 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:59,267 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 205 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:59,267 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 206 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:59,268 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTimeoutSeconds()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 233 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:59,268 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getTemperature()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 234 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:59,268 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumPredict()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 235 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
+2026-04-07 04:27:59,269 5e3a2c37c28a /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[28271] ERROR [io.qua.dep.dev.JavaCompilationProvider] (vert.x-worker-thread-3) cannot find symbol
+  symbol:   method getNumCtx()
+  location: variable settings of type ac.uk.sussex.kn253.repository.LLMSettings, line 236 in /workspaces/development/uni/2025-project/pdhd/src/main/java/ac/uk/sussex/kn253/resources/MenuApiResource.java
