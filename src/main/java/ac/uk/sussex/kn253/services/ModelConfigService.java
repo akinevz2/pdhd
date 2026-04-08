@@ -32,6 +32,9 @@ public class ModelConfigService {
     OllamaManagementService ollamaManagementService;
 
     @Inject
+    OllamaRuntimeEndpointService runtimeEndpointService;
+
+    @Inject
     ObjectMapper objectMapper;
 
     /**
@@ -64,7 +67,8 @@ public class ModelConfigService {
     @Transactional
     public List<OllamaModelInfo> refreshModelCache() {
         final LLMSettings settings = load();
-        final List<OllamaModelInfo> live = ollamaManagementService.listModels(settings.getBaseUrl());
+        final String runtimeBaseUrl = runtimeEndpointService.resolvePersistedOrActive(settings.getBaseUrl());
+        final List<OllamaModelInfo> live = ollamaManagementService.listModels(runtimeBaseUrl);
         if (!live.isEmpty()) {
             settings.setOllamaModelsJson(toJson(live));
             em.merge(settings);

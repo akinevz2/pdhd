@@ -58,6 +58,9 @@ public class OllamaManagementService {
     @Inject
     ObjectMapper objectMapper;
 
+    @Inject
+    OllamaRuntimeEndpointService runtimeEndpointService;
+
     // -------------------------------------------------------------------------
     // Health
     // -------------------------------------------------------------------------
@@ -66,7 +69,7 @@ public class OllamaManagementService {
      * Returns {@code true} if the Ollama server responds with HTTP 200.
      */
     public boolean isHealthy() {
-        return isHealthy(config.baseUrl());
+        return isHealthy(null);
     }
 
     /**
@@ -75,7 +78,7 @@ public class OllamaManagementService {
      */
     public boolean isHealthy(final String baseUrl) {
         try {
-            final String resolvedBaseUrl = (baseUrl == null || baseUrl.isBlank()) ? config.baseUrl() : baseUrl;
+            final String resolvedBaseUrl = resolveBaseUrl(baseUrl);
             final String normalizedBaseUrl = normalizeBaseUrl(resolvedBaseUrl);
             final int statusCode = probeHealthStatus(normalizedBaseUrl);
             final boolean ok = statusCode == 200;
@@ -119,7 +122,7 @@ public class OllamaManagementService {
      */
     public Optional<String> getVersion() {
         try {
-            return Optional.ofNullable(getClient(config.baseUrl()).version());
+            return Optional.ofNullable(getClient(null).version());
         } catch (final Exception e) {
             LOG.warning(() -> String.format("Could not retrieve Ollama version: %s", e.getMessage()));
             return Optional.empty();
@@ -135,7 +138,7 @@ public class OllamaManagementService {
      * Returns an empty list if the server is unreachable.
      */
     public List<OllamaModelInfo> listModels() {
-        return listModels(config.baseUrl());
+        return listModels(null);
     }
 
     /**
@@ -158,7 +161,7 @@ public class OllamaManagementService {
      */
     public List<OllamaRunningModel> listRunningModels() {
         try {
-            final var response = getClient(config.baseUrl()).listRunningModels();
+            final var response = getClient(null).listRunningModels();
             return response.getModels() != null ? response.getModels() : Collections.emptyList();
         } catch (final Exception e) {
             LOG.severe(() -> String.format("Failed to list running Ollama models: %s", e.getMessage()));
@@ -188,7 +191,7 @@ public class OllamaManagementService {
      * @return {@link Optional} containing the show response, or empty on error.
      */
     public Optional<OllamaShowResponse> showModel(final String modelName) {
-        return showModel(config.baseUrl(), modelName);
+        return showModel(null, modelName);
     }
 
     public Optional<OllamaShowResponse> showModel(final String baseUrl, final String modelName) {
@@ -213,7 +216,7 @@ public class OllamaManagementService {
      * @throws OllamaException if the pull fails.
      */
     public OllamaPullStatus pullModel(final String modelName) {
-        return pullModel(config.baseUrl(), modelName);
+        return pullModel(null, modelName);
     }
 
     /**
@@ -260,7 +263,7 @@ public class OllamaManagementService {
             throw new OllamaException("Progress consumer must not be null");
         }
 
-        final String configuredBaseUrl = (baseUrl == null || baseUrl.isBlank()) ? config.baseUrl() : baseUrl.trim();
+        final String configuredBaseUrl = resolveBaseUrl(baseUrl);
         final String endpoint = configuredBaseUrl.endsWith("/")
                 ? configuredBaseUrl + "api/pull"
                 : configuredBaseUrl + "/api/pull";
@@ -318,7 +321,7 @@ public class OllamaManagementService {
      * @throws OllamaException if the server returns a non-2xx response.
      */
     public void deleteModel(final String modelName) {
-        deleteModel(config.baseUrl(), modelName);
+        deleteModel(null, modelName);
     }
 
     public void deleteModel(final String baseUrl, final String modelName) {
@@ -382,13 +385,21 @@ public class OllamaManagementService {
     }
 
     OllamaManagementClient getClient(final String baseUrl) {
-        final String resolvedBaseUrl = (baseUrl == null || baseUrl.isBlank())
-                ? config.baseUrl()
-                : baseUrl.trim();
+        final String resolvedBaseUrl = resolveBaseUrl(baseUrl);
         if (resolvedBaseUrl == null || resolvedBaseUrl.isBlank()) {
             throw new IllegalStateException("Ollama base URL is not configured");
         }
         return buildClient(resolvedBaseUrl);
+    }
+
+    String resolveBaseUrl(final String baseUrl) {
+        if (runtimeEndpointService != null) {
+            return runtimeEndpointService.resolveExplicitOrActive(baseUrl);
+        }
+        if (baseUrl != null && !baseUrl.isBlank()) {
+            return baseUrl.trim();
+        }
+        return config.baseUrl();
     }
 
     OllamaManagementClient buildClient(final String resolvedBaseUrl) {

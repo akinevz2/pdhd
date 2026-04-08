@@ -4,6 +4,7 @@ import java.nio.file.Path;
 import java.util.EnumSet;
 import java.util.Set;
 
+import ac.uk.sussex.kn253.services.ai.SubagentService;
 import dev.langchain4j.model.chat.ChatModel;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;

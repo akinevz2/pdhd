@@ -4,6 +4,8 @@ export type ProjectSummary = {
   directory: string;
   hasGitRepository: boolean;
   loaded: boolean;
+  /** Present only on the register response when the directory has no .git folder. */
+  warning?: string;
 };
 
 

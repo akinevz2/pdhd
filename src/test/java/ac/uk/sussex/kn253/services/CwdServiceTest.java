@@ -18,6 +18,32 @@ import jakarta.ws.rs.WebApplicationException;
 class CwdServiceTest {
 
     @Test
+    void resolveDirectoryPathResolvesRelativePathAgainstCurrentWorkingDirectory() throws Exception {
+        final CwdService service = new CwdService();
+        final Path tempDir = Files.createTempDirectory("pdhd-cwd-relative-");
+        final Path nested = Files.createDirectories(tempDir.resolve("nested"));
+        try {
+            service.setCurrentWorkingDirectory(tempDir.toString());
+
+            final String resolved = service.resolveDirectoryPath("nested");
+
+            assertEquals(nested.toAbsolutePath().normalize().toString(), resolved);
+        } finally {
+            Files.deleteIfExists(nested);
+            Files.deleteIfExists(tempDir);
+        }
+    }
+
+    @Test
+    void setCurrentWorkingDirectoryResolvesTildeToUserHome() {
+        final CwdService service = new CwdService();
+
+        final String resolved = service.setCurrentWorkingDirectory("~");
+
+        assertEquals(Path.of(System.getProperty("user.home")).toAbsolutePath().normalize().toString(), resolved);
+    }
+
+    @Test
     void setCurrentWorkingDirectoryFiresCwdResolvedEvent() throws Exception {
         final CwdService service = new CwdService();
         final List<CwdResolvedEvent> firedEvents = new ArrayList<>();

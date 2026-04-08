@@ -52,6 +52,52 @@ const REQUEST_SOURCE_FILE_EXPLORER = "file-explorer";
 const CWD_GET_TIMEOUT_MS = 2_000;
 const CWD_GET_MAX_RETRIES = 1;
 
+function toUnixPath(path: string): string {
+  return path.replace(/\\/g, "/");
+}
+
+function isAbsolutePath(path: string): boolean {
+  return /^(\/|[A-Za-z]:[\\/])/.test(path);
+}
+
+function resolveTargetPath(
+  projectDirectory: string,
+  entryPath: string,
+): string {
+  const base = toUnixPath((projectDirectory || "").trim());
+  const raw = toUnixPath((entryPath || "").trim());
+
+  if (!raw || raw === "." || raw === "./") {
+    return base;
+  }
+  if (isAbsolutePath(raw)) {
+    return raw;
+  }
+  if (!base) {
+    return raw;
+  }
+  return `${base}/${raw}`;
+}
+
+function toEntryPath(
+  projectDirectory: string,
+  absoluteOrRelativePath: string,
+): string {
+  const base = toUnixPath((projectDirectory || "").trim()).replace(/\/$/, "");
+  const value = toUnixPath((absoluteOrRelativePath || "").trim());
+
+  if (!value || !base || !isAbsolutePath(value)) {
+    return value;
+  }
+  if (value === base) {
+    return ".";
+  }
+  if (value.startsWith(`${base}/`)) {
+    return value.slice(base.length + 1);
+  }
+  return value;
+}
+
 type AssistantActionPayload = {
   label: string;
   prompt: string;
@@ -65,6 +111,7 @@ const SIGNALS = {
   FS_FILE: "fs:file",
   FS_GIT_OPEN: "fs:git:open",
   FS_PROJECT: "fs:project",
+  FS_PROJECT_REGISTER: "fs:project:register",
   FS_PROJECT_LOAD: "fs:project:load",
   FS_PROJECT_UNLOAD: "fs:project:unload",
   CHAT_SEND: "chat:send",
@@ -99,7 +146,10 @@ export function App() {
   const [chatError, setChatError] = useState<string | null>(null);
   const [assistantUnreachable, setAssistantUnreachable] =
     useState<boolean>(false);
-  const lastSignalErrorRef = useRef<{ fingerprint: string; timestamp: number } | null>(null);
+  const lastSignalErrorRef = useRef<{
+    fingerprint: string;
+    timestamp: number;
+  } | null>(null);
   const chatLogRef = useRef<HTMLDivElement | null>(null);
   const chatInputRef = useRef<HTMLTextAreaElement | null>(null);
   const [windows, setWindows] = useState<WindowState[]>([]);
@@ -112,7 +162,10 @@ export function App() {
 
   useEffect(() => {
     registerApiSignals([
-      [SIGNALS.TOOL_TELEMETRY_GET, { method: "GET", endpoint: "/api/tool-telemetry" }],
+      [
+        SIGNALS.TOOL_TELEMETRY_GET,
+        { method: "GET", endpoint: "/api/tool-telemetry" },
+      ],
       [
         SIGNALS.CWD_GET,
         { method: "GET", endpoint: "/api/cwd", timeoutMs: CWD_GET_TIMEOUT_MS },
@@ -143,9 +196,22 @@ export function App() {
         },
       ],
       [SIGNALS.FS_PROJECT, { method: "GET", endpoint: "/api/fs/project" }],
-      [SIGNALS.FS_PROJECT_LOAD, { method: "POST", endpoint: "/api/fs/project/load" }],
-      [SIGNALS.FS_PROJECT_UNLOAD, { method: "POST", endpoint: "/api/fs/project/unload" }],
-      [SIGNALS.CHAT_SEND, { method: "POST", endpoint: "/api/chat", timeoutMs: CHAT_TIMEOUT_MS }],
+      [
+        SIGNALS.FS_PROJECT_REGISTER,
+        { method: "POST", endpoint: "/api/fs/project" },
+      ],
+      [
+        SIGNALS.FS_PROJECT_LOAD,
+        { method: "POST", endpoint: "/api/fs/project/load" },
+      ],
+      [
+        SIGNALS.FS_PROJECT_UNLOAD,
+        { method: "POST", endpoint: "/api/fs/project/unload" },
+      ],
+      [
+        SIGNALS.CHAT_SEND,
+        { method: "POST", endpoint: "/api/chat", timeoutMs: CHAT_TIMEOUT_MS },
+      ],
       [SIGNALS.CHAT_RESET, { method: "POST", endpoint: "/api/chat/reset" }],
       [
         SIGNALS.CHAT_SUMMARIZE_FOLDER,
@@ -355,8 +421,12 @@ export function App() {
           SIGNALS.FS_LIST,
           { path: directory },
         );
+        const normalizedEntries = (response.entries || []).map((entry) => ({
+          ...entry,
+          path: toEntryPath(directory, entry.path),
+        }));
         updateWindow(windowId, {
-          entries: response.entries,
+          entries: normalizedEntries,
           entriesLoading: false,
           entriesError: undefined,
         });
@@ -386,15 +456,47 @@ export function App() {
         )
         .sort((a, b) => b.directory.length - a.directory.length)[0];
 
-      const project: ProjectSummaryType =
-        match ?? {
-          id: -(Math.abs(target.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0)) + 1),
-          directory: target,
-          hasGitRepository: false,
-          loaded: false,
-        };
+      let project: ProjectSummaryType;
+      if (match) {
+        project = match;
+        try {
+          await emitApiSignal<{ id: number }, { status: string }>(
+            SIGNALS.FS_PROJECT_LOAD,
+            { id: project.id },
+          );
+        } catch {
+          // non-fatal
+        }
+      } else {
+        try {
+          project = await emitApiSignal<{ directory: string }, ProjectSummaryType>(
+            SIGNALS.FS_PROJECT_REGISTER,
+            { directory: target },
+          );
+          if (project.warning) {
+            setChatMessages((prev) => [
+              ...prev,
+              { role: "system", content: `⚠️ ${project.warning}` },
+            ]);
+          }
+        } catch {
+          // fallback to transient project if registration fails
+          project = {
+            id: -(
+              Math.abs(
+                target.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0),
+              ) + 1
+            ),
+            directory: target,
+            hasGitRepository: false,
+            loaded: false,
+          };
+        }
+      }
 
-      const existing = windows.find((w) => w.project.directory === project.directory);
+      const existing = windows.find(
+        (w) => w.project.directory === project.directory,
+      );
       if (existing) {
         focusWindow(existing.id);
         setWorkingFolder(project.directory).catch(() => {});
@@ -412,16 +514,6 @@ export function App() {
           z: ++nextZ.current,
         },
       ]);
-      if (project.id > 0) {
-        try {
-          await emitApiSignal<{ id: number }, { status: string }>(
-            SIGNALS.FS_PROJECT_LOAD,
-            { id: project.id },
-          );
-        } catch {
-          // non-fatal: keep opening window even if persistence update fails
-        }
-      }
       await loadEntriesForWindow(winId, project.directory);
     },
     [cwd, windows, focusWindow, loadEntriesForWindow],
@@ -550,7 +642,6 @@ export function App() {
     }
   }, []);
 
-
   const openFile = useCallback(
     async (
       windowId: number,
@@ -573,11 +664,12 @@ export function App() {
         selectedFilePath: relativePath,
         fileLoading: true,
         fileLoadingFolderSummary: false,
-        fileContentMarkdown: MARKDOWN_FILE_PATTERN.test(relativePath) || README_FILE_PATTERN.test(relativePath),
+        fileContentMarkdown:
+          MARKDOWN_FILE_PATTERN.test(relativePath) ||
+          README_FILE_PATTERN.test(relativePath),
         fileError: undefined,
       });
-      const absolutePath =
-        projectDirectory.replace(/\\/g, "/") + "/" + relativePath;
+      const absolutePath = resolveTargetPath(projectDirectory, relativePath);
       try {
         const file = await emitApiSignal<{ path: string }, FileContentResponse>(
           SIGNALS.FS_FILE,
@@ -587,7 +679,9 @@ export function App() {
           fileLoading: false,
           fileLoadingFolderSummary: false,
           fileContent: file.content,
-          fileContentMarkdown: MARKDOWN_FILE_PATTERN.test(relativePath) || README_FILE_PATTERN.test(relativePath),
+          fileContentMarkdown:
+            MARKDOWN_FILE_PATTERN.test(relativePath) ||
+            README_FILE_PATTERN.test(relativePath),
           fileError: undefined,
         });
       } catch {
@@ -609,9 +703,7 @@ export function App() {
       relativePath: string,
     ) => {
       const safeRelativePath = relativePath || "";
-      const folderPath = safeRelativePath
-        ? `${projectDirectory.replace(/\\/g, "/")}/${safeRelativePath}`
-        : projectDirectory;
+      const folderPath = resolveTargetPath(projectDirectory, safeRelativePath);
 
       updateWindow(windowId, {
         selectedFilePath: safeRelativePath || ".",
@@ -637,7 +729,10 @@ export function App() {
             await new Promise((r) => setTimeout(r, 1000 * 2 ** (attempt - 1)));
           }
           try {
-            result = await emitApiSignal<{ path: string }, AssistantChatResponse>(
+            result = await emitApiSignal<
+              { path: string },
+              AssistantChatResponse
+            >(
               SIGNALS.CHAT_SUMMARIZE_FOLDER,
               { path: folderPath },
               {
@@ -747,7 +842,10 @@ export function App() {
       }, 0);
 
       try {
-        const result = await emitApiSignal<{ message: string }, AssistantChatResponse>(
+        const result = await emitApiSignal<
+          { message: string },
+          AssistantChatResponse
+        >(
           SIGNALS.CHAT_SEND,
           { message },
           {
@@ -840,7 +938,9 @@ export function App() {
 
       if (parts.length === 0) {
         return (
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{normalizedContent}</ReactMarkdown>
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {normalizedContent}
+          </ReactMarkdown>
         );
       }
       return parts;
@@ -850,7 +950,10 @@ export function App() {
 
   const resetChat = useCallback(async () => {
     try {
-      await emitApiSignal<Record<string, never>, unknown>(SIGNALS.CHAT_RESET, {});
+      await emitApiSignal<Record<string, never>, unknown>(
+        SIGNALS.CHAT_RESET,
+        {},
+      );
       setChatMessages([]);
       setChatError(null);
     } catch {
@@ -1104,7 +1207,10 @@ export function App() {
                 openFolderSummary(win.id, win.project.directory, path)
               }
               onAssistantAction={(prompt) => {
-                sendChatMessage(prompt, REQUEST_SOURCE_ASSISTANT_ACTION_BUTTON).catch(() => {
+                sendChatMessage(
+                  prompt,
+                  REQUEST_SOURCE_ASSISTANT_ACTION_BUTTON,
+                ).catch(() => {
                   // handled in callback
                 });
               }}

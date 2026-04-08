@@ -1,6 +1,18 @@
 # Project Discovery in High Definition (PDHD)
 
-PDHD is a Quarkus application for exploring local projects with a web UI and an Ollama-powered assistant.
+PDHD is a Quarkus application for inspecting the local filesystem, documenting the files and folders inside software projects, and building reusable knowledge about known projects and their purposes.
+
+The main product goal is project inspection rather than generic chat: point PDHD at a directory, explore its files and folders, and produce evidence-grounded summaries of what the project is, how it is organised, and what state it appears to be in.
+
+The current stretch goal is AI-assisted completion estimation: using the accumulated project evidence to estimate how complete a project is and what work most likely remains.
+
+## What PDHD Does
+
+- Explore local folders and registered project roots through a web UI and assistant endpoints.
+- Generate folder-level and project-level markdown documentation grounded in retrieved evidence.
+- Persist project summaries and embedding-backed recall so known projects can be re-inspected later.
+- Estimate likely next implementation steps from current project evidence.
+- Prepare the groundwork for future AI-based completion estimation.
 
 ## Versioning Note
 
@@ -65,6 +77,7 @@ For the assistant TUI behaviour specification and pre-rewrite architecture revie
   - `▸` folder runs a one-shot assistant summary for that folder
   - `●` file opens file content
 - Project discovery still starts from the current working folder and discovers Git projects recursively via `/api/projects`.
+- Known projects can then be inspected repeatedly so PDHD can refine and recall their documented purpose over time.
 
 ## Screenshots
 

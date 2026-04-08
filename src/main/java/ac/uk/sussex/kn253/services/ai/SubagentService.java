@@ -1,5 +1,6 @@
-package ac.uk.sussex.kn253.services;
+package ac.uk.sussex.kn253.services.ai;
 
+import ac.uk.sussex.kn253.services.SupportResponse;
 import dev.langchain4j.service.*;
 import io.quarkiverse.langchain4j.RegisterAiService;
 

@@ -2,15 +2,32 @@
 
 ## Project Purpose
 
-**PDHD** (Project Definition Hierarchy Discovery) is an AI-powered development assistant system that provides intelligent filesystem navigation, project understanding, and tool-based interaction capabilities. The system enables developers to interact with their codebase through natural language while leveraging structured tool calls for filesystem operations, project knowledge retrieval, and semantic analysis.
+**PDHD** (Project Definition Hierarchy Discovery) is a local project-inspection system. Its primary purpose is to explore the local filesystem, document the files and folders inside a project, and build a reusable understanding of known projects and their purposes.
+
+The assistant capability exists to support inspection, not to replace it. The highest-value workflows are discovering project roots, summarising folders, producing project-level documentation from persisted evidence, and recalling those findings later when the same project is inspected again.
 
 ## Core Capabilities
 
-- **Filesystem Exploration**: Navigate and analyze project directories with context-aware search
-- **Project Knowledge**: Maintain and query cached project understanding (file structure, patterns, summaries)
-- **Tool-Based Interaction**: Execute structured operations via a modular tool system
-- **AI-Powered Analysis**: Leverage LLMs for code understanding, summarization, and recommendations
-- **Web UI**: Browser-based interface for interactive exploration and chat
+- **Filesystem Exploration**: Browse local folders, inspect files, and identify candidate project roots.
+- **Project Documentation**: Generate folder summaries and project summaries as structured markdown.
+- **Known Project Recall**: Persist project findings so previously inspected projects can be recalled and compared later.
+- **Evidence-Grounded AI Analysis**: Use embedding-backed retrieval and RAFT-style prompting to ground summaries and next-step analysis in stored evidence.
+- **Web UI and API Access**: Expose inspection workflows through browser UI and REST endpoints.
+
+## Product Direction
+
+### Primary Goal
+
+PDHD should answer questions such as:
+
+- What does this folder contain?
+- What is this project for?
+- Which folders matter most in this repository?
+- What do we already know about this project from earlier inspection?
+
+### Stretch Goal
+
+The longer-term stretch goal is **AI-assisted project completion estimation**: infer how complete a project appears to be, what work streams are still open, and how much implementation risk remains, based on the evidence already collected during inspection.
 
 ## Architecture Overview
 
@@ -20,84 +37,71 @@
 ┌─────────────────────────────────────────────────────────────┐
 │                        Frontend Layer                       │
 │  (React + TypeScript + Vite)                                │
-│  - Chat interface                                           │
-│  - File browser                                             │
-│  - Explorer canvas (floating project windows)               │
+│  - Chat interface                                            │
+│  - File browser                                              │
+│  - Project explorer / file viewers                           │
 └─────────────────────────────────────────────────────────────┘
                               ↓ HTTP
 ┌─────────────────────────────────────────────────────────────┐
 │                     API Layer                               │
-│  - ProjectApiResource (filesystem, knowledge)               │
-│  - MenuApiResource (settings, configuration)                │
-│  - AssistantResource (chat, tool execution)                 │
+│  - ChatApiResource (chat, folder summary, next steps)       │
+│  - FsApiResource (filesystem listing and file content)       │
+│  - ProjectApiResource (project discovery and loading)        │
+│  - CwdApiResource / MenuApiResource (environment/config)     │
 └─────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
 │                     Service Layer                           │
-│  - ToolService (tool dispatch and execution)                │
-│  - OllamaChatService (LLM interaction)                      │
-│  - WorkingDirectoryService (CWD management)                 │
-│  - ProjectKnowledgeRagService (knowledge retrieval)         │
-│  - ToolTelemetryService (execution metrics)                 │
+│  - SummaryOrchestratorService (inspection workflow)         │
+│  - FolderSummaryService (folder extraction + rendering)      │
+│  - ProjectKnowledgeSummaryStoreService (persisted recall)    │
+│  - EmbeddingIndexingService / RetrievalService               │
+│  - RagPolicyService / CwdService / TelemetryService          │
 └─────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
 │                     Tool Layer                              │
-│  - ExploreToolset (filesystem navigation)                   │
-│  - ReadToolset (file reading and caching)                   │
-│  - WriteToolset (file writing and persistence)              │
-│  - IntrospectToolset (project introspection)                │
+│  - ChatService / RaftProjectAnalysisService / SubagentService│
+│  - FolderSummaryTools / ProjectSummaryTools                  │
+│  - CwdTools / KnowledgeTools / FiletypeTools                 │
 └─────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
 │                     Data Layer                              │
-│  - Filesystem (project directories)                         │
-│  - Knowledge cache (sqlite database)                        │
-│  - LLM models (Ollama)                                      │
+│  - Local filesystem                                           │
+│  - Persisted project knowledge and embedding chunks          │
+│  - Ollama-hosted chat and embedding models                   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ### Key Design Patterns
 
-1. **Tool Macro Pattern**: Each tool operation is a self-contained `ToolMacro` class with single responsibility
-2. **Module-Based Dispatch**: Tools are organized into `ToolModule` implementations with explicit precedence
-3. **Alias Resolution**: Tools support canonical names and legacy keyphrases for backward compatibility
-4. **Transactional Execution**: Tool execution is wrapped in transactional boundaries with error handling
-5. **Caching Strategy**: Read operations cache results with TTL-based invalidation on writes
+1. **Inspect First**: Folder and project inspection are first-class workflows, not side effects of chat.
+2. **Persisted Recall**: Generated summaries are stored so known projects can be revisited with historical context.
+3. **Evidence-Grounded Analysis**: Retrieval context is supplied explicitly and RAFT-style prompting separates likely relevant evidence from distractors.
+4. **Typed AI Contracts**: AI services use structured outputs where possible so higher-level services consume stable Java types instead of free-form JSON.
+5. **Incremental Enrichment**: Folder summaries feed project summaries, which in turn feed later next-step or completion-oriented analysis.
 
-## Tool Calling System
+## Inspection Workflow
 
-### Tool Lifecycle
+### Folder Inspection
 
-1. **Definition**: Tools are defined as `ToolMacro` subclasses with explicit contracts
-2. **Registration**: Tools are grouped into `ToolMacroToolset` implementations
-3. **Discovery**: Tools are discovered automatically via CDI at application startup
-4. **Invocation**: Tools are invoked via `ToolService.execute()` with typed arguments
+1. Resolve the requested path relative to the current working directory.
+2. Read a folder manifest and representative files.
+3. Extract a structured intermediate representation.
+4. Render deterministic markdown for the folder.
 
-### Tool Modules
+### Registered Project Inspection
 
-| Module            | Purpose                             | Key Tools                                                              |
-| ----------------- | ----------------------------------- | ---------------------------------------------------------------------- |
-| ExploreToolset    | Filesystem discovery and navigation | `list_files`, `search_paths`, `change_cwd`, `get_path_info`            |
-| ReadToolset       | File reading and caching            | `read_file`, `read_folder_manifest`, `read_project_knowledge`          |
-| WriteToolset      | Output generation and persistence   | `write_file`, `append_project_todo`, `create_plan`                     |
-| IntrospectToolset | Session/project introspection       | `read_project_manifest`, `get_session_context`, `read_folder_manifest` |
+1. Discover the root folder and selected child folders.
+2. Generate and persist folder summaries for those locations.
+3. Retrieve stored semantic/graph evidence for the project.
+4. Use RAFT-style analysis to produce a grounded project summary or next-step report.
+5. Persist the resulting markdown so the project becomes a known, recallable project.
 
-### Execution Flow
+### Completion Estimation Roadmap
 
-```
-LLM Request
-    ↓
-ToolService.execute(request, memoryId)
-    ↓
-Module selection (iterative canHandle check)
-    ↓
-ToolMacroRegistry.resolve(name, args)
-    ↓
-ToolMacro.execute(args, memoryId)
-    ↓
-Result returned to LLM
-```
+Completion estimation is not the mainline feature yet, but the current architecture is preparing for it by accumulating structured folder summaries, project summaries, retrieved evidence, and next-step analysis that can later be scored or classified into a completion estimate.
 
 ## Frontend Integration
 
@@ -128,95 +132,86 @@ Result returned to LLM
 
 ### Knowledge Structure
 
-Project knowledge is cached in a `.pdhd` directory within each project:
+Project knowledge is persisted in the application database, keyed by project and logical knowledge key. The main persisted artifacts today are:
 
-```
-.pdhd/
-├── knowledge.json          # Main knowledge document
-├── cache/
-│   ├── file:*             # File content cache
-│   ├── path:*             # Path analysis cache
-│   └── folder:*           # Folder manifest cache
-└── embeddings/            # Semantic embeddings (optional)
-```
+- Project summary reports.
+- Project next-step reports.
+- Folder summaries for selected folders inside a registered project.
+- Embedding chunks and graph-derived chunks used for later semantic recall.
 
 ### Knowledge Document Format
 
 ```json
 {
-  "tag": "project-root",
+  "key": "summary",
   "projectDirectory": "/path/to/project",
-  "entries": [
-    {
-      "path": "src/main/java",
-      "type": "directory",
-      "summary": "Main Java source directory"
-    }
-  ],
-  "timestamp": "2026-04-01T12:00:00Z",
-  "source": "folder_manifest",
-  "query": "root directory",
-  "note": "Initial project scan"
+  "generatedAt": "2026-04-08T12:00:00Z",
+  "content": "# Project Summary\n\n..."
 }
 ```
 
-### Cache Invalidation
+### Knowledge Lifecycle
 
-- **Write operations**: Invalidate all read caches for the project
-- **TTL-based expiration**: Configurable time-to-live for cached entries
-- **Explicit refresh**: Tools can force cache regeneration
+1. Folder or project inspection generates markdown content.
+2. The content is stored as a `ProjectKnowledge` row keyed by `(project, key)`.
+3. Stored content is indexed into semantic embedding chunks.
+4. Graph structure is extracted and indexed as additional retrieval material.
+5. Later inspections can retrieve both semantic and graph-backed evidence to ground new summaries.
 
 ## Known Issues
 
-### 1. Folder Summary Evidence Leakage
+### 1. Completion Estimation Is Not Implemented Yet
 
-**Issue**: Folder summaries display internal tool evidence markers (e.g., "=== sampled file contents (evidence only) ===") in the final response.
+**Issue**: The system can document purpose and estimate likely next steps, but it does not yet produce a reliable completion percentage or maturity score.
 
-**Impact**: User experience degraded by exposing implementation details.
+**Impact**: Users still need to interpret project state manually rather than relying on a formal completion estimate.
 
-**Recommendation**: Strip evidence scaffolding before sending to LLM or post-process LLM response.
+**Recommendation**: Introduce a completion-oriented analysis pipeline grounded in persisted summaries, missing capabilities, and project signals.
 
-### 2. Frontend Navigation Gap
+### 2. Project Inspection Is Still Shallow By Default
 
-**Issue**: Parent directory navigation is a separate button rather than an ".." entry in the folder list.
+**Issue**: Registered project inspection currently summarises the root and a bounded set of direct child folders rather than recursively mapping the whole repository.
 
-**Impact**: UI inconsistency with standard file explorer patterns.
+**Impact**: Large projects may only be partially documented unless the user performs additional inspection steps.
 
-**Recommendation**: Integrate ".." entry naturally into folder listing.
+**Recommendation**: Expand the inspection planner to select deeper folders based on project structure and retrieved evidence.
 
-### 3. Explore Button Missing
+### 3. Known Project Purpose Is Stored as Markdown, Not Yet as a Typed Domain Model
 
-**Issue**: No visible "Explore" button for quick access to opening folders/files in the explorer canvas.
+**Issue**: The system stores high-value summaries, but it does not yet maintain a dedicated typed model for project purpose, scope, maturity, and completion status.
 
-**Impact**: Users must manually arrange windows or use canvas auto-open feature.
+**Impact**: Higher-level reasoning across projects remains harder than it should be.
 
-**Recommendation**: Add secondary action buttons to browser entries.
+**Recommendation**: Add a structured project-profile record alongside markdown summaries.
 
-### 4. Tool Error Propagation
+### 4. General Chat and Inspection Workflows Are Still Loosely Coupled
 
-**Issue**: Errors are silently swallowed in production use, hiding failures from developers.
+**Issue**: The API exposes both generic chat and dedicated inspection endpoints, but the system still relies on the caller to choose the right path.
 
-**Recommendation**: Improve error logging and user visibility.
+**Recommendation**: Add explicit task routing so inspection/documentation intents automatically prefer the project-analysis pipeline.
 
 ## Implementation Recommendations
 
 ### Priority 1: Critical Fixes
 
-1. **Evidence Leakage**: Implement response filtering for folder summaries
-2. **Error Visibility**: Enhance error logging and user notifications
-3. **Navigation UX**: Integrate ".." entry into folder listing
+1. **Structured Project Profile**: Persist a typed record for project purpose, scope, maturity, and completion signals.
+2. **Deeper Inspection Planning**: Choose important folders beyond the first directory layer.
+3. **Inspection Routing**: Route documentation-oriented requests to the inspection pipeline automatically.
 
 ### Priority 2: UX Improvements
 
-1. **Explore Buttons**: Add secondary action buttons to browser entries
-2. **Cache Status**: Display cache freshness indicators in UI
-3. **Tool Telemetry**: Add user-visible tool execution metrics
+1. **Known Project Dashboard**: Show persisted purpose, latest summary, and freshness for each project.
+2. **Evidence Visibility**: Surface the evidence used for project summaries and next-step estimates.
+3. **Progress Signals**: Add UI indicators for inspection coverage and stale summaries.
 
 ### Priority 3: Enhancements
 
-1. **Typed Contracts**: Extend API responses with versioned schemas
-2. **Performance Monitoring**: Add latency tracking and optimization
-3. **Advanced Search**: Enhance path search with semantic understanding
+1. **Completion Estimation**: Use accumulated evidence to infer project completeness and remaining effort.
+2. **Cross-Project Comparison**: Compare known projects by purpose, technology stack, and maturity.
+3. **Historical Re-Inspection**: Track how project understanding changes over time.
+4. **Typed Contracts**: Extend API responses with versioned schemas.
+5. **Performance Monitoring**: Add latency tracking and optimization.
+6. **Advanced Search**: Enhance path search with semantic understanding.
 
 ## Development Workflow
 
@@ -224,6 +219,14 @@ Project knowledge is cached in a `.pdhd` directory within each project:
 
 ```bash
 # From repository root
+./mvnw quarkus:dev
+```
+
+The backend serves the application on `http://localhost:8080`.
+
+For frontend-only iteration:
+
+```bash
 cd src/main/webui
 npm install
 npm run dev
@@ -240,13 +243,18 @@ npm run preview
 ### Testing Tool Execution
 
 ```bash
-# Run via CLI
+# Compile the backend
 ./mvnw -q -DskipTests compile
 
-# Execute tool via API
-curl -X POST http://localhost:8080/api/assistant/chat \
+# Ask the assistant through the current chat API
+curl -X POST http://localhost:8080/api/chat \
   -H "Content-Type: application/json" \
   -d '{"message": "list files in src/main/java"}'
+
+# Request a folder summary
+curl -X POST http://localhost:8080/api/chat/summarize-folder \
+  -H "Content-Type: application/json" \
+  -d '{"path": "."}'
 ```
 
 ### Key Documentation
@@ -277,17 +285,18 @@ curl -X POST http://localhost:8080/api/assistant/chat \
 
 ### Data Storage
 
-- **Filesystem** - Project directories and knowledge cache
-- **JSON** - Knowledge document format
-- **Panache/JPA** - Entity persistence (optional)
+- **Filesystem** - Local folders and project contents being inspected.
+- **Panache/JPA** - Persistence for known projects, settings, knowledge artifacts, and telemetry.
+- **Database-backed knowledge rows** - Stored markdown summaries and next-step reports keyed by project.
+- **Embedding chunks** - Indexed semantic and graph-derived retrieval material.
 
 ## Future Directions
 
-1. **Multi-Project Support**: Enable concurrent project exploration
-2. **Collaborative Features**: Add shared knowledge and annotations
-3. **Advanced Analytics**: Project health metrics and code quality insights
-4. **Plugin System**: Extensible tool ecosystem
-5. **Mobile Support**: Responsive UI for on-the-go development
+1. **Completion Assessment**: Add a typed completion-assessment model with evidence-backed maturity bands and confidence.
+2. **Deeper Inspection Planning**: Expand project inspection beyond the root and first folder layer.
+3. **Known Project Profiles**: Persist structured project purpose, scope, risks, and maturity alongside markdown summaries.
+4. **Cross-Project Comparison**: Compare known projects by purpose, stack, inspection freshness, and maturity.
+5. **Historical Re-Inspection**: Track how project understanding and completion estimates change over time.
 
 ## Contact and Support
 

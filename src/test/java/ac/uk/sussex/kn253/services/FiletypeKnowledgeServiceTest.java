@@ -8,6 +8,8 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import ac.uk.sussex.kn253.services.ai.SubagentService;
+
 class FiletypeKnowledgeServiceTest {
 
     @TempDir

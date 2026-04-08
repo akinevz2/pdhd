@@ -49,6 +49,29 @@ class OllamaManagementServiceTest {
     }
 
     @Test
+    void isHealthyUsesRuntimeBaseUrlWhenConfiguredAsActive() {
+        final TestableOllamaManagementService service = newService("http://configured-host:11434",
+                clientReturningModels(List.of()));
+        service.activeRuntimeBaseUrl = "http://runtime-host:11434";
+        service.healthStatusByBaseUrl.put("http://runtime-host:11434", 200);
+
+        assertTrue(service.isHealthy(" "));
+        assertEquals("http://runtime-host:11434", service.lastResolvedBaseUrl);
+    }
+
+    @Test
+    void listModelsPrefersExplicitBaseUrlOverRuntimeBaseUrl() {
+        final OllamaModelInfo model = new OllamaModelInfo();
+        model.setName("llama3.1");
+        final TestableOllamaManagementService service = newService("http://configured-host:11434",
+                clientReturningModels(List.of(model)));
+        service.activeRuntimeBaseUrl = "http://runtime-host:11434";
+
+        service.listModels("http://explicit-host:11434");
+        assertEquals("http://explicit-host:11434", service.lastResolvedBaseUrl);
+    }
+
+    @Test
     void listModelsReturnsEmptyWhenConfiguredBaseUrlMissing() {
         final TestableOllamaManagementService service = newService("   ", clientReturningModels(List.of()));
         assertTrue(service.listModels(" ").isEmpty());
@@ -120,8 +143,20 @@ class OllamaManagementServiceTest {
 
     private static final class TestableOllamaManagementService extends OllamaManagementService {
         private String lastResolvedBaseUrl;
+        private String activeRuntimeBaseUrl;
         private OllamaManagementClient clientToReturn;
         private final Map<String, Integer> healthStatusByBaseUrl = new java.util.HashMap<>();
+
+        @Override
+        String resolveBaseUrl(final String baseUrl) {
+            if (baseUrl != null && !baseUrl.isBlank()) {
+                return baseUrl.trim();
+            }
+            if (activeRuntimeBaseUrl != null && !activeRuntimeBaseUrl.isBlank()) {
+                return activeRuntimeBaseUrl;
+            }
+            return config.baseUrl();
+        }
 
         @Override
         int probeHealthStatus(final String normalizedBaseUrl) throws Exception {

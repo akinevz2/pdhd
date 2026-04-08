@@ -1,4 +1,4 @@
-package ac.uk.sussex.kn253.services;
+package ac.uk.sussex.kn253.services.ai;
 
 import dev.langchain4j.service.SystemMessage;
 import dev.langchain4j.service.UserMessage;

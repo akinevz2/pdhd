@@ -9,8 +9,7 @@ import java.util.*;
 import java.util.stream.Stream;
 
 import ac.uk.sussex.kn253.repository.ProjectFolder;
-import ac.uk.sussex.kn253.services.CwdService;
-import ac.uk.sussex.kn253.services.FiletypeKnowledgeService;
+import ac.uk.sussex.kn253.services.*;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
@@ -50,11 +49,21 @@ public class FsApiResource {
     public record ProjectStateRequest(long id) {
     }
 
+    public record ProjectRegisterRequest(String directory) {
+    }
+
+    public record ProjectRegisterResponse(long id, String directory, boolean hasGitRepository, boolean loaded,
+            String warning) {
+    }
+
     @Inject
     CwdService cwdService;
 
     @Inject
     FiletypeKnowledgeService filetypeKnowledgeService;
+
+    @Inject
+    RagPolicyService ragPolicyService;
 
     @GET
     @Path("/list")
@@ -103,13 +112,11 @@ public class FsApiResource {
         try {
             final String content = Files.readString(target, StandardCharsets.UTF_8);
             final String fileName = target.getFileName().toString();
-            final String mimeType = getMimeType(fileName);
-            final String language = getLanguage(fileName);
+            final String mimeType = ragPolicyService.resolveMimeType(fileName);
+            final String language = ragPolicyService.resolveLanguage(fileName);
             final boolean isPdf = "application/pdf".equals(mimeType);
             final boolean isImage = mimeType != null && mimeType.startsWith("image/");
-            final String lowerFileName = fileName.toLowerCase();
-            final boolean isMarkdown = lowerFileName.endsWith(".md") || lowerFileName.endsWith(".markdown")
-                    || lowerFileName.startsWith("readme");
+            final boolean isMarkdown = ragPolicyService.isMarkdownFileName(fileName);
 
             return new FileContentResponse(
                     target.toString(),
@@ -175,6 +182,45 @@ public class FsApiResource {
     }
 
     @POST
+    @Path("/project")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Transactional
+    public ProjectRegisterResponse registerProject(final ProjectRegisterRequest request) {
+        if (request == null || request.directory() == null || request.directory().isBlank()) {
+            throw new WebApplicationException("Directory is required", Response.Status.BAD_REQUEST);
+        }
+        final String resolved = cwdService.resolveDirectoryPath(request.directory());
+        final java.nio.file.Path dir = java.nio.file.Path.of(resolved);
+        if (!java.nio.file.Files.isDirectory(dir)) {
+            throw new WebApplicationException("Not a directory: " + resolved, Response.Status.NOT_FOUND);
+        }
+        final boolean hasGit = java.nio.file.Files.exists(dir.resolve(".git"));
+        final String warning = hasGit ? null
+                : "This directory has no .git folder. AI intelligence will operate with reduced context "
+                        + "— commit history, branch names, and repository metadata will be unavailable.";
+        final ProjectFolder existing = ProjectFolder.find("directory", resolved).firstResult();
+        if (existing != null) {
+            existing.setLoaded(true);
+            return new ProjectRegisterResponse(
+                    existing.id == null ? -1L : existing.id,
+                    existing.getDirectory(),
+                    existing.getGitRepository() != null,
+                    existing.isLoaded(),
+                    warning);
+        }
+        final ProjectFolder project = new ProjectFolder();
+        project.setDirectory(resolved);
+        project.setLoaded(true);
+        project.persist();
+        return new ProjectRegisterResponse(
+                project.id == null ? -1L : project.id,
+                project.getDirectory(),
+                project.getGitRepository() != null,
+                project.isLoaded(),
+                warning);
+    }
+
+    @POST
     @Path("/project/load")
     @Consumes(MediaType.APPLICATION_JSON)
     @Transactional
@@ -237,88 +283,6 @@ public class FsApiResource {
         } catch (final IOException e) {
             return Optional.empty();
         }
-    }
-
-    private String getMimeType(final String fileName) {
-        if (fileName == null)
-            return "text/plain";
-        final String lower = fileName.toLowerCase();
-
-        if (lower.endsWith(".pdf"))
-            return "application/pdf";
-        if (lower.endsWith(".jpg") || lower.endsWith(".jpeg"))
-            return "image/jpeg";
-        if (lower.endsWith(".png"))
-            return "image/png";
-        if (lower.endsWith(".gif"))
-            return "image/gif";
-        if (lower.endsWith(".svg"))
-            return "image/svg+xml";
-        if (lower.endsWith(".json"))
-            return "application/json";
-        if (lower.endsWith(".xml"))
-            return "application/xml";
-        if (lower.endsWith(".html") || lower.endsWith(".htm"))
-            return "text/html";
-        if (lower.endsWith(".css"))
-            return "text/css";
-        if (lower.endsWith(".js") || lower.endsWith(".jsx"))
-            return "application/javascript";
-        if (lower.endsWith(".ts") || lower.endsWith(".tsx"))
-            return "application/typescript";
-        if (lower.endsWith(".java"))
-            return "text/plain";
-        if (lower.endsWith(".py"))
-            return "text/plain";
-        if (lower.endsWith(".md") || lower.endsWith(".markdown"))
-            return "text/markdown";
-
-        return "text/plain";
-    }
-
-    private String getLanguage(final String fileName) {
-        if (fileName == null)
-            return "plaintext";
-        final String lower = fileName.toLowerCase();
-
-        if (lower.endsWith(".json"))
-            return "json";
-        if (lower.endsWith(".xml"))
-            return "xml";
-        if (lower.endsWith(".html") || lower.endsWith(".htm"))
-            return "html";
-        if (lower.endsWith(".css"))
-            return "css";
-        if (lower.endsWith(".js"))
-            return "javascript";
-        if (lower.endsWith(".jsx"))
-            return "jsx";
-        if (lower.endsWith(".ts"))
-            return "typescript";
-        if (lower.endsWith(".tsx"))
-            return "tsx";
-        if (lower.endsWith(".java"))
-            return "java";
-        if (lower.endsWith(".py"))
-            return "python";
-        if (lower.endsWith(".java"))
-            return "java";
-        if (lower.endsWith(".md") || lower.endsWith(".markdown"))
-            return "markdown";
-        if (lower.endsWith(".sql"))
-            return "sql";
-        if (lower.endsWith(".yaml") || lower.endsWith(".yml"))
-            return "yaml";
-        if (lower.endsWith(".properties"))
-            return "properties";
-        if (lower.endsWith(".sh"))
-            return "bash";
-        if (lower.endsWith(".gradle"))
-            return "gradle";
-        if (lower.endsWith(".pom") || lower.endsWith("pom.xml"))
-            return "xml";
-
-        return "plaintext";
     }
 
     private Optional<String> normalizeGitRemoteToBrowsableUrl(final String rawUrl) {

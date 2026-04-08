@@ -2,7 +2,6 @@ package ac.uk.sussex.kn253.services;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Objects;
 
 import ac.uk.sussex.kn253.events.CwdResolvedEvent;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -93,7 +92,6 @@ public class CwdService {
     }
 
     private static WebApplicationException badRequest(final String message) {
-        Objects.requireNonNull(message, "CwdService resolveDirectory subscription message is null");
         throw new WebApplicationException(message, Response.Status.BAD_REQUEST);
     }
 }
