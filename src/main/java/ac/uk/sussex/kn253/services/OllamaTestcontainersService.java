@@ -20,6 +20,21 @@ public class OllamaTestcontainersService {
     private final Object lock = new Object();
     private OllamaContainer container;
 
+    public boolean isUsingTestcontainers() {
+        synchronized (lock) {
+            return container != null && container.isRunning();
+        }
+    }
+
+    public String getRunningEndpointOrNull() {
+        synchronized (lock) {
+            if (container == null || !container.isRunning()) {
+                return null;
+            }
+            return normalize(container.getEndpoint());
+        }
+    }
+
     public String startAndGetEndpoint() {
         synchronized (lock) {
             if (container != null && container.isRunning()) {
@@ -52,6 +67,10 @@ public class OllamaTestcontainersService {
 
     @PreDestroy
     void stopIfRunning() {
+        stopRunningContainer();
+    }
+
+    public void stopRunningContainer() {
         synchronized (lock) {
             if (container == null) {
                 return;

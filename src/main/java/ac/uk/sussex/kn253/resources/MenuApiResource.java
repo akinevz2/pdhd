@@ -3,11 +3,17 @@ package ac.uk.sussex.kn253.resources;
 import java.util.*;
 import java.util.logging.Logger;
 
+import org.jboss.resteasy.reactive.RestStreamElementType;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import ac.uk.sussex.kn253.repository.LLMSettings;
 import ac.uk.sussex.kn253.repository.OllamaModelInfo;
-import ac.uk.sussex.kn253.services.ModelConfigService;
-import ac.uk.sussex.kn253.services.OllamaManagementService;
+import ac.uk.sussex.kn253.services.*;
 import io.quarkus.runtime.Quarkus;
+import io.smallrye.common.annotation.Blocking;
+import io.smallrye.mutiny.Multi;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
@@ -68,11 +74,104 @@ public class MenuApiResource {
             String modelName) {
     }
 
+    public record OllamaRuntimeStatusResponse(
+            String runtimeEndpoint,
+            String runtimeProvider,
+            boolean usingTestcontainers,
+            boolean healthy) {
+    }
+
+    public record SetRuntimeProviderRequest(
+            String provider,
+            String baseUrl) {
+    }
+
     @Inject
     ModelConfigService modelConfigService;
 
     @Inject
     OllamaManagementService ollamaManagementService;
+
+    @Inject
+    OllamaRuntimeEndpointService runtimeEndpointService;
+
+    @Inject
+    OllamaTestcontainersService ollamaTestcontainersService;
+
+    @Inject
+    ObjectMapper objectMapper;
+
+    @GET
+    @Path("/ollama/status")
+    public OllamaRuntimeStatusResponse getOllamaRuntimeStatus() {
+        final String runtime = runtimeEndpointService.getActiveBaseUrl();
+        final String containerEndpoint = ollamaTestcontainersService.getRunningEndpointOrNull();
+        final boolean usingTestcontainers = containerEndpoint != null && containerEndpoint.equals(runtime);
+        final String runtimeProvider = usingTestcontainers ? "INTERNAL" : "EXTERNAL";
+        final boolean healthy = ollamaManagementService.isHealthy(runtime);
+        return new OllamaRuntimeStatusResponse(runtime, runtimeProvider, usingTestcontainers, healthy);
+    }
+
+    @POST
+    @Path("/ollama/runtime/provider")
+    @Transactional
+    public OllamaRuntimeStatusResponse setOllamaRuntimeProvider(final SetRuntimeProviderRequest request) {
+        if (request == null || request.provider() == null || request.provider().isBlank()) {
+            throw new WebApplicationException("Provider is required", Response.Status.BAD_REQUEST);
+        }
+
+        final String provider = request.provider().trim().toUpperCase(Locale.ROOT);
+        switch (provider) {
+            case "INTERNAL": {
+                final String endpoint = ollamaTestcontainersService.startAndGetEndpoint();
+                runtimeEndpointService.setRuntimeBaseUrl(endpoint);
+                break;
+            }
+            case "EXTERNAL": {
+                String externalBaseUrl = request.baseUrl();
+                if (externalBaseUrl == null || externalBaseUrl.isBlank()) {
+                    final LLMSettings settings = modelConfigService.load();
+                    externalBaseUrl = settings.getBaseUrl();
+                }
+                if (externalBaseUrl == null || externalBaseUrl.isBlank()) {
+                    throw new WebApplicationException("External Ollama base URL is required",
+                            Response.Status.BAD_REQUEST);
+                }
+                runtimeEndpointService.setRuntimeBaseUrl(externalBaseUrl);
+                ollamaTestcontainersService.stopRunningContainer();
+                break;
+            }
+            default:
+                throw new WebApplicationException("Unsupported provider: " + provider, Response.Status.BAD_REQUEST);
+        }
+
+        return getOllamaRuntimeStatus();
+    }
+
+    @GET
+    @Path("/ollama/models/pull/stream")
+    @Produces(MediaType.SERVER_SENT_EVENTS)
+    @RestStreamElementType(MediaType.APPLICATION_JSON)
+    @Blocking
+    public Multi<String> pullModelStream(@QueryParam("modelName") final String modelName) {
+        if (modelName == null || modelName.isBlank()) {
+            throw new WebApplicationException("Model name is required", Response.Status.BAD_REQUEST);
+        }
+        return Multi.createFrom().emitter(em -> {
+            try {
+                ollamaManagementService.pullModelStreaming(null, modelName, status -> {
+                    try {
+                        em.emit(objectMapper.writeValueAsString(status));
+                    } catch (final JsonProcessingException e) {
+                        em.fail(e);
+                    }
+                });
+                em.complete();
+            } catch (final RuntimeException e) {
+                em.fail(e);
+            }
+        });
+    }
 
     @GET
     @Path("/ollama")

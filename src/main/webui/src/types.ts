@@ -8,7 +8,21 @@ export type ProjectSummary = {
   warning?: string;
 };
 
+/** Runtime status of the Ollama backend (local vs. Testcontainers fallback). */
+export type OllamaRuntimeStatus = {
+  runtimeEndpoint: string;
+  runtimeProvider: "EXTERNAL" | "INTERNAL";
+  usingTestcontainers: boolean;
+  healthy: boolean;
+};
 
+/** Incremental progress event emitted during an Ollama model pull. */
+export type PullProgressStatus = {
+  status: string;
+  digest: string | null;
+  total: number;
+  completed: number;
+};
 
 /** A single tool-call trace emitted by the AI assistant. */
 export type ToolActivityItem = {
@@ -103,7 +117,7 @@ export type OllamaSettingField = {
   modelField: boolean;
 };
 
-export type ConfigurationProvider = "OLLAMA" | "OPENAI";
+export type ConfigurationProvider = "OLLAMA";
 
 /** Response body for listing models available from an Ollama endpoint. */
 export type OllamaModelsResponse = {
@@ -114,6 +128,8 @@ export type OllamaModelsResponse = {
 export type ChatMessage = {
   role: "user" | "assistant" | "system";
   content: string;
+  /** Optional stable identity used to update a streaming message in-place. */
+  id?: string;
 };
 
 /** Runtime state for an open project explorer window. */

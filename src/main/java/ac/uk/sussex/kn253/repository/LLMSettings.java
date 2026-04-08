@@ -31,10 +31,9 @@ public class LLMSettings extends PanacheEntityBase {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     public Long id;
 
-    /** Preserved for backward-compatible schema inserts. */
+    /** Runtime provider options supported by this application. */
     public enum Provider {
-        OLLAMA,
-        OPENAI
+        OLLAMA
     }
 
     /**

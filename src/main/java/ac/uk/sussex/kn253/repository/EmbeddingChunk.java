@@ -16,9 +16,6 @@ import jakarta.persistence.*;
 @Entity
 @Table(name = "embedding_chunk", uniqueConstraints = {
                 @UniqueConstraint(columnNames = { "project_id", "source_key", "chunk_index" })
-}, indexes = {
-                @Index(name = "idx_chunk_project", columnList = "project_id"),
-                @Index(name = "idx_chunk_content_hash", columnList = "content_hash")
 })
 public class EmbeddingChunk extends PanacheEntity {
 

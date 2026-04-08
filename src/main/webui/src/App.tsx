@@ -41,6 +41,7 @@ import {
   subscribeSignalErrors,
   type ApiSignalKey,
 } from "./signals";
+import { chatWebSocket } from "./websocket";
 
 const MARKDOWN_FILE_PATTERN = /\.(md|markdown|mdx)$/i;
 const README_FILE_PATTERN = /^readme(\.(md|markdown|mdx|txt))?$/i;
@@ -114,7 +115,6 @@ const SIGNALS = {
   FS_PROJECT_REGISTER: "fs:project:register",
   FS_PROJECT_LOAD: "fs:project:load",
   FS_PROJECT_UNLOAD: "fs:project:unload",
-  CHAT_SEND: "chat:send",
   CHAT_RESET: "chat:reset",
   CHAT_SUMMARIZE_FOLDER: "chat:summarizeFolder",
 } as const satisfies Record<string, ApiSignalKey>;
@@ -208,10 +208,6 @@ export function App() {
         SIGNALS.FS_PROJECT_UNLOAD,
         { method: "POST", endpoint: "/api/fs/project/unload" },
       ],
-      [
-        SIGNALS.CHAT_SEND,
-        { method: "POST", endpoint: "/api/chat", timeoutMs: CHAT_TIMEOUT_MS },
-      ],
       [SIGNALS.CHAT_RESET, { method: "POST", endpoint: "/api/chat/reset" }],
       [
         SIGNALS.CHAT_SUMMARIZE_FOLDER,
@@ -222,6 +218,28 @@ export function App() {
         },
       ],
     ]);
+  }, []);
+
+  useEffect(() => {
+    const checkOllamaRuntime = async () => {
+      try {
+        const status = await fetch("/api/menu/ollama/status").then((r) =>
+          r.json(),
+        );
+        if (status?.usingTestcontainers) {
+          setChatMessages((prev) => [
+            ...prev,
+            {
+              role: "system",
+              content: `⚙️ Local Ollama is unreachable. A Docker container has been started as a fallback at ${status.runtimeEndpoint ?? "unknown endpoint"}. AI features may be slower during initial startup.`,
+            },
+          ]);
+        }
+      } catch {
+        // non-fatal: startup status check is best-effort
+      }
+    };
+    checkOllamaRuntime().catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -469,10 +487,10 @@ export function App() {
         }
       } else {
         try {
-          project = await emitApiSignal<{ directory: string }, ProjectSummaryType>(
-            SIGNALS.FS_PROJECT_REGISTER,
-            { directory: target },
-          );
+          project = await emitApiSignal<
+            { directory: string },
+            ProjectSummaryType
+          >(SIGNALS.FS_PROJECT_REGISTER, { directory: target });
           if (project.warning) {
             setChatMessages((prev) => [
               ...prev,
@@ -823,7 +841,7 @@ export function App() {
   const sendChatMessage = useCallback(
     async (
       overrideMessage?: string,
-      source: string = REQUEST_SOURCE_CHAT_INPUT,
+      _source: string = REQUEST_SOURCE_CHAT_INPUT,
     ) => {
       const message = (overrideMessage ?? chatInput).trim();
       if (!message || chatLoading) {
@@ -833,40 +851,52 @@ export function App() {
       setChatError(null);
       setChatLoading(true);
       if (!overrideMessage) setChatInput("");
-      setChatMessages((prev) => [...prev, { role: "user", content: message }]);
+
+      // Add the user turn and a blank assistant placeholder that gets filled token-by-token
+      const placeholderId = `streaming-${Date.now()}`;
+      setChatMessages((prev) => [
+        ...prev,
+        { role: "user", content: message },
+        { role: "assistant", content: "", id: placeholderId },
+      ]);
       setRetryMessage(null);
-      setChatError(null);
-      // Refocus the chat input for accessibility
+
       setTimeout(() => {
         if (chatInputRef.current) chatInputRef.current.focus();
       }, 0);
 
-      try {
-        const result = await emitApiSignal<
-          { message: string },
-          AssistantChatResponse
-        >(
-          SIGNALS.CHAT_SEND,
-          { message },
-          {
-            timeoutMs: CHAT_TIMEOUT_MS,
-            headers: { [REQUEST_SOURCE_HEADER]: source },
-          },
-        );
-        setChatMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: result.reply || "" },
-        ]);
-        setAssistantUnreachable(false);
-        setRetryMessage(null);
-      } catch (err) {
-        const detail = err instanceof Error ? err.message : "Unknown error";
-        setAssistantUnreachable(true);
-        setChatError(detail);
-        setRetryMessage(message);
-      } finally {
-        setChatLoading(false);
-      }
+      let errorOccurred = false;
+      await chatWebSocket.stream(message, {
+        onToken: (fragment) => {
+          setChatMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === placeholderId
+                ? { ...msg, content: msg.content + fragment }
+                : msg,
+            ),
+          );
+        },
+        onError: (detail) => {
+          errorOccurred = true;
+          setAssistantUnreachable(true);
+          setChatError(detail);
+          setRetryMessage(message);
+          setChatMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === placeholderId
+                ? { ...msg, content: `_(error: ${detail})_` }
+                : msg,
+            ),
+          );
+        },
+        onDone: () => {
+          if (!errorOccurred) {
+            setAssistantUnreachable(false);
+            setRetryMessage(null);
+          }
+          setChatLoading(false);
+        },
+      });
     },
     [chatInput, chatLoading],
   );
@@ -988,12 +1018,16 @@ export function App() {
               supportsManagedModels={configurationMenus.supportsManagedModels}
               availableModels={configurationMenus.availableModels}
               modelsLoading={configurationMenus.modelsLoading}
+              pullProgress={configurationMenus.pullProgress}
+              runtimeStatus={configurationMenus.runtimeStatus}
+              runtimeSwitching={configurationMenus.runtimeSwitching}
               setConfigOpen={configurationMenus.setConfigOpen}
               setConfigForm={configurationMenus.setConfigForm}
               refreshModels={configurationMenus.refreshModels}
               pullModel={configurationMenus.pullModel}
               deleteModel={configurationMenus.deleteModel}
               saveConfiguration={configurationMenus.saveConfiguration}
+              switchRuntimeProvider={configurationMenus.switchRuntimeProvider}
             />
           }
           onOpenDebug={() => menuPanels.setDebugOpen(true)}

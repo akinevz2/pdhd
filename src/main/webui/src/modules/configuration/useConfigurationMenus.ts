@@ -2,17 +2,20 @@ import { useCallback, useMemo, useState } from "react";
 import { api, apiPost } from "../../api";
 import type {
   OllamaModelsResponse,
+  OllamaRuntimeStatus,
   OllamaSettingField,
   OllamaSettings,
+  PullProgressStatus,
 } from "../../types";
 
-export type ConfigurationProvider = "OLLAMA" | "OPENAI";
+export type ConfigurationProvider = "OLLAMA";
 export type ConfigurationForm = Record<
   string,
   string | number | boolean | null
 >;
 
 const DEFAULT_PROVIDER: ConfigurationProvider = "OLLAMA";
+type RuntimeProviderMode = "EXTERNAL" | "INTERNAL";
 
 export function useConfigurationMenus() {
   const [configOpen, setConfigOpen] = useState(false);
@@ -23,13 +26,17 @@ export function useConfigurationMenus() {
   const [configError, setConfigError] = useState<string | null>(null);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
+  const [pullProgress, setPullProgress] = useState<PullProgressStatus | null>(
+    null,
+  );
+  const [runtimeStatus, setRuntimeStatus] =
+    useState<OllamaRuntimeStatus | null>(null);
+  const [runtimeSwitching, setRuntimeSwitching] = useState(false);
 
-  const currentProvider = useMemo<ConfigurationProvider>(() => {
-    const provider = String(configForm?.provider ?? DEFAULT_PROVIDER)
-      .trim()
-      .toUpperCase();
-    return provider === "OPENAI" ? "OPENAI" : "OLLAMA";
-  }, [configForm]);
+  const currentProvider = useMemo<ConfigurationProvider>(
+    () => DEFAULT_PROVIDER,
+    [],
+  );
 
   const supportsManagedModels = currentProvider === "OLLAMA";
 
@@ -37,9 +44,13 @@ export function useConfigurationMenus() {
     setConfigLoading(true);
     setConfigError(null);
     try {
-      const data = await api<OllamaSettings>("/api/menu/ollama");
+      const [data, status] = await Promise.all([
+        api<OllamaSettings>("/api/menu/ollama"),
+        api<OllamaRuntimeStatus>("/api/menu/ollama/status"),
+      ]);
       setConfigForm((data.settings ?? null) as ConfigurationForm | null);
       setConfigFields(data.settingFields ?? []);
+      setRuntimeStatus(status);
       setAvailableModels([]);
       setConfigOpen(true);
     } catch {
@@ -64,17 +75,48 @@ export function useConfigurationMenus() {
   const pullModel = useCallback(async (modelName: string) => {
     setModelsLoading(true);
     setConfigError(null);
+    setPullProgress(null);
     try {
-      const data = await apiPost<{ modelName: string }, OllamaModelsResponse>(
-        "/api/menu/ollama/models/pull",
-        { modelName },
-      );
+      await new Promise<void>((resolve, reject) => {
+        const source = new EventSource(
+          `/api/menu/ollama/models/pull/stream?modelName=${encodeURIComponent(modelName)}`,
+        );
+        let lastStatus: PullProgressStatus | null = null;
+
+        source.onmessage = (event) => {
+          try {
+            const s = JSON.parse(event.data as string) as PullProgressStatus;
+            lastStatus = s;
+            setPullProgress(s);
+          } catch {
+            // ignore parse errors
+          }
+        };
+
+        source.onerror = () => {
+          source.close();
+          if (lastStatus?.status === "success") {
+            resolve();
+          } else {
+            reject(
+              new Error(
+                lastStatus?.status
+                  ? `Pull ended with status: ${lastStatus.status}`
+                  : "Pull failed or connection lost",
+              ),
+            );
+          }
+        };
+      });
+
+      const data = await api<OllamaModelsResponse>("/api/menu/ollama/models");
       setAvailableModels(data.models ?? []);
     } catch (error) {
       setConfigError(
         error instanceof Error ? error.message : "Failed to pull model.",
       );
     } finally {
+      setPullProgress(null);
       setModelsLoading(false);
     }
   }, []);
@@ -131,6 +173,35 @@ export function useConfigurationMenus() {
     }
   }, [configForm]);
 
+  const switchRuntimeProvider = useCallback(
+    async (provider: RuntimeProviderMode) => {
+      setRuntimeSwitching(true);
+      setConfigError(null);
+      try {
+        const status = await apiPost<
+          { provider: RuntimeProviderMode; baseUrl?: string },
+          OllamaRuntimeStatus
+        >("/api/menu/ollama/runtime/provider", {
+          provider,
+          baseUrl:
+            provider === "EXTERNAL"
+              ? String(configForm?.baseUrl ?? "")
+              : undefined,
+        });
+        setRuntimeStatus(status);
+      } catch (error) {
+        setConfigError(
+          error instanceof Error
+            ? error.message
+            : "Failed to switch runtime provider.",
+        );
+      } finally {
+        setRuntimeSwitching(false);
+      }
+    },
+    [configForm],
+  );
+
   return {
     configOpen,
     setConfigOpen,
@@ -144,10 +215,14 @@ export function useConfigurationMenus() {
     supportsManagedModels,
     availableModels,
     modelsLoading,
+    pullProgress,
+    runtimeStatus,
+    runtimeSwitching,
     openConfiguration,
     refreshModels,
     pullModel,
     deleteModel,
     saveConfiguration,
+    switchRuntimeProvider,
   };
 }

@@ -1,6 +1,13 @@
 import type { Dispatch, ReactNode, SetStateAction } from "react";
-import type { OllamaSettingField } from "../../types";
-import type { ConfigurationForm, ConfigurationProvider } from "./useConfigurationMenus";
+import type {
+  OllamaRuntimeStatus,
+  OllamaSettingField,
+  PullProgressStatus,
+} from "../../types";
+import type {
+  ConfigurationForm,
+  ConfigurationProvider,
+} from "./useConfigurationMenus";
 
 type ConfigurationMenuButtonsProps = {
   configLoading: boolean;
@@ -17,15 +24,19 @@ type ConfigurationModalsProps = {
   supportsManagedModels: boolean;
   availableModels: string[];
   modelsLoading: boolean;
+  pullProgress: PullProgressStatus | null;
+  runtimeStatus: OllamaRuntimeStatus | null;
+  runtimeSwitching: boolean;
   setConfigOpen: Dispatch<SetStateAction<boolean>>;
   setConfigForm: Dispatch<SetStateAction<ConfigurationForm | null>>;
   refreshModels: () => Promise<void>;
   pullModel: (modelName: string) => Promise<void>;
   deleteModel: (modelName: string) => Promise<void>;
   saveConfiguration: () => Promise<void>;
+  switchRuntimeProvider: (provider: "EXTERNAL" | "INTERNAL") => Promise<void>;
 };
 
-const PROVIDERS: ConfigurationProvider[] = ["OLLAMA", "OPENAI"];
+const PROVIDERS: ConfigurationProvider[] = ["OLLAMA"];
 const FIELD_PRIORITY: Record<string, number> = {
   provider: 0,
   baseUrl: 1,
@@ -61,12 +72,16 @@ export function ConfigurationModals({
   supportsManagedModels,
   availableModels,
   modelsLoading,
+  pullProgress,
+  runtimeStatus,
+  runtimeSwitching,
   setConfigOpen,
   setConfigForm,
   refreshModels,
   pullModel,
   deleteModel,
   saveConfiguration,
+  switchRuntimeProvider,
 }: ConfigurationModalsProps) {
   const fieldString = (key: string) => String(configForm?.[key] ?? "");
   const fieldNumber = (key: string) => {
@@ -77,7 +92,8 @@ export function ConfigurationModals({
   };
   const fieldBoolean = (key: string) => Boolean(configForm?.[key]);
   const orderedFields = [...configFields].sort(
-    (left, right) => (FIELD_PRIORITY[left.key] ?? 100) - (FIELD_PRIORITY[right.key] ?? 100),
+    (left, right) =>
+      (FIELD_PRIORITY[left.key] ?? 100) - (FIELD_PRIORITY[right.key] ?? 100),
   );
   const selectedModel = fieldString("modelName");
 
@@ -142,9 +158,12 @@ export function ConfigurationModals({
                 })
               }
             >
-              {!availableModels.includes(fieldString(field.key)) && selectedModel && (
-                <option value={fieldString(field.key)}>{fieldString(field.key)}</option>
-              )}
+              {!availableModels.includes(fieldString(field.key)) &&
+                selectedModel && (
+                  <option value={fieldString(field.key)}>
+                    {fieldString(field.key)}
+                  </option>
+                )}
               {availableModels.map((model) => (
                 <option key={model} value={model}>
                   {model}
@@ -165,12 +184,18 @@ export function ConfigurationModals({
           )}
           {supportsManagedModels ? (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button onClick={() => refreshModels().catch(() => {})} disabled={modelsLoading}>
+              <button
+                onClick={() => refreshModels().catch(() => {})}
+                disabled={modelsLoading}
+              >
                 {modelsLoading ? "Refreshing..." : "Refresh Models"}
               </button>
               <button
                 onClick={() => {
-                  const requested = window.prompt("Pull model", selectedModel || "");
+                  const requested = window.prompt(
+                    "Pull model",
+                    selectedModel || "",
+                  );
                   const modelName = requested?.trim();
                   if (modelName) {
                     pullModel(modelName).catch(() => {});
@@ -195,7 +220,28 @@ export function ConfigurationModals({
               </button>
             </div>
           ) : (
-            <span className="form-hint">Model management is only available for the Ollama provider.</span>
+            <span className="form-hint">
+              Model management is only available for the Ollama provider.
+            </span>
+          )}
+          {pullProgress && (
+            <div style={{ marginTop: 8 }}>
+              <div style={{ fontSize: 12, marginBottom: 4 }}>
+                {pullProgress.status}
+                {pullProgress.digest
+                  ? ` \u2014 ${pullProgress.digest.slice(0, 19)}\u2026`
+                  : ""}
+              </div>
+              {pullProgress.total > 0 ? (
+                <progress
+                  value={pullProgress.completed}
+                  max={pullProgress.total}
+                  style={{ width: "100%" }}
+                />
+              ) : (
+                <progress style={{ width: "100%" }} />
+              )}
+            </div>
           )}
         </div>
       );
@@ -252,7 +298,10 @@ export function ConfigurationModals({
           <div className="modal-panel">
             <div className="modal-header">
               <span className="modal-title">Provider Configuration</span>
-              <button className="modal-close" onClick={() => setConfigOpen(false)}>
+              <button
+                className="modal-close"
+                onClick={() => setConfigOpen(false)}
+              >
                 X
               </button>
             </div>
@@ -266,13 +315,55 @@ export function ConfigurationModals({
                   </div>
                 ))}
               </div>
+              <div
+                style={{
+                  marginTop: 12,
+                  padding: 10,
+                  border: "1px solid rgba(255,255,255,0.15)",
+                  borderRadius: 8,
+                  display: "grid",
+                  gap: 8,
+                }}
+              >
+                <strong>Runtime Provider</strong>
+                <div style={{ fontSize: 12, opacity: 0.9 }}>
+                  Mode: {runtimeStatus?.runtimeProvider ?? "unknown"}
+                </div>
+                <div style={{ fontSize: 12, opacity: 0.9 }}>
+                  Endpoint: {runtimeStatus?.runtimeEndpoint ?? "unknown"}
+                </div>
+                <div style={{ fontSize: 12, opacity: 0.9 }}>
+                  Health: {runtimeStatus?.healthy ? "healthy" : "unreachable"}
+                </div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button
+                    onClick={() =>
+                      switchRuntimeProvider("EXTERNAL").catch(() => {})
+                    }
+                    disabled={runtimeSwitching}
+                  >
+                    Use External Ollama
+                  </button>
+                  <button
+                    onClick={() =>
+                      switchRuntimeProvider("INTERNAL").catch(() => {})
+                    }
+                    disabled={runtimeSwitching}
+                  >
+                    Use Internal Testcontainer
+                  </button>
+                </div>
+              </div>
               <div style={{ marginTop: 12, fontSize: 12, opacity: 0.7 }}>
                 Active provider: {currentProvider}
               </div>
             </div>
             <div className="modal-footer">
               <button onClick={() => setConfigOpen(false)}>Cancel</button>
-              <button onClick={() => saveConfiguration().catch(() => {})} disabled={configSaving}>
+              <button
+                onClick={() => saveConfiguration().catch(() => {})}
+                disabled={configSaving}
+              >
                 {configSaving ? "Saving..." : "Save"}
               </button>
             </div>
