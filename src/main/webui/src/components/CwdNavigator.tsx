@@ -3,7 +3,6 @@ import { api } from "../api";
 
 type CwdNavigatorProps = {
   cwd: string;
-  cwdError: string | null;
   onNavigate: (path: string) => Promise<void>;
 };
 
@@ -15,7 +14,7 @@ type CwdNavigatorProps = {
  * endpoint.  Pressing Enter, Tab, or clicking a suggestion commits the new
  * path; Escape cancels.
  */
-export function CwdNavigator({ cwd, cwdError, onNavigate }: CwdNavigatorProps) {
+export function CwdNavigator({ cwd, onNavigate }: CwdNavigatorProps) {
   const [editing, setEditing] = useState(false);
   const [input, setInput] = useState("");
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -80,7 +79,7 @@ export function CwdNavigator({ cwd, cwdError, onNavigate }: CwdNavigatorProps) {
         }}
         title="Click to change working folder"
       >
-        {cwdError || cwd || "Loading..."}
+        {cwd || "Loading..."}
       </span>
     );
   }

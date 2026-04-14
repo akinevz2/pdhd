@@ -1,41 +1,64 @@
 import React from "react";
-import type { ChatMessage } from "../types";
+import type { ApiFailureState, ChatMessage } from "../types";
 
 export type ChatDockProps = {
-  assistantUnreachable: boolean;
+  chatUnavailable: boolean;
+  apiFailures: ApiFailureState[];
   chatMessages: ChatMessage[];
   chatLoading: boolean;
   chatInput: string;
-  chatError: string | null;
   retryMessage: string | null;
-  cwdRetryPending: boolean;
   chatLogRef: React.RefObject<HTMLDivElement>;
   chatInputRef: React.RefObject<HTMLTextAreaElement>;
-  setAssistantUnreachable: (value: boolean) => void;
+  setChatUnavailable: (value: boolean) => void;
   setChatInput: (value: string) => void;
+  dismissApiError: (id: string) => void;
+  retryApiError: (id: string) => Promise<void>;
   sendChatMessage: (overrideMessage?: string, source?: string) => Promise<void>;
-  retryCwdGet: () => Promise<void>;
   resetChat: () => Promise<void>;
   renderAssistantMarkdown: (content: string) => React.ReactNode;
 };
 
 export function ChatDock({
-  assistantUnreachable,
+  chatUnavailable,
+  apiFailures,
   chatMessages,
   chatLoading,
   chatInput,
-  chatError,
   retryMessage,
-  cwdRetryPending,
   chatLogRef,
   chatInputRef,
-  setAssistantUnreachable,
+  setChatUnavailable,
   setChatInput,
+  dismissApiError,
+  retryApiError,
   sendChatMessage,
-  retryCwdGet,
   resetChat,
   renderAssistantMarkdown,
 }: ChatDockProps) {
+  const unreachableMessage = chatUnavailable
+    ? "Assistant is unreachable - check that Ollama is running and the model is loaded."
+    : null;
+  const nonApiErrorMessages = [unreachableMessage].filter(
+    (value): value is string => Boolean(value),
+  );
+  const hasNonApiErrorState = nonApiErrorMessages.length > 0;
+
+  const handleRetry = () => {
+    if (retryMessage) {
+      sendChatMessage(retryMessage).catch(() => {
+        // handled in callback
+      });
+      return;
+    }
+
+    setChatUnavailable(false);
+  };
+
+  const handleDismiss = () => {
+    setChatUnavailable(false);
+  };
+
   return (
     <section className="chat-dock panel">
       <div className="toolbar">
@@ -45,51 +68,99 @@ export function ChatDock({
         </button>
       </div>
 
-      {assistantUnreachable && (
-        <div className="assistant-unreachable-notice">
-          <span>
-            Assistant is unreachable - check that Ollama is running and the
-            model is loaded.
-          </span>
-          <button
-            className="notice-dismiss"
-            onClick={() => setAssistantUnreachable(false)}
-            aria-label="Dismiss"
-          >
-            X
-          </button>
-        </div>
-      )}
+      <div className="chat-log-wrap">
+        <div className="chat-log" ref={chatLogRef}>
+          {chatMessages.length === 0 && (
+            <p className="chat-empty">Ask the assistant about this project.</p>
+          )}
+          {chatMessages.map((entry, idx) => (
+            <div
+              key={`${entry.role}-${idx}`}
+              className={`chat-row ${entry.role}`}
+            >
+              <strong>
+                {entry.role === "user"
+                  ? "You"
+                  : entry.role === "assistant"
+                    ? "Assistant"
+                    : "System"}
+              </strong>
+              {entry.role === "assistant" ? (
+                <div className="chat-message-markdown">
+                  {entry.content
+                    ? renderAssistantMarkdown(entry.content)
+                    : chatLoading
+                      ? "▊"
+                      : ""}
+                </div>
+              ) : (
+                <span>{entry.content}</span>
+              )}
+            </div>
+          ))}
+          {chatLoading && (
+            <div className="chat-row assistant">Assistant is thinking...</div>
+          )}
 
-      <div className="chat-log" ref={chatLogRef}>
-        {chatMessages.length === 0 && (
-          <p className="chat-empty">Ask the assistant about this project.</p>
-        )}
-        {chatMessages.map((entry, idx) => (
-          <div key={`${entry.role}-${idx}`} className={`chat-row ${entry.role}`}>
-            <strong>
-              {entry.role === "user"
-                ? "You"
-                : entry.role === "assistant"
-                  ? "Assistant"
-                  : "System"}
-            </strong>
-            {entry.role === "assistant" ? (
-              <div className="chat-message-markdown">
-                {entry.content
-                  ? renderAssistantMarkdown(entry.content)
-                  : chatLoading
-                    ? "▊"
-                    : ""}
+          {apiFailures.map((apiFailure) => (
+            <div
+              key={apiFailure.id}
+              className="chat-errors"
+              role="alert"
+              aria-live="polite"
+            >
+              <p className="chat-error">
+                {apiFailure.message} [signal {apiFailure.signal}]
+              </p>
+              <div className="chat-retry-row">
+                <button
+                  className="retry-button"
+                  onClick={() => dismissApiError(apiFailure.id)}
+                  disabled={chatLoading}
+                >
+                  Dismiss
+                </button>
+                <button
+                  className="retry-button"
+                  onClick={() => {
+                    retryApiError(apiFailure.id).catch(() => {
+                      // handled in callback
+                    });
+                  }}
+                  disabled={chatLoading}
+                >
+                  Retry
+                </button>
               </div>
-            ) : (
-              <span>{entry.content}</span>
-            )}
-          </div>
-        ))}
-        {chatLoading && (
-          <div className="chat-row assistant">Assistant is thinking...</div>
-        )}
+            </div>
+          ))}
+
+          {hasNonApiErrorState && (
+            <div className="chat-errors" role="alert" aria-live="polite">
+              {nonApiErrorMessages.map((message, idx) => (
+                <p key={`${message}-${idx}`} className="chat-error">
+                  {message}
+                </p>
+              ))}
+              <div className="chat-retry-row">
+                <button
+                  className="retry-button"
+                  onClick={handleDismiss}
+                  disabled={chatLoading}
+                >
+                  Dismiss
+                </button>
+                <button
+                  className="retry-button"
+                  onClick={handleRetry}
+                  disabled={chatLoading}
+                >
+                  Retry
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="chat-compose">
@@ -118,32 +189,7 @@ export function ChatDock({
         >
           Send
         </button>
-        {retryMessage && (
-          <button
-            className="retry-button"
-            onClick={() => sendChatMessage(retryMessage)}
-            disabled={chatLoading}
-            style={{ marginLeft: 8 }}
-          >
-            Retry
-          </button>
-        )}
-        {cwdRetryPending && (
-          <button
-            className="retry-button"
-            onClick={() => {
-              retryCwdGet().catch(() => {
-                // handled in callback
-              });
-            }}
-            disabled={chatLoading}
-            style={{ marginLeft: 8 }}
-          >
-            Confirm CWD Retry
-          </button>
-        )}
       </div>
-      {chatError && <p className="chat-error">{chatError}</p>}
     </section>
   );
 }

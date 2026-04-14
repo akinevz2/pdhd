@@ -259,6 +259,7 @@ curl -X POST http://localhost:8080/api/chat/summarize-folder \
 
 ### Key Documentation
 
+- [Assistant Request Flow](assistant-request-flow.md) - End-to-end launch-to-assistant runtime sequence
 - [Frontend Guide](frontend.md) - UI architecture and integration
 - [Tool Calling Architecture](tool-calling-architecture.md) - Runtime control flow
 - [Tool Calling Conventions](tool-calling-conventions.md) - Tool definition patterns

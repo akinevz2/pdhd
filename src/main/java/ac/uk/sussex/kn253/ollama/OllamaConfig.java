@@ -1,5 +1,7 @@
 package ac.uk.sussex.kn253.ollama;
 
+import java.util.Optional;
+
 import io.smallrye.config.*;
 
 /**
@@ -14,7 +16,7 @@ import io.smallrye.config.*;
  * 
  * <pre>
  *   OLLAMA_BASE_URL=http://my-gpu-box:11434
- *   OLLAMA_MODEL_NAME=llama3.1:8b-instruct-q4_K_M
+ *   OLLAMA_MODEL_NAME=gemma4
  * </pre>
  */
 @ConfigMapping(prefix = "pdhd.ollama")
@@ -26,12 +28,11 @@ public interface OllamaConfig {
 
     /** Base URL of the Ollama HTTP API, e.g. {@code http://localhost:11434}. */
     @WithName("base-url")
-    @WithDefault("http://localhost:11434")
-    String baseUrl();
+    Optional<String> baseUrl();
 
     /** Default model name used when no explicit model is supplied. */
     @WithName("model-name")
-    @WithDefault("llama3.1")
+    @WithDefault("gemma4")
     String modelName();
 
     /** Default embeddings model name used when no explicit model is supplied. */
@@ -71,10 +72,5 @@ public interface OllamaConfig {
     @WithName("embedding-dimension")
     @WithDefault("384")
     Integer embeddingDimension();
-
-    /** Docker image name for Ollama, e.g. {@code ollama/ollama:latest}. */
-    @WithName("image")
-    @WithDefault("ollama/ollama:latest")
-    String ollamaImage();
 
 }

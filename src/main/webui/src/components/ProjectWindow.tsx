@@ -19,8 +19,8 @@ export type ProjectWindowProps = {
   onClose: () => void;
   onFocus: () => void;
   onMove: (x: number, y: number) => void;
-  onOpenFile: (path: string) => void;
-  onOpenFolderSummary: (path: string) => void;
+  onOpenFile: (path: string, uuid: string) => void;
+  onOpenFolderSummary: (path: string, uuid?: string | null) => void;
   onAssistantAction: (prompt: string) => void;
   assistantActionDisabled?: boolean;
 };
@@ -196,12 +196,12 @@ export function ProjectWindow({
             !windowState.entriesError &&
             windowState.entries?.map((entry) => (
               <div
-                key={entry.path}
+                key={entry.uuid ?? entry.path}
                 className="file-node"
                 onClick={
                   entry.directory
-                    ? () => onOpenFolderSummary(entry.path)
-                    : () => onOpenFile(entry.path)
+                    ? () => onOpenFolderSummary(entry.path, entry.uuid)
+                    : () => onOpenFile(entry.path, entry.uuid)
                 }
               >
                 <span className="node-entry">
@@ -233,8 +233,8 @@ export function ProjectWindow({
               <img
                 className="image-preview"
                 src={rawImageUrl(
-                  windowState.project.directory,
-                  windowState.selectedFilePath!,
+                  windowState.project.id,
+                  windowState.selectedFileUuid!,
                 )}
                 alt={windowState.selectedFilePath}
               />
@@ -248,8 +248,8 @@ export function ProjectWindow({
               <iframe
                 className="pdf-preview"
                 src={rawFileUrl(
-                  windowState.project.directory,
-                  windowState.selectedFilePath!,
+                  windowState.project.id,
+                  windowState.selectedFileUuid!,
                 )}
                 title={windowState.selectedFilePath}
               />

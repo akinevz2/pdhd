@@ -20,7 +20,13 @@ export function FileWindow({
   let markdown = "";
   if (!windowState.loading && !windowState.error) {
     const language = windowState.language || "text";
-    markdown = `\`\`\`${language}\n${windowState.content || ""}\n\`\`\``;
+    const mimeType = windowState.mimeType || "";
+    const isMarkdown =
+      /^(markdown|md|mdx)$/i.test(language) ||
+      mimeType.toLowerCase().includes("markdown");
+    markdown = isMarkdown
+      ? windowState.content || ""
+      : `\`\`\`${language}\n${windowState.content || ""}\n\`\`\``;
   }
 
   return (
@@ -41,7 +47,9 @@ export function FileWindow({
           )}
           {!windowState.loading && !windowState.error && (
             <div className="file-markdown">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{markdown}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {markdown}
+              </ReactMarkdown>
             </div>
           )}
         </article>

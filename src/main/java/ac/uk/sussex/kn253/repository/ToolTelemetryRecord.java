@@ -8,11 +8,20 @@ import jakarta.persistence.*;
  * retention.
  *
  * <p>
- * Each row captures the raw inputs to
- * {@link ac.uk.sussex.kn253.services.macro.ToolTelemetryService#record}
- * so that historical data survives application restarts. The table is managed
- * by
- * Hibernate's {@code update} strategy and is therefore never dropped.
+ * Each row captures the raw inputs from every {@code @Tool}-annotated method
+ * so that historical evidence survives application restarts.
+ *
+ * <p>
+ * <strong>Operational constraint (recommendations §8):</strong> this table
+ * ({@code tool_telemetry}) MUST NOT be dropped, truncated, or migrated
+ * destructively. The Hibernate schema strategy in production is {@code update}
+ * to enforce this. Any migration or refactor that would remove existing rows
+ * must be reviewed and replaced with a safe, additive migration path before
+ * merging.
+ *
+ * <p>
+ * Schema evolution must be backward-compatible: add columns with defaults
+ * rather than removing or renaming existing ones.
  */
 @Entity
 @Table(name = "tool_telemetry")
@@ -39,6 +48,22 @@ public class ToolTelemetryRecord extends PanacheEntityBase {
 
     @Column(name = "output_payload", columnDefinition = "TEXT")
     public String outputPayload;
+
+    /**
+     * Optional JSON payload produced by the tool alongside the human-readable
+     * {@link #outputPayload}. Populated when a tool returns a typed result;
+     * {@code null} for string-only tools. Supports evolution via
+     * {@link #outputSchemaVersion}.
+     */
+    @Column(name = "typed_output_payload", columnDefinition = "TEXT")
+    public String typedOutputPayload;
+
+    /**
+     * Schema version tag for {@link #typedOutputPayload}. A {@code null} or zero
+     * value indicates that no typed payload was recorded.
+     */
+    @Column(name = "output_schema_version")
+    public Integer outputSchemaVersion;
 
     @Column(name = "success", nullable = false)
     public boolean success;

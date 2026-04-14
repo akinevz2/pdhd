@@ -6,7 +6,10 @@
  *   { "type": "done",   "content": null }  — stream complete
  *   { "type": "error",  "content": "…" }  — server-side error, followed by "done"
  *
- * Client → server: plain text string (the user's message).
+ * Client → server (JSON):
+ *   { "type": "chat",              "content": "…" }    — conversational turn
+ *   { "type": "summarize-folder",  "path": "…" }       — folder / project summary
+ *   { "type": "project-next-steps","path": "…" }       — next-steps estimation
  *
  * The connection is lazily opened on the first call to `stream()` and kept alive
  * across turns so that subsequent messages reuse the same socket.  The connection
@@ -14,6 +17,11 @@
  */
 
 const WS_PATH = "/ws/chat";
+
+export type ClientMessage =
+  | { type: "chat"; content: string }
+  | { type: "summarize-folder"; projectUuid: string; uuid: string }
+  | { type: "project-next-steps"; projectUuid: string; uuid: string };
 
 type ServerMessage =
   | { type: "token"; content: string }
@@ -98,7 +106,7 @@ class ChatWebSocketClient {
     try {
       msg = JSON.parse(raw) as ServerMessage;
     } catch {
-      callbacks.onError(`Failed to parse server message: ${raw}`);
+      callbacks.onError(raw);
       return;
     }
 
@@ -117,7 +125,7 @@ class ChatWebSocketClient {
   }
 
   /**
-   * Sends a user message and streams the assistant reply via `callbacks`.
+   * Sends a typed client message and streams the assistant reply via `callbacks`.
    *
    * Only one stream may be active at a time.  Calling `stream()` while a
    * previous one is in progress will invoke the previous callbacks' `onError`.
@@ -126,7 +134,7 @@ class ChatWebSocketClient {
    *          reopening the underlying connection.
    */
   async stream(
-    userMessage: string,
+    payload: ClientMessage,
     callbacks: ChatStreamCallbacks,
   ): Promise<() => void> {
     if (this.pendingCallbacks) {
@@ -145,7 +153,7 @@ class ChatWebSocketClient {
     }
 
     this.pendingCallbacks = callbacks;
-    socket.send(userMessage);
+    socket.send(JSON.stringify(payload));
 
     const cancel = () => {
       if (this.pendingCallbacks === callbacks) {

@@ -32,9 +32,6 @@ public class ModelConfigService {
     OllamaManagementService ollamaManagementService;
 
     @Inject
-    OllamaRuntimeEndpointService runtimeEndpointService;
-
-    @Inject
     ObjectMapper objectMapper;
 
     /**
@@ -67,14 +64,22 @@ public class ModelConfigService {
     @Transactional
     public List<OllamaModelInfo> refreshModelCache() {
         final LLMSettings settings = load();
-        final String runtimeBaseUrl = runtimeEndpointService.resolvePersistedOrActive(settings.getBaseUrl());
-        final List<OllamaModelInfo> live = ollamaManagementService.listModels(runtimeBaseUrl);
-        if (!live.isEmpty()) {
-            settings.setOllamaModelsJson(toJson(live));
-            em.merge(settings);
-            return live;
+        final List<OllamaModelInfo> cached = readModelsJson(settings.getOllamaModelsJson());
+        final String baseUrl = settings.getBaseUrl();
+
+        if (!ollamaManagementService.isHealthy(baseUrl)) {
+            return cached;
         }
-        return readModelsJson(settings.getOllamaModelsJson());
+
+        try {
+            final List<OllamaModelInfo> liveModels = ollamaManagementService.listModels(baseUrl);
+            settings.setOllamaModelsJson(writeModelsJson(liveModels));
+            em.merge(settings);
+            return liveModels;
+        } catch (final Exception e) {
+            LOG.warning(() -> "Failed to refresh live Ollama models; using cached values: " + e.getMessage());
+            return cached;
+        }
     }
 
     /**
@@ -93,7 +98,7 @@ public class ModelConfigService {
     private LLMSettings createDefaults() {
         final LLMSettings defaults = new LLMSettings();
         try {
-            defaults.setBaseUrl(ollamaConfig.baseUrl());
+            defaults.setBaseUrl(ollamaConfig.baseUrl().orElse(null));
             defaults.setModelName(ollamaConfig.modelName());
             defaults.setEmbeddingModelName(ollamaConfig.embeddingModelName());
         } catch (final Exception e) {
@@ -118,12 +123,13 @@ public class ModelConfigService {
         }
     }
 
-    private String toJson(final List<OllamaModelInfo> models) {
+    private String writeModelsJson(final List<OllamaModelInfo> models) {
         try {
-            return objectMapper.writeValueAsString(models);
+            return objectMapper.writeValueAsString(models != null ? models : Collections.emptyList());
         } catch (final Exception e) {
-            LOG.warning(() -> "Failed to serialize model cache: " + e.getMessage());
+            LOG.warning(() -> "Failed to serialize model cache JSON: " + e.getMessage());
             return "[]";
         }
     }
+
 }

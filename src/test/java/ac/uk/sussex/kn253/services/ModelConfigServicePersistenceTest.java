@@ -22,16 +22,16 @@ class ModelConfigServicePersistenceTest {
         LLMSettings.deleteAll();
 
         final LLMSettings settings = modelConfigService.load();
-        settings.setBaseUrl("http://desktop-box26.local:11434");
-        settings.setModelName("llama3.2");
+        settings.setBaseUrl("http://host.docker.internal:11434");
+        settings.setModelName("gemma4");
         settings.setEmbeddingModelName("qwen3-embedding");
 
         modelConfigService.save(settings);
 
         final LLMSettings reloaded = modelConfigService.load();
         assertNotNull(reloaded.id);
-        assertEquals("http://desktop-box26.local:11434", reloaded.getBaseUrl());
-        assertEquals("llama3.2", reloaded.getModelName());
+        assertEquals("http://host.docker.internal:11434", reloaded.getBaseUrl());
+        assertEquals("gemma4", reloaded.getModelName());
         assertEquals("qwen3-embedding", reloaded.getEmbeddingModelName());
     }
 }

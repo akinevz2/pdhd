@@ -8,12 +8,16 @@ import org.jboss.resteasy.reactive.RestStreamElementType;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import ac.uk.sussex.kn253.ollama.OllamaConfig;
+import ac.uk.sussex.kn253.ollama.OllamaPullStatus;
 import ac.uk.sussex.kn253.repository.LLMSettings;
 import ac.uk.sussex.kn253.repository.OllamaModelInfo;
-import ac.uk.sussex.kn253.services.*;
+import ac.uk.sussex.kn253.services.ModelConfigService;
+import ac.uk.sussex.kn253.services.OllamaManagementService;
 import io.quarkus.runtime.Quarkus;
 import io.smallrye.common.annotation.Blocking;
 import io.smallrye.mutiny.Multi;
+import io.smallrye.mutiny.infrastructure.Infrastructure;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
@@ -67,17 +71,18 @@ public class MenuApiResource {
     }
 
     public record PullModelRequest(
-            String modelName) {
+            String modelName,
+            String baseUrl) {
     }
 
     public record DeleteModelRequest(
-            String modelName) {
+            String modelName,
+            String baseUrl) {
     }
 
     public record OllamaRuntimeStatusResponse(
             String runtimeEndpoint,
             String runtimeProvider,
-            boolean usingTestcontainers,
             boolean healthy) {
     }
 
@@ -93,23 +98,22 @@ public class MenuApiResource {
     OllamaManagementService ollamaManagementService;
 
     @Inject
-    OllamaRuntimeEndpointService runtimeEndpointService;
-
-    @Inject
-    OllamaTestcontainersService ollamaTestcontainersService;
+    OllamaConfig ollamaConfig;
 
     @Inject
     ObjectMapper objectMapper;
 
+    private final String DOCKER_INTERNAL_URL = "http://host.docker.internal:11434";
+
     @GET
     @Path("/ollama/status")
     public OllamaRuntimeStatusResponse getOllamaRuntimeStatus() {
-        final String runtime = runtimeEndpointService.getActiveBaseUrl();
-        final String containerEndpoint = ollamaTestcontainersService.getRunningEndpointOrNull();
-        final boolean usingTestcontainers = containerEndpoint != null && containerEndpoint.equals(runtime);
-        final String runtimeProvider = usingTestcontainers ? "INTERNAL" : "EXTERNAL";
+        final String runtime = resolveRuntimeEndpoint();
         final boolean healthy = ollamaManagementService.isHealthy(runtime);
-        return new OllamaRuntimeStatusResponse(runtime, runtimeProvider, usingTestcontainers, healthy);
+        return new OllamaRuntimeStatusResponse(
+                runtime,
+                resolveRuntimeProvider(runtime),
+                healthy);
     }
 
     @POST
@@ -120,30 +124,26 @@ public class MenuApiResource {
             throw new WebApplicationException("Provider is required", Response.Status.BAD_REQUEST);
         }
 
+        final LLMSettings settings = modelConfigService.load();
         final String provider = request.provider().trim().toUpperCase(Locale.ROOT);
         switch (provider) {
-            case "INTERNAL": {
-                final String endpoint = ollamaTestcontainersService.startAndGetEndpoint();
-                runtimeEndpointService.setRuntimeBaseUrl(endpoint);
+            case "INTERNAL":
+                settings.setBaseUrl(DOCKER_INTERNAL_URL);
                 break;
-            }
             case "EXTERNAL": {
-                String externalBaseUrl = request.baseUrl();
+                final String externalBaseUrl = request.baseUrl() == null ? null : request.baseUrl().trim();
                 if (externalBaseUrl == null || externalBaseUrl.isBlank()) {
-                    final LLMSettings settings = modelConfigService.load();
-                    externalBaseUrl = settings.getBaseUrl();
-                }
-                if (externalBaseUrl == null || externalBaseUrl.isBlank()) {
-                    throw new WebApplicationException("External Ollama base URL is required",
+                    throw new WebApplicationException("Base URL is required for external provider",
                             Response.Status.BAD_REQUEST);
                 }
-                runtimeEndpointService.setRuntimeBaseUrl(externalBaseUrl);
-                ollamaTestcontainersService.stopRunningContainer();
+                settings.setBaseUrl(externalBaseUrl);
                 break;
             }
             default:
-                throw new WebApplicationException("Unsupported provider: " + provider, Response.Status.BAD_REQUEST);
+                throw new WebApplicationException("Provider is required", Response.Status.BAD_REQUEST);
         }
+
+        modelConfigService.save(settings);
 
         return getOllamaRuntimeStatus();
     }
@@ -153,24 +153,36 @@ public class MenuApiResource {
     @Produces(MediaType.SERVER_SENT_EVENTS)
     @RestStreamElementType(MediaType.APPLICATION_JSON)
     @Blocking
-    public Multi<String> pullModelStream(@QueryParam("modelName") final String modelName) {
+    public Multi<String> pullModelStream(
+            @QueryParam("modelName") final String modelName,
+            @QueryParam("baseUrl") final String baseUrl) {
         if (modelName == null || modelName.isBlank()) {
             throw new WebApplicationException("Model name is required", Response.Status.BAD_REQUEST);
         }
-        return Multi.createFrom().emitter(em -> {
+        return Multi.createFrom().<String>emitter(em -> {
             try {
-                ollamaManagementService.pullModelStreaming(null, modelName, status -> {
+                ollamaManagementService.pullModelStreaming(normalizeBaseUrl(baseUrl), modelName, status -> {
                     try {
                         em.emit(objectMapper.writeValueAsString(status));
                     } catch (final JsonProcessingException e) {
-                        em.fail(e);
+                        throw new RuntimeException(e);
                     }
                 });
-                em.complete();
             } catch (final RuntimeException e) {
-                em.fail(e);
+                try {
+                    final OllamaPullStatus failedStatus = new OllamaPullStatus(
+                            "error: " + e.getMessage(),
+                            null,
+                            0L,
+                            0L);
+                    em.emit(objectMapper.writeValueAsString(failedStatus));
+                } catch (final Exception ignored) {
+                    // Best effort: if status serialization fails, close stream.
+                }
+            } finally {
+                em.complete();
             }
-        });
+        }).runSubscriptionOn(Infrastructure.getDefaultWorkerPool());
     }
 
     @GET
@@ -209,13 +221,13 @@ public class MenuApiResource {
     @GET
     @Path("/ollama/models")
     @Transactional
-    public OllamaModelsResponse listOllamaModels() {
+    public OllamaModelsResponse listOllamaModels(@QueryParam("baseUrl") final String baseUrl) {
         try {
-            final List<OllamaModelInfo> models = modelConfigService.refreshModelCache();
-            final List<String> modelNames = models.stream()
-                    .map(OllamaModelInfo::getName)
-                    .toList();
-            return new OllamaModelsResponse(modelNames);
+            final String normalizedBaseUrl = normalizeBaseUrl(baseUrl);
+            if (normalizedBaseUrl != null) {
+                return new OllamaModelsResponse(listModelNames(normalizedBaseUrl));
+            }
+            return new OllamaModelsResponse(listModelNames(null));
         } catch (final Exception e) {
             LOG.warning(() -> "Failed to list Ollama models: " + e.getMessage());
             return new OllamaModelsResponse(Collections.emptyList());
@@ -231,12 +243,9 @@ public class MenuApiResource {
         }
 
         try {
-            ollamaManagementService.pullModel(request.modelName);
-            final List<OllamaModelInfo> models = modelConfigService.refreshModelCache();
-            final List<String> modelNames = models.stream()
-                    .map(OllamaModelInfo::getName)
-                    .toList();
-            return new OllamaModelsResponse(modelNames);
+            final String normalizedBaseUrl = normalizeBaseUrl(request.baseUrl());
+            ollamaManagementService.pullModel(normalizedBaseUrl, request.modelName);
+            return new OllamaModelsResponse(listModelNames(normalizedBaseUrl));
         } catch (final Exception e) {
             LOG.warning(() -> "Failed to pull model: " + e.getMessage());
             throw new WebApplicationException("Failed to pull model: " + e.getMessage(),
@@ -253,12 +262,9 @@ public class MenuApiResource {
         }
 
         try {
-            ollamaManagementService.deleteModel(request.modelName);
-            final List<OllamaModelInfo> models = modelConfigService.refreshModelCache();
-            final List<String> modelNames = models.stream()
-                    .map(OllamaModelInfo::getName)
-                    .toList();
-            return new OllamaModelsResponse(modelNames);
+            final String normalizedBaseUrl = normalizeBaseUrl(request.baseUrl());
+            ollamaManagementService.deleteModel(normalizedBaseUrl, request.modelName);
+            return new OllamaModelsResponse(listModelNames(normalizedBaseUrl));
         } catch (final Exception e) {
             LOG.warning(() -> "Failed to delete model: " + e.getMessage());
             throw new WebApplicationException("Failed to delete model: " + e.getMessage(),
@@ -302,5 +308,42 @@ public class MenuApiResource {
                 LLMSettings.DEFAULT_SYSTEM_PROMPT,
                 settings.getToolSystemPrompt(),
                 LLMSettings.DEFAULT_TOOL_SYSTEM_PROMPT);
+    }
+
+    private String resolveRuntimeEndpoint() {
+        final LLMSettings settings = modelConfigService.load();
+        final String persistedBaseUrl = settings != null ? settings.getBaseUrl() : null;
+        if (persistedBaseUrl != null && !persistedBaseUrl.isBlank()) {
+            return persistedBaseUrl.trim();
+        }
+
+        return ollamaConfig.baseUrl()
+                .map(String::trim)
+                .filter(baseUrl -> !baseUrl.isBlank())
+                .orElse(DOCKER_INTERNAL_URL);
+    }
+
+    private String resolveRuntimeProvider(final String runtimeEndpoint) {
+        if (runtimeEndpoint == null || runtimeEndpoint.isBlank()) {
+            return "EXTERNAL";
+        }
+        return DOCKER_INTERNAL_URL.equals(runtimeEndpoint) ? "INTERNAL" : "EXTERNAL";
+    }
+
+    private String normalizeBaseUrl(final String baseUrl) {
+        if (baseUrl == null) {
+            return null;
+        }
+        final String trimmed = baseUrl.trim();
+        return trimmed.isBlank() ? null : trimmed;
+    }
+
+    private List<String> listModelNames(final String baseUrl) {
+        final List<OllamaModelInfo> models = baseUrl == null
+                ? modelConfigService.refreshModelCache()
+                : ollamaManagementService.listModels(baseUrl);
+        return models.stream()
+                .map(OllamaModelInfo::getName)
+                .toList();
     }
 }

@@ -141,7 +141,7 @@ Practical outcome:
 **Key Fields:**
 
 - `baseUrl` - Ollama server endpoint (e.g., `http://localhost:11434`)
-- `modelName` - Selected model identifier (e.g., `llama3.2`, `qwen2.5-coder`)
+- `modelName` - Selected model identifier (e.g., `gemma4`, `qwen2.5-coder`)
 - `temperature` - Sampling randomness (0.0 = deterministic, 1.0+ = creative)
 - `numPredict` - Maximum tokens to generate per response
 - `numCtx` - Context window size
@@ -174,7 +174,7 @@ Tool Execution Request
     ↓
 OllamaChatSession.toolService.execute(request, memoryId)
     ├─ Dispatch to appropriate ToolModule
-    ├─ Execute ToolMacro
+    ├─ Execute tool implementation
     └─ Return String result
     ↓
 Append to history as ToolExecutionResultMessage
@@ -265,7 +265,7 @@ Different models have different capabilities:
 
 ### Tool-Native Models
 
-Models like `llama3.2` have native tool support and can generate structured tool calls directly.
+Models like `gemma4` have native tool support and can generate structured tool calls directly.
 
 - Advantage: Cleaner tool invocation
 - Advantage: Reduced prompt engineering
@@ -358,7 +358,7 @@ When embeddings are used, additional pre-processing occurs:
 // Create session without CDI
 OllamaChatSession session = new OllamaChatSession(
     "http://localhost:11434",
-    "llama3.2"
+    "gemma4"
 );
 session.setSystemPrompt("You are a helpful assistant.");
 String response = session.send("What is 2+2?");

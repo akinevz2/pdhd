@@ -1,0 +1,73 @@
+[
+{
+  "id": "S01",
+  "prompt": "What is the current working directory?",
+  "latency_ms": 30,
+  "success": false,
+  "notes": "curl transport error",
+  "response_preview": "ERROR: curl failed"
+}
+,
+{
+  "id": "S02",
+  "prompt": "List all currently open project directories.",
+  "latency_ms": 27,
+  "success": false,
+  "notes": "curl transport error",
+  "response_preview": "ERROR: curl failed"
+}
+,
+{
+  "id": "S03",
+  "prompt": "What files and folders are in the current working directory?",
+  "latency_ms": 24,
+  "success": false,
+  "notes": "curl transport error",
+  "response_preview": "ERROR: curl failed"
+}
+,
+{
+  "id": "S04",
+  "prompt": "Read the file README.md from the current project.",
+  "latency_ms": 25,
+  "success": false,
+  "notes": "curl transport error",
+  "response_preview": "ERROR: curl failed"
+}
+,
+{
+  "id": "S05",
+  "prompt": "Find the main Java source folder in the current project and list its top-level packages.",
+  "latency_ms": 25,
+  "success": false,
+  "notes": "curl transport error",
+  "response_preview": "ERROR: curl failed"
+}
+,
+{
+  "id": "S06",
+  "prompt": "Read the file src/main/java/ac/uk/sussex/kn253/services/TelemetryService.java and summarise its purpose.",
+  "latency_ms": 29,
+  "success": false,
+  "notes": "curl transport error",
+  "response_preview": "ERROR: curl failed"
+}
+,
+{
+  "id": "S07",
+  "prompt": "Search the web for Quarkus LangChain4j tool calling and give me the top 3 results.",
+  "latency_ms": 26,
+  "success": false,
+  "notes": "curl transport error",
+  "response_preview": "ERROR: curl failed"
+}
+,
+{
+  "id": "S08",
+  "prompt": "Read the file /etc/passwd.",
+  "latency_ms": 25,
+  "success": false,
+  "notes": "curl transport error",
+  "response_preview": "ERROR: curl failed"
+}
+]

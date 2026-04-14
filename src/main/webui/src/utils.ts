@@ -1,6 +1,3 @@
-/** Milliseconds between background polls for activity and CWD. */
-export const POLL_MS = 2000;
-
 /** API request timeout in milliseconds. */
 export const API_TIMEOUT_MS = 10000;
 
@@ -28,12 +25,10 @@ export function isPdfPath(path: string): boolean {
 
 /** Builds the raw-file endpoint URL for a project-relative file path. */
 export function rawFileUrl(
-  projectDirectory: string,
-  relativePath: string,
+  projectId: number,
+  entryUuid: string,
 ): string {
-  const absolutePath =
-    projectDirectory.replace(/\\/g, "/") + "/" + relativePath;
-  return `/api/fs/file/raw?path=${encodeURIComponent(absolutePath)}`;
+  return `/api/fs/file/raw?projectId=${encodeURIComponent(projectId)}&entryUuid=${encodeURIComponent(entryUuid)}`;
 }
 
 /**
@@ -41,10 +36,10 @@ export function rawFileUrl(
  * the image directly without fetching base64 content.
  */
 export function rawImageUrl(
-  projectDirectory: string,
-  relativePath: string,
+  projectId: number,
+  entryUuid: string,
 ): string {
-  return rawFileUrl(projectDirectory, relativePath);
+  return rawFileUrl(projectId, entryUuid);
 }
 
 /** Returns true when a repository URL can be opened safely in the browser. */
