@@ -86,3 +86,16 @@ false-positive evidence and weakened evaluation credibility.
 **Evidence/links:** `scripts/benchmark.sh`,
 `docs/evaluation/results/run-2026-04-14T04:18:41.json`,
 `docs/operation-summary-2026-04-14.md`
+
+### 2026-04-14 – Retry policy for benchmark operations
+
+**Area:** other  
+**Change:** Documented a conservative retry policy in implementation notes:
+avoid automatic retries, rely on configurable request timeouts, and require
+manual user confirmation before re-running failed or timed-out benchmark/model
+operations.  
+**Rationale:** Prevents hidden instability and preserves transparent,
+interpretable benchmark evidence by ensuring retries are intentional and
+operator-approved.  
+**Evidence/links:** `docs/operation-summary-2026-04-14.md`,
+`scripts/benchmark.sh`

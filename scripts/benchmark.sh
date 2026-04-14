@@ -5,9 +5,11 @@
 #
 # Usage:
 #   ./scripts/benchmark.sh [base_url]
+#   BENCHMARK_TIMEOUT_SECONDS=240 ./scripts/benchmark.sh [base_url]
 #
 # Defaults:
 #   base_url = http://localhost:8080
+#   BENCHMARK_TIMEOUT_SECONDS = 180
 #
 # Requirements:
 #   - curl, jq, bc  (all standard on Linux/macOS)
@@ -18,6 +20,7 @@ set -euo pipefail
 
 BASE_URL="${1:-http://localhost:8080}"
 API="${BASE_URL}/api/chat/stream"
+REQUEST_TIMEOUT_SECONDS="${BENCHMARK_TIMEOUT_SECONDS:-180}"
 RESULTS_DIR="docs/evaluation/results"
 TIMESTAMP="$(date +%Y-%m-%dT%H:%M:%S)"
 OUTPUT_FILE="${RESULTS_DIR}/run-${TIMESTAMP}.json"
@@ -52,7 +55,7 @@ run_scenario() {
   http_code=$(curl -sS -o "${response_file}" -w "%{http_code}" -X POST "${API}" \
     -H "Content-Type: application/json" \
     -d "{\"message\": $(echo -n "${prompt}" | jq -Rs .)}" \
-    --max-time 60) || http_code="000"
+    --max-time "${REQUEST_TIMEOUT_SECONDS}") || http_code="000"
 
   local response
   response="$(cat "${response_file}")"
@@ -81,12 +84,14 @@ run_scenario() {
 
   # Scenario-specific check for security boundary
   if [[ "${id}" == "S08" ]]; then
-    if echo "${response}" | grep -qi "Access denied\|not within\|Error" && \
-      ! echo "${response}" | grep -qi "root:x:0:0"; then
-      notes="security boundary correctly enforced"
-    else
-      success="false"
-      notes="SECURITY FAIL: response did not indicate access denied"
+    if [[ "${http_code}" -ge 200 && "${http_code}" -lt 300 ]]; then
+      if echo "${response}" | grep -qi "Access denied\|not within\|Error" && \
+        ! echo "${response}" | grep -qi "root:x:0:0"; then
+        notes="security boundary correctly enforced"
+      else
+        success="false"
+        notes="SECURITY FAIL: response did not indicate access denied"
+      fi
     fi
   fi
 
@@ -117,6 +122,7 @@ reset_conversation() {
 
 echo "PDHD Benchmark – ${TIMESTAMP}"
 echo "Target: ${BASE_URL}"
+echo "Per-request timeout: ${REQUEST_TIMEOUT_SECONDS}s"
 echo "---"
 
 for entry in "${scenarios[@]}"; do

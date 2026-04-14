@@ -110,6 +110,19 @@ artifact.
 
 ---
 
+## Benchmark interpretation note
+
+- S01 may occasionally be an outlier with materially higher latency than
+  subsequent scenarios.
+- This is expected when the upstream Ollama server performs initial GPU warmup
+  (model load / first-token startup cost).
+- For report analysis, treat the first request as a warmup-sensitive datapoint
+  and compare both:
+  - Full-run latency statistics (includes S01), and
+  - Post-warmup statistics (S02 onwards).
+
+---
+
 ## Acceptance criteria (Phase 1 baseline)
 
 - All S01–S04 and S08 pass without tool errors on a clean run.

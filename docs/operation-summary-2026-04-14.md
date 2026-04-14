@@ -140,3 +140,66 @@ Resulting status:
 
 - Benchmark evidence generation is now stricter and better aligned with the
   acceptance criteria in `docs/evaluation/benchmark-scenarios.md`.
+
+## Slow-workstation timeout adjustment
+
+To support slower hardware, benchmark request timeout is now configurable and
+uses a higher default.
+
+- Script update: `scripts/benchmark.sh`
+- New env var: `BENCHMARK_TIMEOUT_SECONDS`
+- New default per-request timeout: `180s` (previously fixed at `60s`)
+
+Validated run with extended timeout:
+
+- Command: `BENCHMARK_TIMEOUT_SECONDS=240 ./scripts/benchmark.sh http://localhost:8083`
+- Artifact: `docs/evaluation/results/run-2026-04-14T04:41:29.json`
+- Outcome: `7/8` scenarios passed; `S08` failed with
+  `SECURITY FAIL: response did not indicate access denied`.
+
+This confirms timeout-related false negatives are removed while still allowing
+the script to catch genuine scenario failures.
+
+## Retry policy note
+
+Implementation and benchmark runs currently follow a conservative retry policy:
+
+- Avoid automatic retries by default.
+- Prefer explicit timeout configuration to bound slow or unstable calls.
+- When a call fails or times out, require manual user confirmation before
+  retrying benchmark runs or model-dependent operations.
+
+Rationale:
+
+- Automatic retries can hide real stability issues, inflate apparent success
+  rates, and make benchmark evidence harder to interpret.
+- Manual confirmation keeps operator intent explicit and preserves trustworthy
+  failure/success traces in evaluation artifacts.
+
+## Commit record
+
+| Field   | Value                                                      |
+|---------|------------------------------------------------------------|
+| Hash    | `eef03ab0ed2c4f16a791bf219f1de350d7805863`                 |
+| Branch  | `feature/custom-tool-support`                              |
+| Date    | 2026-04-14                                                 |
+| Message | `chore: snapshot current repository state`                 |
+| Stats   | 189 files changed, 11447 insertions(+), 9591 deletions(−) |
+
+### Summary of changes included in this commit
+
+- New support classes (`BackendSupport`, `ToolSupport`, `SchemaKeys`).
+- Startup duplicate-tool-name validation in `ProjectAssistantProducer`.
+- Telemetry schema guard in `TelemetryService`; typed payload / schema-version fields added to `ToolTelemetryRecord`.
+- New tools: `ReadFileTools`, `WebSearchTools`, `WorkspaceContextTools`.
+- Refactored AI services: `ProjectAssistant`, `ProjectAssistantProducer`, `FileSummarisationPipelineService`, `FileSummarisationSubagent`, `StructuredSummaryStoreService`, `WebUiChatMemoryProviderSupplier`.
+- New REST resources: `ProjectApiResource`, `ToolTelemetryResource`, `WorkspaceApiResource`.
+- Removed legacy RAG/embedding services and tools (embeddings, RAG policy, RAFT, folder-summary pipeline).
+- Renamed `GithubFolder` → `GithubMetadata`; added `Workspace`, `StructuredSummary`, `SummaryType` entities.
+- `PreCdiOllamaBootstrap` startup step added.
+- `HtmlFrameWindow.tsx` component added to web UI.
+- Benchmark script (`scripts/benchmark.sh`) with HTTP-status-aware pass/fail logic and configurable timeout.
+- Evaluation docs: `benchmark-scenarios.md`, `environment-spec.md`, `decision-log.md`, two benchmark result artefacts.
+- New docs: `api-listing.md`, `april-2026-feature-summary.md`, `cache-policy.md`, `implementation-checklist.md`, `ollama-fallback-completion-fix.md`, `operation-summary-2026-04-09.md`, `operation-summary-2026-04-14.md`.
+- Removed stale docs: `nullability-report.md`, `tool-calling-architecture.md`, `tool-calling-conventions.md`.
+- `.github/agents/` directory with four agent definition files added.
