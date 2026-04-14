@@ -31,6 +31,16 @@ The application is a Quarkus Picocli CLI tool that runs an AI-powered developer 
    (LangChain4j)     (Panache/Postgres)   (Panache/Postgres)
 ```
 
+## End-to-End Runtime Flow
+
+For a launch-to-request narrative suitable for reports, see
+`docs/assistant-request-flow.md`. That document consolidates:
+
+- Application startup and bootstrap behavior
+- Web UI and REST API request entry path
+- Chat orchestration and tool-calling control flow
+- Response return path and persistence side effects
+
 ---
 
 ## Package Map

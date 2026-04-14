@@ -42,7 +42,7 @@ public class LLMSettings extends PanacheEntityBase {
     @Column(name = "base_url")
     private String baseUrl;
 
-    /** Selected runtime model identifier (e.g. {@code llama3.1:8b}). */
+    /** Selected runtime model identifier (e.g. {@code gemma4:8b}). */
     @Column(name = "model_name")
     private String modelName;
 

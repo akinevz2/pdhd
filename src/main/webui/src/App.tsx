@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { apiPostTextStream, apiWithTimeout } from "./api";
 import { normalizeToolCallMarkup } from "./assistantActions";
 import { ChatDock } from "./components/ChatDock";
 import { CwdNavigator } from "./components/CwdNavigator";
 import { FileWindow } from "./components/FileWindow";
+import { HtmlFrameWindow } from "./components/HtmlFrameWindow";
 import { PaneWindow } from "./components/PaneWindow";
 import { TopMenuAndModals } from "./components/TopMenuAndModals";
 import { useMenuPanels } from "./hooks/useMenuPanels";
@@ -14,44 +16,102 @@ import {
 } from "./modules/configuration/ConfigurationMenus";
 import { useConfigurationMenus } from "./modules/configuration/useConfigurationMenus";
 import type {
-  AssistantChatResponse,
   ChatMessage,
-  CwdResponse,
   FileWindowState,
   FileContentResponse,
   FsBrowserEntry,
-  FsListResponse,
+  IframeWindowState,
+  WorkspaceResponse,
+  BrowseResponse,
+  ProjectFolderEntity,
   ProjectSummary as ProjectSummaryType,
   ToolActivityItem,
   ToolTelemetryItem,
   ToolTelemetryResponse,
+  OllamaRuntimeStatus,
+  ApiFailureState,
   WindowState,
 } from "./types";
 import {
-  CHAT_TIMEOUT_MS,
-  POLL_MS,
   isBrowsableRepoUrl,
+  CHAT_TIMEOUT_MS,
   isImagePath,
   isPdfPath,
   openExternalUrl,
 } from "./utils";
 import {
+  dismissSignalFailure,
   emitApiSignal,
+  getSignalErrors,
   registerApiSignals,
+  retryFailedSignal,
   subscribeSignalErrors,
+  subscribeSignalHtmlFrames,
   type ApiSignalKey,
 } from "./signals";
-import { chatWebSocket } from "./websocket";
 
 const MARKDOWN_FILE_PATTERN = /\.(md|markdown|mdx)$/i;
 const README_FILE_PATTERN = /^readme(\.(md|markdown|mdx|txt))?$/i;
 const ASSISTANT_ACTION_BLOCK_PATTERN = /```assistant-action\s*([\s\S]*?)```/gi;
-const REQUEST_SOURCE_HEADER = "X-Assistant-Request-Source";
 const REQUEST_SOURCE_CHAT_INPUT = "chat-input";
 const REQUEST_SOURCE_ASSISTANT_ACTION_BUTTON = "assistant-action-button";
-const REQUEST_SOURCE_FILE_EXPLORER = "file-explorer";
-const CWD_GET_TIMEOUT_MS = 2_000;
-const CWD_GET_MAX_RETRIES = 1;
+const CWD_GET_TIMEOUT_MS = 10_000;
+const OLLAMA_STARTUP_STATUS_TIMEOUT_MS = 1_500;
+const OLLAMA_STATUS_POLL_MS = 10_000;
+const MOBILE_LAYOUT_BREAKPOINT_PX = 1120;
+const MIN_LEFT_RAIL_WIDTH_PX = 220;
+const MAX_LEFT_RAIL_WIDTH_PX = 520;
+const MIN_RIGHT_RAIL_WIDTH_PX = 240;
+const MAX_RIGHT_RAIL_WIDTH_PX = 520;
+const MIN_CHAT_HEIGHT_PX = 180;
+const MAX_CHAT_HEIGHT_RATIO = 0.55;
+
+type ShellResizer = "left" | "right" | "bottom";
+
+type ResizeDragState = {
+  type: ShellResizer;
+  startX: number;
+  startY: number;
+  startLeftWidth: number;
+  startRightWidth: number;
+  startChatHeight: number;
+};
+
+function normalizeApiFailureMessage(
+  statusCode: number | undefined,
+  message: string,
+): string {
+  if (typeof statusCode === "number") {
+    return `${statusCode}: API unavailable`;
+  }
+  const statusMatch = /([1-5]\d{2}):\s*API unavailable/.exec(message || "");
+  if (statusMatch) {
+    return `${statusMatch[1]}: API unavailable`;
+  }
+  return message;
+}
+
+function mergeFailuresById(
+  existing: ApiFailureState[],
+  incoming: ApiFailureState[],
+): ApiFailureState[] {
+  const merged = new Map(existing.map((item) => [item.id, item]));
+  for (const item of incoming) {
+    merged.set(item.id, item);
+  }
+  return Array.from(merged.values()).sort((a, b) =>
+    a.timestamp.localeCompare(b.timestamp),
+  );
+}
+
+function estimateTokenCount(text: string): number {
+  const matches = text.match(/\S+/g);
+  return matches ? matches.length : 0;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
 
 function toUnixPath(path: string): string {
   return path.replace(/\\/g, "/");
@@ -80,25 +140,6 @@ function resolveTargetPath(
   return `${base}/${raw}`;
 }
 
-function toEntryPath(
-  projectDirectory: string,
-  absoluteOrRelativePath: string,
-): string {
-  const base = toUnixPath((projectDirectory || "").trim()).replace(/\/$/, "");
-  const value = toUnixPath((absoluteOrRelativePath || "").trim());
-
-  if (!value || !base || !isAbsolutePath(value)) {
-    return value;
-  }
-  if (value === base) {
-    return ".";
-  }
-  if (value.startsWith(`${base}/`)) {
-    return value.slice(base.length + 1);
-  }
-  return value;
-}
-
 type AssistantActionPayload = {
   label: string;
   prompt: string;
@@ -106,59 +147,229 @@ type AssistantActionPayload = {
 
 const SIGNALS = {
   TOOL_TELEMETRY_GET: "telemetry:get",
-  CWD_GET: "cwd:get",
-  CWD_SET: "cwd:set",
-  FS_LIST: "fs:list",
-  FS_FILE: "fs:file",
-  FS_GIT_OPEN: "fs:git:open",
-  FS_PROJECT: "fs:project",
-  FS_PROJECT_REGISTER: "fs:project:register",
-  FS_PROJECT_LOAD: "fs:project:load",
-  FS_PROJECT_UNLOAD: "fs:project:unload",
+  WORKSPACE_GET: "workspace:get",
+  PROJECT_LIST: "project:list",
+  PROJECT_OPEN: "project:open",
+  PROJECT_CLOSE: "project:close",
+  PROJECT_REMOTE_URL: "project:remote-url",
+  PROJECT_BROWSE: "project:browse",
+  PROJECT_FILE: "project:file",
   CHAT_RESET: "chat:reset",
-  CHAT_SUMMARIZE_FOLDER: "chat:summarizeFolder",
 } as const satisfies Record<string, ApiSignalKey>;
 
 export function App() {
+  const appShellRef = useRef<HTMLElement | null>(null);
   const [browserPath, setBrowserPath] = useState<string>("");
   const [browserEntries, setBrowserEntries] = useState<FsBrowserEntry[]>([]);
   const [browserLoading, setBrowserLoading] = useState(false);
-  const [browserError, setBrowserError] = useState<string | null>(null);
   const [browserRepoUrl, setBrowserRepoUrl] = useState<string | null>(null);
+  const [browserProjectId, setBrowserProjectId] = useState(0);
 
   const [activityItems] = useState<ToolActivityItem[]>([]);
 
   const [telemetryOpen, setTelemetryOpen] = useState(false);
   const [telemetryItems, setTelemetryItems] = useState<ToolTelemetryItem[]>([]);
   const [telemetryLoading, setTelemetryLoading] = useState(false);
-  const [telemetryError, setTelemetryError] = useState<string | null>(null);
   const [telemetrySummary, setTelemetrySummary] = useState<string>("");
   const [telemetryGeneratedAt, setTelemetryGeneratedAt] = useState<string>("");
 
   const [cwd, setCwd] = useState<string>("");
-  const [cwdError, setCwdError] = useState<string | null>(null);
   const [cwdUpdating, setCwdUpdating] = useState(false);
-  const [cwdRetryPending, setCwdRetryPending] = useState(false);
 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState<string>("");
   const [chatLoading, setChatLoading] = useState<boolean>(false);
-  const [chatError, setChatError] = useState<string | null>(null);
-  const [assistantUnreachable, setAssistantUnreachable] =
-    useState<boolean>(false);
-  const lastSignalErrorRef = useRef<{
-    fingerprint: string;
-    timestamp: number;
-  } | null>(null);
+  const [apiFailures, setApiFailures] = useState<ApiFailureState[]>([]);
+  const [ollamaHealthy, setOllamaHealthy] = useState<boolean | null>(null);
+  const [ollamaEndpoint, setOllamaEndpoint] = useState<string>("");
+  const [streamingActive, setStreamingActive] = useState<boolean>(false);
+  const [streamingTokenCount, setStreamingTokenCount] = useState<number>(0);
+  const [streamingTokensPerSecond, setStreamingTokensPerSecond] =
+    useState<number>(0);
+  const [leftRailWidth, setLeftRailWidth] = useState<number>(300);
+  const [rightRailWidth, setRightRailWidth] = useState<number>(320);
+  const [chatHeight, setChatHeight] = useState<number>(240);
+  const [activeResizer, setActiveResizer] = useState<ShellResizer | null>(null);
+  const [chatUnavailable, setChatUnavailable] = useState<boolean>(false);
   const chatLogRef = useRef<HTMLDivElement | null>(null);
   const chatInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const initialCwdLoadedRef = useRef(false);
+  const streamStartedAtRef = useRef<number>(0);
+  const streamTextRef = useRef<string>("");
   const [windows, setWindows] = useState<WindowState[]>([]);
   const [fileWindows, setFileWindows] = useState<FileWindowState[]>([]);
+  const [iframeWindows, setIframeWindows] = useState<IframeWindowState[]>([]);
   const nextWindowId = useRef(1);
   const nextZ = useRef(10);
+  const resizeDragRef = useRef<ResizeDragState | null>(null);
 
   const menuPanels = useMenuPanels();
   const configurationMenus = useConfigurationMenus();
+
+  const startShellResize = useCallback(
+    (type: ShellResizer, event: React.PointerEvent<HTMLDivElement>) => {
+      if (window.innerWidth <= MOBILE_LAYOUT_BREAKPOINT_PX) {
+        return;
+      }
+      event.preventDefault();
+      resizeDragRef.current = {
+        type,
+        startX: event.clientX,
+        startY: event.clientY,
+        startLeftWidth: leftRailWidth,
+        startRightWidth: rightRailWidth,
+        startChatHeight: chatHeight,
+      };
+      setActiveResizer(type);
+    },
+    [chatHeight, leftRailWidth, rightRailWidth],
+  );
+
+  const nudgeShellResize = useCallback((type: ShellResizer, direction: -1 | 1) => {
+    if (window.innerWidth <= MOBILE_LAYOUT_BREAKPOINT_PX) {
+      return;
+    }
+
+    if (type === "left") {
+      setLeftRailWidth((current) =>
+        clamp(current + direction * 24, MIN_LEFT_RAIL_WIDTH_PX, MAX_LEFT_RAIL_WIDTH_PX),
+      );
+      return;
+    }
+
+    if (type === "right") {
+      setRightRailWidth((current) =>
+        clamp(current - direction * 24, MIN_RIGHT_RAIL_WIDTH_PX, MAX_RIGHT_RAIL_WIDTH_PX),
+      );
+      return;
+    }
+
+    const shellHeight = appShellRef.current?.clientHeight ?? window.innerHeight;
+    const maxChatHeight = Math.max(MIN_CHAT_HEIGHT_PX, Math.floor(shellHeight * MAX_CHAT_HEIGHT_RATIO));
+    setChatHeight((current) =>
+      clamp(current - direction * 24, MIN_CHAT_HEIGHT_PX, maxChatHeight),
+    );
+  }, []);
+
+  useEffect(() => {
+    const handlePointerMove = (event: PointerEvent) => {
+      const dragState = resizeDragRef.current;
+      if (!dragState || window.innerWidth <= MOBILE_LAYOUT_BREAKPOINT_PX) {
+        return;
+      }
+
+      if (dragState.type === "left") {
+        const nextWidth = clamp(
+          dragState.startLeftWidth + (event.clientX - dragState.startX),
+          MIN_LEFT_RAIL_WIDTH_PX,
+          MAX_LEFT_RAIL_WIDTH_PX,
+        );
+        setLeftRailWidth(nextWidth);
+        return;
+      }
+
+      if (dragState.type === "right") {
+        const nextWidth = clamp(
+          dragState.startRightWidth - (event.clientX - dragState.startX),
+          MIN_RIGHT_RAIL_WIDTH_PX,
+          MAX_RIGHT_RAIL_WIDTH_PX,
+        );
+        setRightRailWidth(nextWidth);
+        return;
+      }
+
+      const shellHeight = appShellRef.current?.clientHeight ?? window.innerHeight;
+      const maxChatHeight = Math.max(MIN_CHAT_HEIGHT_PX, Math.floor(shellHeight * MAX_CHAT_HEIGHT_RATIO));
+      const nextHeight = clamp(
+        dragState.startChatHeight - (event.clientY - dragState.startY),
+        MIN_CHAT_HEIGHT_PX,
+        maxChatHeight,
+      );
+      setChatHeight(nextHeight);
+    };
+
+    const stopResizing = () => {
+      resizeDragRef.current = null;
+      setActiveResizer(null);
+    };
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", stopResizing);
+    window.addEventListener("pointercancel", stopResizing);
+
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", stopResizing);
+      window.removeEventListener("pointercancel", stopResizing);
+    };
+  }, []);
+
+  const shellStyle = {
+    "--left-rail-width": `${leftRailWidth}px`,
+    "--right-rail-width": `${rightRailWidth}px`,
+    "--chat-height": `${chatHeight}px`,
+  } as CSSProperties;
+
+  const startStreamingStats = useCallback(() => {
+    streamStartedAtRef.current = performance.now();
+    streamTextRef.current = "";
+    setStreamingTokenCount(0);
+    setStreamingTokensPerSecond(0);
+    setStreamingActive(true);
+  }, []);
+
+  const updateStreamingStats = useCallback((chunk: string) => {
+    streamTextRef.current += chunk;
+    const tokenCount = estimateTokenCount(streamTextRef.current);
+    const elapsedSeconds = Math.max(
+      (performance.now() - streamStartedAtRef.current) / 1000,
+      0.001,
+    );
+
+    setStreamingTokenCount(tokenCount);
+    setStreamingTokensPerSecond(tokenCount / elapsedSeconds);
+  }, []);
+
+  const finishStreamingStats = useCallback(() => {
+    setStreamingActive(false);
+  }, []);
+
+  const mapProjectEntityToSummary = useCallback(
+    async (project: ProjectFolderEntity): Promise<ProjectSummaryType> => {
+      const projectId = Number.isFinite(project.id) ? project.id : -1;
+
+      return {
+        id: projectId,
+        directory: project.directory,
+        hasGitRepository: Boolean(
+          project.gitRepository || project.githubRepository,
+        ),
+        hasGithubRepository: Boolean(project.githubRepository),
+        loaded: Boolean(project.loaded),
+      };
+    },
+    [],
+  );
+
+  const listProjectSummaries = useCallback(async (): Promise<
+    ProjectSummaryType[]
+  > => {
+    const projects = await emitApiSignal<void, ProjectFolderEntity[]>(
+      SIGNALS.PROJECT_LIST,
+    );
+    return Promise.all(projects.map(mapProjectEntityToSummary));
+  }, [mapProjectEntityToSummary]);
+
+  const openProjectSummary = useCallback(
+    async (directory: string): Promise<ProjectSummaryType> => {
+      const project = await emitApiSignal<
+        { directory: string },
+        ProjectFolderEntity
+      >(SIGNALS.PROJECT_OPEN, { directory });
+      return mapProjectEntityToSummary(project);
+    },
+    [mapProjectEntityToSummary],
+  );
 
   useEffect(() => {
     registerApiSignals([
@@ -167,104 +378,177 @@ export function App() {
         { method: "GET", endpoint: "/api/tool-telemetry" },
       ],
       [
-        SIGNALS.CWD_GET,
-        { method: "GET", endpoint: "/api/cwd", timeoutMs: CWD_GET_TIMEOUT_MS },
-      ],
-      [SIGNALS.CWD_SET, { method: "POST", endpoint: "/api/cwd" }],
-      [
-        SIGNALS.FS_LIST,
+        SIGNALS.WORKSPACE_GET,
         {
           method: "GET",
-          endpoint: (payload: { path: string }) =>
-            `/api/fs/list?path=${encodeURIComponent(payload.path)}`,
+          timeoutMs: CWD_GET_TIMEOUT_MS,
+          endpoint: (payload: { path?: string }) => {
+            const q = new URLSearchParams();
+            if (payload?.path) q.set("path", payload.path);
+            const s = q.toString();
+            return s ? `/api/workspace?${s}` : "/api/workspace";
+          },
+        },
+      ],
+      [SIGNALS.PROJECT_LIST, { method: "GET", endpoint: "/api/project" }],
+      [SIGNALS.PROJECT_OPEN, { method: "POST", endpoint: "/api/project" }],
+      [
+        SIGNALS.PROJECT_CLOSE,
+        {
+          method: "DELETE",
+          endpoint: (payload: { id: number }) => `/api/project/${payload.id}`,
         },
       ],
       [
-        SIGNALS.FS_FILE,
+        SIGNALS.PROJECT_REMOTE_URL,
         {
           method: "GET",
-          endpoint: (payload: { path: string }) =>
-            `/api/fs/file?path=${encodeURIComponent(payload.path)}`,
+          endpoint: (payload: { id: number }) =>
+            `/api/project/${payload.id}/remote-url`,
         },
       ],
       [
-        SIGNALS.FS_GIT_OPEN,
+        SIGNALS.PROJECT_BROWSE,
         {
           method: "GET",
-          endpoint: (payload: { path: string }) =>
-            `/api/fs/git/open?path=${encodeURIComponent(payload.path)}`,
+          endpoint: (payload: { id: number; parentUuid?: string }) => {
+            const q = new URLSearchParams();
+            if (payload.parentUuid) q.set("parentUuid", payload.parentUuid);
+            const s = q.toString();
+            return s
+              ? `/api/project/${payload.id}/browse?${s}`
+              : `/api/project/${payload.id}/browse`;
+          },
         },
       ],
-      [SIGNALS.FS_PROJECT, { method: "GET", endpoint: "/api/fs/project" }],
       [
-        SIGNALS.FS_PROJECT_REGISTER,
-        { method: "POST", endpoint: "/api/fs/project" },
-      ],
-      [
-        SIGNALS.FS_PROJECT_LOAD,
-        { method: "POST", endpoint: "/api/fs/project/load" },
-      ],
-      [
-        SIGNALS.FS_PROJECT_UNLOAD,
-        { method: "POST", endpoint: "/api/fs/project/unload" },
+        SIGNALS.PROJECT_FILE,
+        {
+          method: "GET",
+          endpoint: (payload: { id: number; entryUuid: string }) =>
+            `/api/project/${payload.id}/file?entryUuid=${encodeURIComponent(payload.entryUuid)}`,
+        },
       ],
       [SIGNALS.CHAT_RESET, { method: "POST", endpoint: "/api/chat/reset" }],
-      [
-        SIGNALS.CHAT_SUMMARIZE_FOLDER,
-        {
-          method: "POST",
-          endpoint: "/api/chat/summarize-folder",
-          timeoutMs: CHAT_TIMEOUT_MS,
-        },
-      ],
     ]);
   }, []);
 
   useEffect(() => {
     const checkOllamaRuntime = async () => {
       try {
-        const status = await fetch("/api/menu/ollama/status").then((r) =>
-          r.json(),
+        const status = await apiWithTimeout<OllamaRuntimeStatus>(
+          "/api/menu/ollama/status",
+          OLLAMA_STARTUP_STATUS_TIMEOUT_MS,
         );
-        if (status?.usingTestcontainers) {
-          setChatMessages((prev) => [
-            ...prev,
-            {
-              role: "system",
-              content: `⚙️ Local Ollama is unreachable. A Docker container has been started as a fallback at ${status.runtimeEndpoint ?? "unknown endpoint"}. AI features may be slower during initial startup.`,
-            },
-          ]);
-        }
+        setOllamaHealthy(status?.healthy ?? null);
+        setOllamaEndpoint(status?.runtimeEndpoint || "");
       } catch {
+        setOllamaHealthy(false);
         // non-fatal: startup status check is best-effort
       }
     };
-    checkOllamaRuntime().catch(() => {});
+
+    const timeoutId = window.setTimeout(() => {
+      checkOllamaRuntime().catch(() => {});
+    }, 0);
+    const intervalId = window.setInterval(() => {
+      checkOllamaRuntime().catch(() => {});
+    }, OLLAMA_STATUS_POLL_MS);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      window.clearInterval(intervalId);
+    };
   }, []);
 
   useEffect(() => {
+    const toFailureState = (signalError: {
+      id: string;
+      signal: string;
+      endpoint: string;
+      message: string;
+      statusCode?: number;
+      contentType?: string | null;
+      timestamp: string;
+    }): ApiFailureState => ({
+      id: signalError.id,
+      signal: signalError.signal,
+      endpoint: signalError.endpoint,
+      message: normalizeApiFailureMessage(
+        signalError.statusCode,
+        signalError.message,
+      ),
+      statusCode: signalError.statusCode,
+      contentType: signalError.contentType,
+      timestamp: signalError.timestamp,
+      iframeWindowIds: [],
+    });
+
+    // Capture failures that may have occurred before this component subscribed.
+    setApiFailures((prev) =>
+      mergeFailuresById(prev, getSignalErrors().map(toFailureState)),
+    );
+
     const unsubscribe = subscribeSignalErrors((signalError) => {
-      const fingerprint = `${signalError.signal}:${signalError.message}`;
-      const now = Date.now();
-      const previous = lastSignalErrorRef.current;
+      setApiFailures((prev) =>
+        mergeFailuresById(prev, [toFailureState(signalError)]),
+      );
+    });
 
-      // Avoid flooding chat with repeated poll failures for the same signal.
-      if (
-        previous &&
-        previous.fingerprint === fingerprint &&
-        now - previous.timestamp < 5000
-      ) {
-        return;
-      }
+    return unsubscribe;
+  }, []);
 
-      lastSignalErrorRef.current = { fingerprint, timestamp: now };
-      setChatMessages((prev) => [
-        ...prev,
+  useEffect(() => {
+    setApiFailures((prev) =>
+      prev.map((failure) => {
+        const message = normalizeApiFailureMessage(
+          failure.statusCode,
+          failure.message,
+        );
+        return message === failure.message ? failure : { ...failure, message };
+      }),
+    );
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = subscribeSignalHtmlFrames((frame) => {
+      const nextId = ++nextWindowId.current;
+      const title =
+        typeof frame.statusCode === "number"
+          ? `${frame.signal} (${frame.statusCode})`
+          : frame.signal;
+
+      setIframeWindows((prev) => [
+        ...(frame.failureId
+          ? prev.filter(
+              (windowState) => windowState.failureId !== frame.failureId,
+            )
+          : prev),
         {
-          role: "system",
-          content: `[signal ${signalError.signal}] ${signalError.message}`,
+          id: nextId,
+          failureId: frame.failureId,
+          title,
+          html: frame.html,
+          signal: frame.signal,
+          endpoint: frame.endpoint,
+          statusCode: frame.statusCode,
+          z: ++nextZ.current,
         },
       ]);
+
+      if (frame.failureId) {
+        setApiFailures((prev) =>
+          prev.map((failure) =>
+            failure.id === frame.failureId &&
+            !failure.iframeWindowIds.includes(nextId)
+              ? {
+                  ...failure,
+                  iframeWindowIds: [...failure.iframeWindowIds, nextId],
+                }
+              : failure,
+          ),
+        );
+      }
     });
 
     return unsubscribe;
@@ -272,7 +556,6 @@ export function App() {
 
   const loadTelemetry = useCallback(async () => {
     setTelemetryLoading(true);
-    setTelemetryError(null);
     try {
       const data = await emitApiSignal<void, ToolTelemetryResponse>(
         SIGNALS.TOOL_TELEMETRY_GET,
@@ -281,115 +564,92 @@ export function App() {
       setTelemetrySummary(data.summary || "");
       setTelemetryGeneratedAt(data.generatedAt || "");
     } catch {
-      setTelemetryError("Failed to load telemetry.");
+      // errors are surfaced by signal failure state
     } finally {
       setTelemetryLoading(false);
     }
   }, []);
 
-  const loadCwd = useCallback(async () => {
-    let attempts = 0;
-    while (attempts <= CWD_GET_MAX_RETRIES) {
-      try {
-        const data = await emitApiSignal<void, CwdResponse>(SIGNALS.CWD_GET);
-        setCwd(data.cwd || "");
-        setCwdError(null);
-        setCwdRetryPending(false);
-        return;
-      } catch {
-        attempts += 1;
-      }
-    }
-
-    setCwdError("Failed to resolve working folder");
-    setCwdRetryPending((wasPending) => {
-      if (!wasPending) {
-        setChatMessages((prev) => [
-          ...prev,
-          {
-            role: "system",
-            content:
-              "Working folder lookup failed after retry. Confirm to try one more attempt.",
-          },
-        ]);
-      }
-      return true;
+  useEffect(() => {
+    loadTelemetry().catch(() => {
+      // errors are surfaced by signal failure state
     });
-  }, []);
 
-  const loadBrowser = useCallback(
+    const intervalId = window.setInterval(() => {
+      loadTelemetry().catch(() => {
+        // errors are surfaced by signal failure state
+      });
+    }, 15_000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [loadTelemetry]);
+
+  const loadCwd = useCallback(
     async (path?: string) => {
-      const targetPath = (path || cwd || "").trim();
-      if (!targetPath) {
-        return;
-      }
       setBrowserLoading(true);
-      setBrowserError(null);
       try {
-        const data = await emitApiSignal<{ path: string }, FsListResponse>(
-          SIGNALS.FS_LIST,
-          { path: targetPath },
+        const data = await emitApiSignal<{ path?: string }, WorkspaceResponse>(
+          SIGNALS.WORKSPACE_GET,
+          path ? { path } : {},
         );
-        setBrowserPath(data.path || targetPath);
+        const targetPath = data.path || "";
+        setCwd(data.path || "");
+        setBrowserPath(data.path || "");
         setBrowserEntries(data.entries || []);
         setBrowserRepoUrl(data.repoUrl || null);
+
+        try {
+          const projects = await listProjectSummaries();
+          const projectMatch = projects
+            .filter(
+              (project) =>
+                targetPath === project.directory ||
+                targetPath.startsWith(`${project.directory}/`) ||
+                targetPath.startsWith(`${project.directory}\\`),
+            )
+            .sort((a, b) => b.directory.length - a.directory.length)[0];
+
+          setBrowserProjectId(projectMatch?.id || 0);
+        } catch {
+          setBrowserProjectId(0);
+        }
       } catch {
-        setBrowserError("Failed to list directory.");
         setBrowserRepoUrl(null);
+        setBrowserProjectId(0);
       } finally {
         setBrowserLoading(false);
       }
     },
-    [cwd],
+    [listProjectSummaries],
   );
+
+  const browserInRegisteredProject = browserProjectId > 0;
 
   const setWorkingFolder = useCallback(
     async (path: string) => {
       setCwdUpdating(true);
       try {
-        const data = await emitApiSignal<{ path: string }, CwdResponse>(
-          SIGNALS.CWD_SET,
-          { path },
-        );
-        setCwd(data.cwd || "");
-        setCwdError(null);
-        await loadBrowser(data.cwd || path);
+        await loadCwd(path);
       } catch {
-        setCwdError("Failed to update working folder");
+        // errors are surfaced by signal failure state
       } finally {
         setCwdUpdating(false);
       }
     },
-    [loadBrowser],
+    [loadCwd],
   );
 
   useEffect(() => {
-    loadCwd();
-    const timer = window.setInterval(() => {
-      loadCwd().catch(() => {
-        // polling errors are non-fatal
-      });
-    }, POLL_MS);
-    return () => window.clearInterval(timer);
+    if (initialCwdLoadedRef.current) {
+      return;
+    }
+    initialCwdLoadedRef.current = true;
+    loadCwd().catch(() => {
+      // errors are surfaced by signal failure state
+    });
   }, [loadCwd]);
-
-  useEffect(() => {
-    if (!cwd) {
-      return;
-    }
-    loadBrowser(cwd).catch(() => {
-      // surfaced by browser state
-    });
-  }, [cwd, loadBrowser]);
-
-  useEffect(() => {
-    if (!telemetryOpen) {
-      return;
-    }
-    loadTelemetry().catch(() => {
-      // surfaced by telemetry state
-    });
-  }, [telemetryOpen, loadTelemetry]);
 
   const focusWindow = useCallback((id: number) => {
     setWindows((prev) =>
@@ -406,14 +666,13 @@ export function App() {
 
   const closeWindow = useCallback(async (id: number, projectId: number) => {
     setWindows((prev) => prev.filter((w) => w.id !== id));
-    if (projectId <= 0) {
+    if (!projectId) {
       return;
     }
     try {
-      await emitApiSignal<{ id: number }, { status: string }>(
-        SIGNALS.FS_PROJECT_UNLOAD,
-        { id: projectId },
-      );
+      await emitApiSignal<{ id: number }, void>(SIGNALS.PROJECT_CLOSE, {
+        id: projectId,
+      });
     } catch {
       // non-fatal: local close should still succeed
     }
@@ -422,6 +681,31 @@ export function App() {
   const closeFileWindow = useCallback((id: number) => {
     setFileWindows((prev) => prev.filter((w) => w.id !== id));
   }, []);
+
+  const closeIframeWindow = useCallback(
+    (id: number) => {
+      const target = iframeWindows.find((windowState) => windowState.id === id);
+      if (target?.failureId) {
+        setApiFailures((prev) =>
+          prev.map((failure) =>
+            failure.id === target.failureId
+              ? {
+                  ...failure,
+                  iframeWindowIds: failure.iframeWindowIds.filter(
+                    (windowId) => windowId !== id,
+                  ),
+                }
+              : failure,
+          ),
+        );
+      }
+
+      setIframeWindows((prev) =>
+        prev.filter((windowState) => windowState.id !== id),
+      );
+    },
+    [iframeWindows],
+  );
 
   const updateWindow = useCallback(
     (id: number, patch: Partial<WindowState>) => {
@@ -433,25 +717,25 @@ export function App() {
   );
 
   const loadEntriesForWindow = useCallback(
-    async (windowId: number, directory: string) => {
+    async (windowId: number, projectId: number) => {
+      if (!projectId) {
+        updateWindow(windowId, { entriesLoading: false });
+        return;
+      }
       try {
-        const response = await emitApiSignal<{ path: string }, FsListResponse>(
-          SIGNALS.FS_LIST,
-          { path: directory },
-        );
-        const normalizedEntries = (response.entries || []).map((entry) => ({
-          ...entry,
-          path: toEntryPath(directory, entry.path),
-        }));
+        const response = await emitApiSignal<
+          { id: number; parentUuid?: string },
+          BrowseResponse
+        >(SIGNALS.PROJECT_BROWSE, { id: projectId });
         updateWindow(windowId, {
-          entries: normalizedEntries,
+          entries: response.entries || [],
           entriesLoading: false,
           entriesError: undefined,
         });
       } catch {
         updateWindow(windowId, {
           entriesLoading: false,
-          entriesError: "Failed to load folder contents.",
+          entriesError: undefined,
         });
       }
     },
@@ -459,38 +743,27 @@ export function App() {
   );
 
   const openInCanvas = useCallback(
-    async (path: string) => {
+    async (
+      path: string,
+    ): Promise<{ windowId: number; projectId: number } | null> => {
       const target = path || cwd;
-      if (!target) return;
-      const projects = await emitApiSignal<void, ProjectSummaryType[]>(
-        SIGNALS.FS_PROJECT,
-      );
-      const match = projects
-        .filter(
-          (p) =>
-            target === p.directory ||
-            target.startsWith(p.directory + "/") ||
-            target.startsWith(p.directory + "\\"),
-        )
-        .sort((a, b) => b.directory.length - a.directory.length)[0];
+      if (!target) return null;
+      const projects = await listProjectSummaries();
+      const match = projects.find((p) => p.directory === target);
 
       let project: ProjectSummaryType;
       if (match) {
         project = match;
-        try {
-          await emitApiSignal<{ id: number }, { status: string }>(
-            SIGNALS.FS_PROJECT_LOAD,
-            { id: project.id },
-          );
-        } catch {
-          // non-fatal
+        if (!project.loaded) {
+          try {
+            project = await openProjectSummary(project.directory);
+          } catch {
+            project = { ...project, loaded: true };
+          }
         }
       } else {
         try {
-          project = await emitApiSignal<
-            { directory: string },
-            ProjectSummaryType
-          >(SIGNALS.FS_PROJECT_REGISTER, { directory: target });
+          project = await openProjectSummary(target);
           if (project.warning) {
             setChatMessages((prev) => [
               ...prev,
@@ -507,6 +780,7 @@ export function App() {
             ),
             directory: target,
             hasGitRepository: false,
+            hasGithubRepository: false,
             loaded: false,
           };
         }
@@ -518,7 +792,7 @@ export function App() {
       if (existing) {
         focusWindow(existing.id);
         setWorkingFolder(project.directory).catch(() => {});
-        return;
+        return { windowId: existing.id, projectId: project.id };
       }
       const winId = ++nextWindowId.current;
       setWindows((prev) => [
@@ -532,9 +806,17 @@ export function App() {
           z: ++nextZ.current,
         },
       ]);
-      await loadEntriesForWindow(winId, project.directory);
+      await Promise.allSettled([loadEntriesForWindow(winId, project.id)]);
+      return { windowId: winId, projectId: project.id };
     },
-    [cwd, windows, focusWindow, loadEntriesForWindow],
+    [
+      cwd,
+      windows,
+      focusWindow,
+      listProjectSummaries,
+      loadEntriesForWindow,
+      openProjectSummary,
+    ],
   );
 
   const restoredOpenProjectsRef = useRef(false);
@@ -547,30 +829,41 @@ export function App() {
 
     const restoreOpenProjects = async () => {
       try {
-        const projects = await emitApiSignal<void, ProjectSummaryType[]>(
-          SIGNALS.FS_PROJECT,
-        );
+        const projects = await listProjectSummaries();
         const openProjects = projects.filter((p) => p.loaded);
-        for (const project of openProjects) {
+        const restoredWindows = openProjects.map((project) => {
           const winId = ++nextWindowId.current;
-          setWindows((prev) => {
-            if (prev.some((w) => w.project.id === project.id)) {
-              return prev;
-            }
-            return [
-              ...prev,
-              {
-                id: winId,
-                project,
-                entriesLoading: true,
-                x: 60 + (winId % 6) * 30,
-                y: 40 + (winId % 6) * 30,
-                z: ++nextZ.current,
-              },
-            ];
-          });
-          await loadEntriesForWindow(winId, project.directory);
+          return {
+            id: winId,
+            project,
+            entriesLoading: true,
+            x: 60 + (winId % 6) * 30,
+            y: 40 + (winId % 6) * 30,
+            z: ++nextZ.current,
+          };
+        });
+
+        if (restoredWindows.length === 0) {
+          return;
         }
+
+        setWindows((prev) => {
+          const existingProjectIds = new Set(prev.map((w) => w.project.id));
+          return [
+            ...prev,
+            ...restoredWindows.filter(
+              (windowState) => !existingProjectIds.has(windowState.project.id),
+            ),
+          ];
+        });
+
+        await Promise.allSettled(
+          restoredWindows.map((windowState) =>
+            Promise.allSettled([
+              loadEntriesForWindow(windowState.id, windowState.project.id),
+            ]),
+          ),
+        );
       } catch {
         // non-fatal during startup restoration
       }
@@ -579,53 +872,63 @@ export function App() {
     restoreOpenProjects().catch(() => {
       // surfaced as signal errors if needed
     });
-  }, [loadEntriesForWindow]);
+  }, [listProjectSummaries, loadEntriesForWindow]);
 
-  const openFileWindow = useCallback(async (filePath: string) => {
-    const id = ++nextWindowId.current;
-    const title = filePath.split(/[\\/]/).pop() || filePath;
-    setFileWindows((prev) => [
-      ...prev,
-      {
-        id,
-        filePath,
-        title,
-        loading: true,
-        x: 80 + (id % 6) * 24,
-        y: 70 + (id % 6) * 24,
-        z: ++nextZ.current,
-      },
-    ]);
+  const openFileWindow = useCallback(
+    async (filePath: string, projectId: number, entryUuid: string) => {
+      if (!projectId || !entryUuid) {
+        return;
+      }
+      const id = ++nextWindowId.current;
+      const title = filePath.split(/[\\/]/).pop() || filePath;
+      setFileWindows((prev) => [
+        ...prev,
+        {
+          id,
+          filePath,
+          title,
+          loading: true,
+          x: 80 + (id % 6) * 24,
+          y: 70 + (id % 6) * 24,
+          z: ++nextZ.current,
+        },
+      ]);
 
-    try {
-      const file = await emitApiSignal<{ path: string }, FileContentResponse>(
-        SIGNALS.FS_FILE,
-        { path: filePath },
-      );
-      setFileWindows((prev) =>
-        prev.map((w) =>
-          w.id === id
-            ? {
-                ...w,
-                loading: false,
-                content: file.content,
-                language: file.language,
-                mimeType: file.mimeType,
-                error: undefined,
-              }
-            : w,
-        ),
-      );
-    } catch {
-      setFileWindows((prev) =>
-        prev.map((w) =>
-          w.id === id
-            ? { ...w, loading: false, error: "Failed to read file." }
-            : w,
-        ),
-      );
-    }
-  }, []);
+      try {
+        const file = await emitApiSignal<
+          { id: number; entryUuid: string },
+          FileContentResponse
+        >(SIGNALS.PROJECT_FILE, { id: projectId, entryUuid });
+        setFileWindows((prev) =>
+          prev.map((w) =>
+            w.id === id
+              ? {
+                  ...w,
+                  loading: false,
+                  content: file.content,
+                  language: file.language,
+                  mimeType: file.mimeType,
+                  error: undefined,
+                }
+              : w,
+          ),
+        );
+      } catch {
+        setFileWindows((prev) =>
+          prev.map((w) =>
+            w.id === id
+              ? {
+                  ...w,
+                  loading: false,
+                  error: undefined,
+                }
+              : w,
+          ),
+        );
+      }
+    },
+    [],
+  );
 
   const focusFileWindow = useCallback((id: number) => {
     setFileWindows((prev) =>
@@ -646,29 +949,37 @@ export function App() {
     );
   }, []);
 
-  const openGitRepo = useCallback(async (path: string) => {
-    try {
-      const data = await emitApiSignal<{ path: string }, { repoUrl: string }>(
-        SIGNALS.FS_GIT_OPEN,
-        { path },
-      );
-      if (data.repoUrl) {
-        openExternalUrl(data.repoUrl);
-      }
-    } catch {
-      setBrowserError("Failed to resolve GitHub repository URL.");
+  const focusIframeWindow = useCallback((id: number) => {
+    setIframeWindows((prev) =>
+      prev.map((w) =>
+        w.id === id
+          ? {
+              ...w,
+              z: ++nextZ.current,
+            }
+          : w,
+      ),
+    );
+  }, []);
+
+  const openGitRepo = useCallback((repoUrl: string | null | undefined) => {
+    if (!isBrowsableRepoUrl(repoUrl)) {
+      return;
     }
+    openExternalUrl(repoUrl!);
   }, []);
 
   const openFile = useCallback(
     async (
       windowId: number,
-      projectDirectory: string,
       relativePath: string,
+      projectId: number,
+      entryUuid: string,
     ) => {
       if (isImagePath(relativePath) || isPdfPath(relativePath)) {
         updateWindow(windowId, {
           selectedFilePath: relativePath,
+          selectedFileUuid: entryUuid,
           fileLoading: false,
           fileLoadingFolderSummary: false,
           fileContent: undefined,
@@ -680,6 +991,7 @@ export function App() {
 
       updateWindow(windowId, {
         selectedFilePath: relativePath,
+        selectedFileUuid: entryUuid,
         fileLoading: true,
         fileLoadingFolderSummary: false,
         fileContentMarkdown:
@@ -687,12 +999,11 @@ export function App() {
           README_FILE_PATTERN.test(relativePath),
         fileError: undefined,
       });
-      const absolutePath = resolveTargetPath(projectDirectory, relativePath);
       try {
-        const file = await emitApiSignal<{ path: string }, FileContentResponse>(
-          SIGNALS.FS_FILE,
-          { path: absolutePath },
-        );
+        const file = await emitApiSignal<
+          { id: number; entryUuid: string },
+          FileContentResponse
+        >(SIGNALS.PROJECT_FILE, { id: projectId, entryUuid });
         updateWindow(windowId, {
           fileLoading: false,
           fileLoadingFolderSummary: false,
@@ -707,19 +1018,24 @@ export function App() {
           fileLoading: false,
           fileLoadingFolderSummary: false,
           fileContentMarkdown: false,
-          fileError: "Failed to read file.",
+          fileError: undefined,
         });
       }
     },
     [updateWindow],
   );
 
-  const openFolderSummary = useCallback(
+  const openFolderPreview = useCallback(
     async (
       windowId: number,
       projectDirectory: string,
       relativePath: string,
+      entryUuid?: string | null,
+      projectId?: number,
     ) => {
+      if (!entryUuid || !projectId) {
+        return;
+      }
       const safeRelativePath = relativePath || "";
       const folderPath = resolveTargetPath(projectDirectory, safeRelativePath);
 
@@ -730,70 +1046,97 @@ export function App() {
         fileContentMarkdown: true,
         fileError: undefined,
       });
-      setChatError(null);
-      setChatLoading(true);
 
       try {
-        setChatMessages((prev) => [
-          ...prev,
-          { role: "user", content: `Summarise folder: ${folderPath}` },
-        ]);
+        const queue: Array<{ uuid: string; depth: number }> = [
+          { uuid: entryUuid, depth: 0 },
+        ];
+        const visited = new Set<string>();
+        const extensionCounts = new Map<string, number>();
+        let fileCount = 0;
+        let folderCount = 0;
+        let maxDepth = 0;
 
-        const MAX_ATTEMPTS = 3;
-        let result: AssistantChatResponse | undefined;
-        let lastErr: unknown;
-        for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-          if (attempt > 0) {
-            await new Promise((r) => setTimeout(r, 1000 * 2 ** (attempt - 1)));
-          }
-          try {
-            result = await emitApiSignal<
-              { path: string },
-              AssistantChatResponse
-            >(
-              SIGNALS.CHAT_SUMMARIZE_FOLDER,
-              { path: folderPath },
-              {
-                headers: {
-                  [REQUEST_SOURCE_HEADER]: REQUEST_SOURCE_FILE_EXPLORER,
-                },
-              },
-            );
+        while (queue.length > 0) {
+          const next = queue.shift();
+          if (!next) {
             break;
-          } catch (err) {
-            lastErr = err;
-            // don't retry on 4xx client errors
-            if (err instanceof Error && /^4\d\d /.test(err.message)) break;
+          }
+          if (visited.has(next.uuid)) {
+            continue;
+          }
+          visited.add(next.uuid);
+          maxDepth = Math.max(maxDepth, next.depth);
+
+          const response = await emitApiSignal<
+            { id: number; parentUuid?: string },
+            BrowseResponse
+          >(SIGNALS.PROJECT_BROWSE, {
+            id: projectId,
+            parentUuid: next.uuid,
+          });
+
+          for (const entry of response.entries || []) {
+            if (entry.directory) {
+              folderCount += 1;
+              if (entry.uuid && !visited.has(entry.uuid)) {
+                queue.push({ uuid: entry.uuid, depth: next.depth + 1 });
+              }
+              continue;
+            }
+
+            fileCount += 1;
+            const dot = entry.name.lastIndexOf(".");
+            const ext =
+              dot > 0 && dot < entry.name.length - 1
+                ? entry.name.slice(dot + 1).toLowerCase()
+                : "(no ext)";
+            extensionCounts.set(ext, (extensionCounts.get(ext) || 0) + 1);
           }
         }
-        if (!result) throw lastErr;
-        const reply = result.reply || "No summary returned.";
 
-        setChatMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: reply },
-        ]);
+        const topExtensions = Array.from(extensionCounts.entries())
+          .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+          .slice(0, 12);
 
-        setAssistantUnreachable(false);
+        const extensionTable =
+          topExtensions.length === 0
+            ? "No files found."
+            : [
+                "| Extension | Count |",
+                "|---|---:|",
+                ...topExtensions.map(([ext, count]) => `| ${ext} | ${count} |`),
+              ].join("\n");
+
+        const preview = [
+          `# Folder Preview`,
+          "",
+          `Path: ${folderPath}`,
+          "",
+          `- Files: ${fileCount}`,
+          `- Folders: ${folderCount}`,
+          `- Total items: ${fileCount + folderCount}`,
+          `- Traversed folders: ${visited.size}`,
+          `- Max depth: ${maxDepth}`,
+          "",
+          "## File Types (Top 12)",
+          extensionTable,
+        ].join("\n");
+
         updateWindow(windowId, {
           fileLoading: false,
           fileLoadingFolderSummary: false,
           fileError: undefined,
-          fileContent: reply,
+          fileContent: preview,
           fileContentMarkdown: true,
         });
-      } catch (err) {
-        const detail = err instanceof Error ? err.message : "Unknown error";
-        setAssistantUnreachable(true);
-        setChatError(`Failed to summarize folder contents: ${detail}`);
+      } catch {
         updateWindow(windowId, {
           fileLoading: false,
           fileLoadingFolderSummary: false,
           fileContentMarkdown: false,
-          fileError: `Failed to summarize folder contents: ${detail}`,
+          fileError: undefined,
         });
-      } finally {
-        setChatLoading(false);
       }
     },
     [updateWindow],
@@ -808,13 +1151,27 @@ export function App() {
 
   const [retryMessage, setRetryMessage] = useState<string | null>(null);
 
-  const retryCwdGet = useCallback(async () => {
-    if (!cwdRetryPending) {
-      return;
+  const dismissApiError = useCallback((id: string) => {
+    dismissSignalFailure(id);
+    setApiFailures((prev) => prev.filter((entry) => entry.id !== id));
+    setIframeWindows((prev) =>
+      prev.filter((windowState) => windowState.failureId !== id),
+    );
+  }, []);
+
+  const retryApiError = useCallback(async (id: string) => {
+    try {
+      await retryFailedSignal(id);
+    } catch {
+      // failed retries are surfaced via signal errors
+    } finally {
+      dismissSignalFailure(id);
+      setApiFailures((prev) => prev.filter((entry) => entry.id !== id));
+      setIframeWindows((prev) =>
+        prev.filter((windowState) => windowState.failureId !== id),
+      );
     }
-    setCwdRetryPending(false);
-    await loadCwd();
-  }, [cwdRetryPending, loadCwd]);
+  }, []);
 
   const parseAssistantActionPayload = useCallback(
     (rawPayload: string): AssistantActionPayload | null => {
@@ -848,7 +1205,6 @@ export function App() {
         return;
       }
 
-      setChatError(null);
       setChatLoading(true);
       if (!overrideMessage) setChatInput("");
 
@@ -866,39 +1222,52 @@ export function App() {
       }, 0);
 
       let errorOccurred = false;
-      await chatWebSocket.stream(message, {
-        onToken: (fragment) => {
-          setChatMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === placeholderId
-                ? { ...msg, content: msg.content + fragment }
-                : msg,
-            ),
-          );
+      startStreamingStats();
+      await apiPostTextStream(
+        "/api/chat/stream",
+        { message },
+        {
+          onChunk: (fragment) => {
+            updateStreamingStats(fragment);
+            setChatMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === placeholderId
+                  ? { ...msg, content: msg.content + fragment }
+                  : msg,
+              ),
+            );
+          },
+          onError: (detail) => {
+            errorOccurred = true;
+            setChatUnavailable(true);
+            setRetryMessage(message);
+            setChatMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === placeholderId
+                  ? { ...msg, content: `_(error: ${detail})_` }
+                  : msg,
+              ),
+            );
+          },
+          onDone: () => {
+            if (!errorOccurred) {
+              setChatUnavailable(false);
+              setRetryMessage(null);
+            }
+            finishStreamingStats();
+            setChatLoading(false);
+          },
         },
-        onError: (detail) => {
-          errorOccurred = true;
-          setAssistantUnreachable(true);
-          setChatError(detail);
-          setRetryMessage(message);
-          setChatMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === placeholderId
-                ? { ...msg, content: `_(error: ${detail})_` }
-                : msg,
-            ),
-          );
-        },
-        onDone: () => {
-          if (!errorOccurred) {
-            setAssistantUnreachable(false);
-            setRetryMessage(null);
-          }
-          setChatLoading(false);
-        },
-      });
+        CHAT_TIMEOUT_MS,
+      );
     },
-    [chatInput, chatLoading],
+    [
+      chatInput,
+      chatLoading,
+      finishStreamingStats,
+      startStreamingStats,
+      updateStreamingStats,
+    ],
   );
 
   const renderAssistantMarkdown = useCallback(
@@ -985,9 +1354,8 @@ export function App() {
         {},
       );
       setChatMessages([]);
-      setChatError(null);
     } catch {
-      setChatError("Failed to reset assistant conversation.");
+      // errors are surfaced by signal failure state
     }
   }, []);
 
@@ -999,7 +1367,7 @@ export function App() {
 
   return (
     <>
-      <main id="app-shell">
+      <main id="app-shell" ref={appShellRef} style={shellStyle}>
         <TopMenuAndModals
           menuButtons={
             <ConfigurationMenuButtons
@@ -1020,14 +1388,12 @@ export function App() {
               modelsLoading={configurationMenus.modelsLoading}
               pullProgress={configurationMenus.pullProgress}
               runtimeStatus={configurationMenus.runtimeStatus}
-              runtimeSwitching={configurationMenus.runtimeSwitching}
               setConfigOpen={configurationMenus.setConfigOpen}
               setConfigForm={configurationMenus.setConfigForm}
               refreshModels={configurationMenus.refreshModels}
               pullModel={configurationMenus.pullModel}
               deleteModel={configurationMenus.deleteModel}
               saveConfiguration={configurationMenus.saveConfiguration}
-              switchRuntimeProvider={configurationMenus.switchRuntimeProvider}
             />
           }
           onOpenDebug={() => menuPanels.setDebugOpen(true)}
@@ -1046,18 +1412,14 @@ export function App() {
           setTelemetryOpen={setTelemetryOpen}
           telemetryItems={telemetryItems}
           telemetryLoading={telemetryLoading}
-          telemetryError={telemetryError}
+          telemetryError={null}
           telemetrySummary={telemetrySummary}
           telemetryGeneratedAt={telemetryGeneratedAt}
           onRefreshTelemetry={loadTelemetry}
         />
         <header className="cwd-bar panel">
           <strong>Working Folder</strong>
-          <CwdNavigator
-            cwd={cwd}
-            cwdError={cwdError}
-            onNavigate={setWorkingFolder}
-          />
+          <CwdNavigator cwd={cwd} onNavigate={setWorkingFolder} />
         </header>
 
         <section className="left-rail panel">
@@ -1089,18 +1451,30 @@ export function App() {
                 )}
               </div>
               {browserLoading && <p>Loading files...</p>}
-              {!browserLoading && browserError && <p>{browserError}</p>}
-              {!browserLoading &&
-                !browserError &&
-                browserEntries.length === 0 && <p>Folder is empty.</p>}
-              {!browserLoading && !browserError && (
+              {!browserLoading && browserEntries.length === 0 && (
+                <p>Folder is empty.</p>
+              )}
+              {!browserLoading && (
                 <>
                   {/* Parent directory entry */}
                   <div key=".." className="browser-row">
                     <button
                       className="browser-row-main"
                       onClick={() => {
-                        setWorkingFolder("..").catch(() => {});
+                        const active = browserPath || cwd;
+                        const normalized = active.replace(/\\/g, "/");
+                        const hasDrive = /^[A-Za-z]:\//.test(normalized);
+                        const isAbsolute =
+                          normalized.startsWith("/") || hasDrive;
+                        if (!isAbsolute) {
+                          return;
+                        }
+                        const parts = normalized.split("/").filter(Boolean);
+                        const parentParts = parts.slice(0, -1);
+                        const parent = hasDrive
+                          ? `${normalized.slice(0, 2)}/${parentParts.join("/")}`
+                          : `/${parentParts.join("/")}`;
+                        setWorkingFolder(parent || active).catch(() => {});
                       }}
                       disabled={cwdUpdating}
                       title="Parent directory"
@@ -1114,8 +1488,8 @@ export function App() {
 
                   {/* Filing system entries */}
                   {browserEntries.map((entry) => (
-                    <div key={entry.path} className="browser-row">
-                      {entry.directory && entry.name !== ".git" ? (
+                    <div key={entry.uuid} className="browser-row">
+                      {entry.directory ? (
                         <>
                           <button
                             className="browser-row-main"
@@ -1149,40 +1523,23 @@ export function App() {
                             →
                           </button>
                         </>
-                      ) : entry.directory && entry.name === ".git" ? (
-                        <>
-                          <button
-                            className="browser-row-main browser-row-main-static"
-                            title={entry.path}
-                          >
-                            <span
-                              className="browser-row-icon browser-row-icon-file"
-                              aria-hidden="true"
-                            >
-                              •
-                            </span>
-                            <span className="browser-row-name">
-                              {entry.name}
-                            </span>
-                          </button>
-                          <button
-                            className="browser-row-action explore-button"
-                            onClick={() => {
-                              openGitRepo(entry.path).catch(() => {});
-                            }}
-                            title={`Open repository for ${entry.name}`}
-                            aria-label={`Open repository for ${entry.name}`}
-                          >
-                            →
-                          </button>
-                        </>
                       ) : (
                         <>
                           <button
                             className="browser-row-main browser-row-main-static"
                             title={entry.path}
                             onClick={() => {
-                              openFileWindow(entry.path).catch(() => {});
+                              if (!browserInRegisteredProject) {
+                                openInCanvas(browserPath || cwd).catch(
+                                  () => {},
+                                );
+                                return;
+                              }
+                              openFileWindow(
+                                entry.path,
+                                browserProjectId,
+                                entry.uuid,
+                              ).catch(() => {});
                             }}
                           >
                             <span
@@ -1226,6 +1583,25 @@ export function App() {
           </button>
         </section>
 
+        <div
+          className={`shell-resizer shell-resizer-vertical ${activeResizer === "left" ? "is-active" : ""}`}
+          role="separator"
+          aria-label="Resize file browser"
+          aria-orientation="vertical"
+          tabIndex={0}
+          onPointerDown={(event) => startShellResize("left", event)}
+          onKeyDown={(event) => {
+            if (event.key === "ArrowLeft") {
+              event.preventDefault();
+              nudgeShellResize("left", -1);
+            }
+            if (event.key === "ArrowRight") {
+              event.preventDefault();
+              nudgeShellResize("left", 1);
+            }
+          }}
+        />
+
         <section className="window-host panel">
           {windows.map((win) => (
             <PaneWindow
@@ -1234,11 +1610,17 @@ export function App() {
               onClose={() => closeWindow(win.id, win.project.id)}
               onFocus={() => focusWindow(win.id)}
               onMove={(x, y) => moveWindow(win.id, x, y)}
-              onOpenFile={(path) =>
-                openFile(win.id, win.project.directory, path)
+              onOpenFile={(path, uuid) =>
+                openFile(win.id, path, win.project.id, uuid)
               }
-              onOpenFolderSummary={(path) =>
-                openFolderSummary(win.id, win.project.directory, path)
+              onOpenFolderPreview={(path, uuid) =>
+                openFolderPreview(
+                  win.id,
+                  win.project.directory,
+                  path,
+                  uuid,
+                  win.project.id,
+                )
               }
               onAssistantAction={(prompt) => {
                 sendChatMessage(
@@ -1260,7 +1642,34 @@ export function App() {
               onMove={(x, y) => moveFileWindow(fileWin.id, x, y)}
             />
           ))}
+          {iframeWindows.map((iframeWin) => (
+            <HtmlFrameWindow
+              key={`iframe-${iframeWin.id}`}
+              windowState={iframeWin}
+              onClose={() => closeIframeWindow(iframeWin.id)}
+              onFocus={() => focusIframeWindow(iframeWin.id)}
+            />
+          ))}
         </section>
+
+        <div
+          className={`shell-resizer shell-resizer-vertical ${activeResizer === "right" ? "is-active" : ""}`}
+          role="separator"
+          aria-label="Resize assistant activity"
+          aria-orientation="vertical"
+          tabIndex={0}
+          onPointerDown={(event) => startShellResize("right", event)}
+          onKeyDown={(event) => {
+            if (event.key === "ArrowLeft") {
+              event.preventDefault();
+              nudgeShellResize("right", -1);
+            }
+            if (event.key === "ArrowRight") {
+              event.preventDefault();
+              nudgeShellResize("right", 1);
+            }
+          }}
+        />
 
         <section className="right-rail panel">
           <div className="toolbar">
@@ -1271,28 +1680,105 @@ export function App() {
           </div>
 
           <div id="activity">
-            <p>Tool activity feed has been removed from the backend.</p>
+            {telemetryLoading && telemetryItems.length === 0 && (
+              <p>Loading tool activity...</p>
+            )}
+            {!telemetryLoading && telemetryItems.length === 0 && (
+              <p>No tool activity recorded yet.</p>
+            )}
+            {telemetryItems.map((item, index) => (
+              <div
+                key={`${item.toolName}-${item.moduleName}-${index}`}
+                className="activity-item"
+              >
+                <div>
+                  <strong>{item.toolName}</strong>
+                  <span> · {item.moduleName}</span>
+                </div>
+                <div>
+                  calls: {item.invocations} · failures: {item.failures} · p95:{" "}
+                  {item.p95DurationMs.toFixed(1)}ms
+                </div>
+              </div>
+            ))}
+            {telemetryGeneratedAt && (
+              <p className="chat-empty">
+                Updated {new Date(telemetryGeneratedAt).toLocaleTimeString()}
+              </p>
+            )}
           </div>
         </section>
 
+        <div
+          className={`shell-resizer shell-resizer-horizontal ${activeResizer === "bottom" ? "is-active" : ""}`}
+          role="separator"
+          aria-label="Resize assistant chat"
+          aria-orientation="horizontal"
+          tabIndex={0}
+          onPointerDown={(event) => startShellResize("bottom", event)}
+          onKeyDown={(event) => {
+            if (event.key === "ArrowUp") {
+              event.preventDefault();
+              nudgeShellResize("bottom", -1);
+            }
+            if (event.key === "ArrowDown") {
+              event.preventDefault();
+              nudgeShellResize("bottom", 1);
+            }
+          }}
+        />
+
         <ChatDock
-          assistantUnreachable={assistantUnreachable}
+          chatUnavailable={chatUnavailable}
+          apiFailures={apiFailures}
           chatMessages={chatMessages}
           chatLoading={chatLoading}
           chatInput={chatInput}
-          chatError={chatError}
           retryMessage={retryMessage}
-          cwdRetryPending={cwdRetryPending}
           chatLogRef={chatLogRef}
           chatInputRef={chatInputRef}
-          setAssistantUnreachable={setAssistantUnreachable}
+          setChatUnavailable={setChatUnavailable}
           setChatInput={setChatInput}
+          dismissApiError={dismissApiError}
+          retryApiError={retryApiError}
           sendChatMessage={sendChatMessage}
-          retryCwdGet={retryCwdGet}
           resetChat={resetChat}
           renderAssistantMarkdown={renderAssistantMarkdown}
         />
       </main>
+      <footer className="live-status-bar" role="status" aria-live="polite">
+        <div className="status-pill">
+          Ollama:
+          <span
+            className={
+              ollamaHealthy === true
+                ? "status-ok"
+                : ollamaHealthy === false
+                  ? "status-error"
+                  : "status-unknown"
+            }
+          >
+            {ollamaHealthy === true
+              ? "Healthy"
+              : ollamaHealthy === false
+                ? "Unreachable"
+                : "Unknown"}
+          </span>
+          {ollamaEndpoint && (
+            <span className="status-meta">{ollamaEndpoint}</span>
+          )}
+        </div>
+        <div className="status-pill">
+          Stream:
+          <span className={streamingActive ? "status-ok" : "status-unknown"}>
+            {streamingActive ? "Live" : "Idle"}
+          </span>
+          <span className="status-meta">
+            {streamingTokensPerSecond.toFixed(1)} tok/s ({streamingTokenCount}{" "}
+            tok)
+          </span>
+        </div>
+      </footer>
     </>
   );
 }

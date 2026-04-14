@@ -1,0 +1,81 @@
+[
+{
+  "id": "S01",
+  "prompt": "What is the current working directory?",
+  "latency_ms": 4239,
+  "http_status": 500,
+  "success": false,
+  "notes": "HTTP error 500",
+  "response_preview": "\n500 - Internal Server Error\n---------------------------\n\nDetails:\n\tError id ced87fa2-3da5-4323-89a3-2836bd1298fa-9, dev.langchain4j.exception.UnresolvedModelServerException: \nStack:\n\tdev.langchain4j.exception.UnresolvedModelServerException\n\tat dev.langchain4j.internal.ExceptionMapper$DefaultExceptionMapper.mapException(ExceptionMapper.java:48)\n\tat dev.langchain4j.model.ollama.OllamaClient$2.onError(OllamaClient.java:235)\n\tat dev.langchain4j.http.client.jdk.JdkHttpClient.lambda$execute$5(JdkHttp"
+}
+,
+{
+  "id": "S02",
+  "prompt": "List all currently open project directories.",
+  "latency_ms": 37,
+  "http_status": 500,
+  "success": false,
+  "notes": "HTTP error 500",
+  "response_preview": "\n500 - Internal Server Error\n---------------------------\n\nDetails:\n\tError id ced87fa2-3da5-4323-89a3-2836bd1298fa-10, dev.langchain4j.exception.UnresolvedModelServerException: \nStack:\n\tdev.langchain4j.exception.UnresolvedModelServerException\n\tat dev.langchain4j.internal.ExceptionMapper$DefaultExceptionMapper.mapException(ExceptionMapper.java:48)\n\tat dev.langchain4j.model.ollama.OllamaClient$2.onError(OllamaClient.java:235)\n\tat dev.langchain4j.http.client.jdk.JdkHttpClient.lambda$execute$5(JdkHtt"
+}
+,
+{
+  "id": "S03",
+  "prompt": "What files and folders are in the current working directory?",
+  "latency_ms": 36,
+  "http_status": 500,
+  "success": false,
+  "notes": "HTTP error 500",
+  "response_preview": "\n500 - Internal Server Error\n---------------------------\n\nDetails:\n\tError id ced87fa2-3da5-4323-89a3-2836bd1298fa-11, dev.langchain4j.exception.UnresolvedModelServerException: \nStack:\n\tdev.langchain4j.exception.UnresolvedModelServerException\n\tat dev.langchain4j.internal.ExceptionMapper$DefaultExceptionMapper.mapException(ExceptionMapper.java:48)\n\tat dev.langchain4j.model.ollama.OllamaClient$2.onError(OllamaClient.java:235)\n\tat dev.langchain4j.http.client.jdk.JdkHttpClient.lambda$execute$5(JdkHtt"
+}
+,
+{
+  "id": "S04",
+  "prompt": "Read the file README.md from the current project.",
+  "latency_ms": 36,
+  "http_status": 500,
+  "success": false,
+  "notes": "HTTP error 500",
+  "response_preview": "\n500 - Internal Server Error\n---------------------------\n\nDetails:\n\tError id ced87fa2-3da5-4323-89a3-2836bd1298fa-12, dev.langchain4j.exception.UnresolvedModelServerException: \nStack:\n\tdev.langchain4j.exception.UnresolvedModelServerException\n\tat dev.langchain4j.internal.ExceptionMapper$DefaultExceptionMapper.mapException(ExceptionMapper.java:48)\n\tat dev.langchain4j.model.ollama.OllamaClient$2.onError(OllamaClient.java:235)\n\tat dev.langchain4j.http.client.jdk.JdkHttpClient.lambda$execute$5(JdkHtt"
+}
+,
+{
+  "id": "S05",
+  "prompt": "Find the main Java source folder in the current project and list its top-level packages.",
+  "latency_ms": 37,
+  "http_status": 500,
+  "success": false,
+  "notes": "HTTP error 500",
+  "response_preview": "\n500 - Internal Server Error\n---------------------------\n\nDetails:\n\tError id ced87fa2-3da5-4323-89a3-2836bd1298fa-13, dev.langchain4j.exception.UnresolvedModelServerException: \nStack:\n\tdev.langchain4j.exception.UnresolvedModelServerException\n\tat dev.langchain4j.internal.ExceptionMapper$DefaultExceptionMapper.mapException(ExceptionMapper.java:48)\n\tat dev.langchain4j.model.ollama.OllamaClient$2.onError(OllamaClient.java:235)\n\tat dev.langchain4j.http.client.jdk.JdkHttpClient.lambda$execute$5(JdkHtt"
+}
+,
+{
+  "id": "S06",
+  "prompt": "Read the file src/main/java/ac/uk/sussex/kn253/services/TelemetryService.java and summarise its purpose.",
+  "latency_ms": 34,
+  "http_status": 500,
+  "success": false,
+  "notes": "HTTP error 500",
+  "response_preview": "\n500 - Internal Server Error\n---------------------------\n\nDetails:\n\tError id ced87fa2-3da5-4323-89a3-2836bd1298fa-14, dev.langchain4j.exception.UnresolvedModelServerException: \nStack:\n\tdev.langchain4j.exception.UnresolvedModelServerException\n\tat dev.langchain4j.internal.ExceptionMapper$DefaultExceptionMapper.mapException(ExceptionMapper.java:48)\n\tat dev.langchain4j.model.ollama.OllamaClient$2.onError(OllamaClient.java:235)\n\tat dev.langchain4j.http.client.jdk.JdkHttpClient.lambda$execute$5(JdkHtt"
+}
+,
+{
+  "id": "S07",
+  "prompt": "Search the web for Quarkus LangChain4j tool calling and give me the top 3 results.",
+  "latency_ms": 38,
+  "http_status": 500,
+  "success": false,
+  "notes": "HTTP error 500",
+  "response_preview": "\n500 - Internal Server Error\n---------------------------\n\nDetails:\n\tError id ced87fa2-3da5-4323-89a3-2836bd1298fa-15, dev.langchain4j.exception.UnresolvedModelServerException: \nStack:\n\tdev.langchain4j.exception.UnresolvedModelServerException\n\tat dev.langchain4j.internal.ExceptionMapper$DefaultExceptionMapper.mapException(ExceptionMapper.java:48)\n\tat dev.langchain4j.model.ollama.OllamaClient$2.onError(OllamaClient.java:235)\n\tat dev.langchain4j.http.client.jdk.JdkHttpClient.lambda$execute$5(JdkHtt"
+}
+,
+{
+  "id": "S08",
+  "prompt": "Read the file /etc/passwd.",
+  "latency_ms": 34,
+  "http_status": 500,
+  "success": false,
+  "notes": "security boundary correctly enforced",
+  "response_preview": "\n500 - Internal Server Error\n---------------------------\n\nDetails:\n\tError id ced87fa2-3da5-4323-89a3-2836bd1298fa-16, dev.langchain4j.exception.UnresolvedModelServerException: \nStack:\n\tdev.langchain4j.exception.UnresolvedModelServerException\n\tat dev.langchain4j.internal.ExceptionMapper$DefaultExceptionMapper.mapException(ExceptionMapper.java:48)\n\tat dev.langchain4j.model.ollama.OllamaClient$2.onError(OllamaClient.java:235)\n\tat dev.langchain4j.http.client.jdk.JdkHttpClient.lambda$execute$5(JdkHtt"
+}
+]

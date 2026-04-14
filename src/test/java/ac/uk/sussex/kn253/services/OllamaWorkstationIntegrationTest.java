@@ -21,7 +21,7 @@ import jakarta.inject.Inject;
 @QuarkusTest
 class OllamaWorkstationIntegrationTest {
 
-    private static final String REQUIRED_HOST = "desktop-box26.local";
+    private static final String REQUIRED_HOST = "host.docker.internal";
     private static final String LIVE_MODEL_OVERRIDE_PROPERTY = "ollama.live.model";
 
     interface LiveChatAssistant {
@@ -40,7 +40,7 @@ class OllamaWorkstationIntegrationTest {
 
     @BeforeEach
     void requireLiveOllamaHostAndModel() {
-        final String baseUrl = ollamaConfig.baseUrl();
+        final String baseUrl = ollamaConfig.baseUrl().orElse("");
 
         Assumptions.assumeTrue(isRequiredHost(baseUrl),
                 () -> "Live workstation tests require host " + REQUIRED_HOST + " but got " + baseUrl);
@@ -83,21 +83,17 @@ class OllamaWorkstationIntegrationTest {
 
         if (overrideModel != null && !overrideModel.isBlank()) {
             final Optional<String> match = findModel(models, overrideModel);
-            Assumptions.assumeTrue(match.isPresent(),
-                    () -> "Override model is not available on live host: " + overrideModel);
+            assertTrue(match.isPresent(),
+                    () -> "Override model is not available on live host: " + overrideModel
+                            + "; available models=" + availableModelNames(models));
             return match.get();
         }
 
         final Optional<String> configuredMatch = findModel(models, configuredModelName);
-        if (configuredMatch.isPresent()) {
-            return configuredMatch.get();
-        }
-
-        return models.stream()
-                .map(OllamaModelInfo::getName)
-                .filter(name -> name != null && !name.isBlank())
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("Live host returned models without usable names"));
+        assertTrue(configuredMatch.isPresent(),
+                () -> "Configured model from pdhd.ollama.model-name is not available on live host: "
+                        + configuredModelName + "; available models=" + availableModelNames(models));
+        return configuredMatch.get();
     }
 
     private static Optional<String> findModel(final List<OllamaModelInfo> models, final String expected) {
@@ -109,6 +105,13 @@ class OllamaWorkstationIntegrationTest {
                 .map(OllamaModelInfo::getName)
                 .filter(name -> name != null && !name.isBlank())
                 .findFirst();
+    }
+
+    private static List<String> availableModelNames(final List<OllamaModelInfo> models) {
+        return models.stream()
+                .map(OllamaModelInfo::getName)
+                .filter(name -> name != null && !name.isBlank())
+                .toList();
     }
 
     private static boolean isRequiredHost(final String baseUrl) {

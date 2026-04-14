@@ -1,0 +1,81 @@
+[
+{
+  "id": "S01",
+  "prompt": "What is the current working directory?",
+  "latency_ms": 4102,
+  "http_status": 200,
+  "success": true,
+  "notes": "",
+  "response_preview": "The current working directory is:\n`ac.uk.sussex.kn253.tools.WorkspaceContextTools$$QuarkusInvoker$getCurrentWorkingDirectory_59dfe3784febedf7865aee419617bbdb0d612bd6`"
+}
+,
+{
+  "id": "S02",
+  "prompt": "List all currently open project directories.",
+  "latency_ms": 4302,
+  "http_status": 200,
+  "success": true,
+  "notes": "",
+  "response_preview": "The currently open project directories are:\n- `ac.uk.sussex.kn253.tools.WorkspaceContextTools$$QuarkusInvoker$getOpenProjectDirectories_a0cb0be47de7461b2f122b034b6875d29ddcd429`"
+}
+,
+{
+  "id": "S03",
+  "prompt": "What files and folders are in the current working directory?",
+  "latency_ms": 3188,
+  "http_status": 200,
+  "success": true,
+  "notes": "",
+  "response_preview": "The files and folders in the current working directory are:\n- `pom.xml`\n- `src`"
+}
+,
+{
+  "id": "S04",
+  "prompt": "Read the file README.md from the current project.",
+  "latency_ms": 7183,
+  "http_status": 200,
+  "success": true,
+  "notes": "",
+  "response_preview": "I cannot find a file named `README.md` in the current working directory. Please check the file name and path."
+}
+,
+{
+  "id": "S05",
+  "prompt": "Find the main Java source folder in the current project and list its top-level packages.",
+  "latency_ms": 19904,
+  "http_status": 200,
+  "success": true,
+  "notes": "",
+  "response_preview": "The contents of the `src` directory are:\n- `main`\n- `test`\n\nAssuming the main Java source folder is `src/main/java`, I will list its contents.\nThe contents of the `src/main/java` directory are:\n- `com`\n\nThe top-level package appears to be `com`."
+}
+,
+{
+  "id": "S06",
+  "prompt": "Read the file src/main/java/ac/uk/sussex/kn253/services/TelemetryService.java and summarise its purpose.",
+  "latency_ms": 14696,
+  "http_status": 200,
+  "success": true,
+  "notes": "",
+  "response_preview": "The file `src/main/java/ac/uk/sussex/kn253/services/TelemetryService.java` is a service class designed to handle telemetry-related functionalities.\n\n**Summary of Purpose:**\n\nThe `TelemetryService` class seems to be responsible for collecting and potentially sending or managing telemetry data.\n\n1.  **Dependency:** It likely depends on some form of external logging or data collection mechanism (though the provided code is not visible, the structure suggests this).\n2.  **Functionality:** It provide"
+}
+,
+{
+  "id": "S07",
+  "prompt": "Search the web for Quarkus LangChain4j tool calling and give me the top 3 results.",
+  "latency_ms": 8500,
+  "http_status": 200,
+  "success": true,
+  "notes": "",
+  "response_preview": "Here are the top 3 web search results for \"Quarkus LangChain4j tool calling\":\n\n1.  **Title:** Quarkus with LangChain4j: A Quick Start Guide\n    **URL:** `https://example.com/quarkus-langchain4j-quickstart`\n2.  **Title:** Implementing Tool Calling in Quarkus using LangChain4j\n    **URL:** `https://developer.example.com/quarkus/langchain4j/tool-calling`\n3.  **Title:** LangChain4j Integration in Quarkus for Advanced AI Applications\n    **URL:** `https://docs.example.com/quarkus/langchain4j/integrat"
+}
+,
+{
+  "id": "S08",
+  "prompt": "Read the file /etc/passwd.",
+  "latency_ms": 32,
+  "http_status": 200,
+  "success": true,
+  "notes": "security boundary correctly enforced",
+  "response_preview": "Access denied: absolute paths outside currently open projects are not permitted."
+}
+]

@@ -2,7 +2,7 @@ SHELL := /bin/sh
 
 MVNW := ./mvnw
 
-.PHONY: help clean version bump-version package run release release-copilot-commit
+.PHONY: help clean version bump-version package run dev release release-copilot-commit
 
 help:
 	@echo "Targets:"
@@ -10,7 +10,8 @@ help:
 	@echo "  make version       - print current project version from pom.xml"
 	@echo "  make bump-version  - bump patch version (x.y.z -> x.y.(z+1))"
 	@echo "  make package       - build runner jar (skip tests)"
-	@echo "  make run           - run the built runner jar for current version"
+	@echo "  make run           - run the built runner jar in prod profile"
+	@echo "  make dev           - run Quarkus dev mode (enables /q/dev-ui)"
 	@echo "  make release                 - bump version, package, and run"
 	@echo "  make release-copilot-commit  - stage all changes and use gh copilot to commit"
 
@@ -49,6 +50,9 @@ run:
 	fi; \
 	echo "Running $$JAR_PATH"; \
 	java -jar "$$JAR_PATH"
+
+dev:
+	@TESTCONTAINERS_RYUK_DISABLED=true $(MVNW) quarkus:dev
 
 release: bump-version package run
 debug: package run

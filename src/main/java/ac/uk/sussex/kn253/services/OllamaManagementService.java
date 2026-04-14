@@ -5,7 +5,11 @@ import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.http.*;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
 
@@ -51,15 +55,15 @@ import jakarta.ws.rs.core.Response;
 public class OllamaManagementService {
 
     private static final Logger LOG = Logger.getLogger(OllamaManagementService.class.getName());
+    private static final Duration HEALTH_FAILURE_LOG_COOLDOWN = Duration.ofSeconds(30);
+
+    private final Map<String, Instant> lastHealthFailureLogAt = new ConcurrentHashMap<>();
 
     @Inject
     OllamaConfig config;
 
     @Inject
     ObjectMapper objectMapper;
-
-    @Inject
-    OllamaRuntimeEndpointService runtimeEndpointService;
 
     // -------------------------------------------------------------------------
     // Health
@@ -77,8 +81,9 @@ public class OllamaManagementService {
      * with HTTP 200.
      */
     public boolean isHealthy(final String baseUrl) {
+        String resolvedBaseUrl = null;
         try {
-            final String resolvedBaseUrl = resolveBaseUrl(baseUrl);
+            resolvedBaseUrl = resolveBaseUrl(baseUrl);
             final String normalizedBaseUrl = normalizeBaseUrl(resolvedBaseUrl);
             final int statusCode = probeHealthStatus(normalizedBaseUrl);
             final boolean ok = statusCode == 200;
@@ -86,11 +91,47 @@ public class OllamaManagementService {
                     normalizedBaseUrl,
                     ok ? "OK" : "FAIL",
                     statusCode));
+            if (ok) {
+                lastHealthFailureLogAt.remove(normalizedBaseUrl);
+            }
             return ok;
         } catch (final Exception e) {
-            LOG.warning(() -> String.format("Ollama health check failed for %s: %s", baseUrl, e.getMessage()));
+            final String targetBaseUrl = normalizeForLog(baseUrl, resolvedBaseUrl);
+            if (shouldLogHealthFailure(targetBaseUrl)) {
+                LOG.warning(() -> String.format("Ollama health check failed for %s: %s",
+                        targetBaseUrl,
+                        describeException(e)));
+            }
             return false;
         }
+    }
+
+    private String normalizeForLog(final String requestedBaseUrl, final String resolvedBaseUrl) {
+        if (resolvedBaseUrl != null && !resolvedBaseUrl.isBlank()) {
+            return resolvedBaseUrl.trim();
+        }
+        if (requestedBaseUrl != null && !requestedBaseUrl.isBlank()) {
+            return requestedBaseUrl.trim();
+        }
+        return "<unconfigured>";
+    }
+
+    private boolean shouldLogHealthFailure(final String targetBaseUrl) {
+        final Instant now = Instant.now();
+        final Instant previous = lastHealthFailureLogAt.get(targetBaseUrl);
+        if (previous != null && Duration.between(previous, now).compareTo(HEALTH_FAILURE_LOG_COOLDOWN) < 0) {
+            return false;
+        }
+        lastHealthFailureLogAt.put(targetBaseUrl, now);
+        return true;
+    }
+
+    private String describeException(final Exception e) {
+        final String message = e.getMessage();
+        if (message == null || message.isBlank()) {
+            return e.getClass().getName();
+        }
+        return e.getClass().getName() + ": " + message;
     }
 
     int probeHealthStatus(final String normalizedBaseUrl) throws Exception {
@@ -173,10 +214,24 @@ public class OllamaManagementService {
      * Returns {@code true} if a model with the given name is locally available.
      *
      * @param modelName fully-qualified model name, e.g.
-     *                  {@code llama3.1:8b-instruct-q4_K_M}.
+     *                  {@code gemma4}.
      */
     public boolean isModelAvailable(final String modelName) {
-        return listModels().stream()
+        return isModelAvailable(null, modelName);
+    }
+
+    /**
+     * Returns {@code true} if a model with the given name is locally available at
+     * the provided base URL.
+     *
+     * @param baseUrl   Ollama base URL to query.
+     * @param modelName fully-qualified model name.
+     */
+    public boolean isModelAvailable(final String baseUrl, final String modelName) {
+        if (modelName == null || modelName.isBlank()) {
+            return false;
+        }
+        return listModels(baseUrl).stream()
                 .anyMatch(m -> modelName.equals(m.getName()) || modelName.equals(m.getModel()));
     }
 
@@ -211,7 +266,7 @@ public class OllamaManagementService {
      * Pulls a model from the Ollama registry, blocking until the download is
      * complete.
      *
-     * @param modelName model to pull, e.g. {@code llama3.1:8b-instruct-q4_K_M}.
+     * @param modelName model to pull, e.g. {@code gemma4}.
      * @return the final {@link OllamaPullStatus}.
      * @throws OllamaException if the pull fails.
      */
@@ -224,7 +279,7 @@ public class OllamaManagementService {
      * complete.
      *
      * @param baseUrl   Ollama base URL to use.
-     * @param modelName model to pull, e.g. {@code llama3.1:8b-instruct-q4_K_M}.
+     * @param modelName model to pull, e.g. {@code gemma4}.
      * @return the final {@link OllamaPullStatus}.
      * @throws OllamaException if the pull fails.
      */
@@ -353,12 +408,51 @@ public class OllamaManagementService {
      * @throws OllamaException if the pull fails.
      */
     public boolean ensureModelAvailable(final String modelName) {
-        if (isModelAvailable(modelName)) {
+        return ensureModelAvailable(null, modelName);
+    }
+
+    /**
+     * Ensures that {@code modelName} is available on the provided Ollama base URL,
+     * pulling it from the registry if needed.
+     *
+     * @param baseUrl   Ollama base URL to target.
+     * @param modelName model to ensure is available.
+     * @return {@code true} if the model was already present; {@code false} if it
+     *         was pulled.
+     * @throws OllamaException if the pull fails or the model is still unavailable.
+     */
+    public boolean ensureModelAvailable(final String baseUrl, final String modelName) {
+        if (modelName == null || modelName.isBlank()) {
+            throw new OllamaException("Model name must not be blank");
+        }
+        if (isModelAvailable(baseUrl, modelName)) {
             LOG.fine(() -> String.format("Model '%s' is already available.", modelName));
             return true;
         }
-        LOG.info(() -> String.format("Model '%s' not found locally - pulling ...", modelName));
-        pullModel(modelName);
+        final String resolvedBaseUrl = resolveBaseUrl(baseUrl);
+        LOG.warning(() -> String.format(
+                "Model '%s' not found locally at %s. Pulling now (this can take several minutes).",
+                modelName,
+                resolvedBaseUrl));
+        final Instant pullStart = Instant.now();
+        final OllamaPullStatus pullStatus = runWithProgressWarnings(
+                () -> pullModel(baseUrl, modelName),
+                "Still pulling Ollama model '%s' from %s ...",
+                modelName,
+                resolvedBaseUrl);
+        final long elapsedSeconds = Duration.between(pullStart, Instant.now()).toSeconds();
+        LOG.warning(() -> String.format(
+                "Completed pull attempt for model '%s' from %s in %ds with status '%s'.",
+                modelName,
+                resolvedBaseUrl,
+                elapsedSeconds,
+                pullStatus != null ? pullStatus.getStatus() : "unknown"));
+        if (!pullStatus.isSuccess() && !isModelAvailable(baseUrl, modelName)) {
+            throw new OllamaException("Pull did not complete successfully for model '" + modelName + "'");
+        }
+        if (!isModelAvailable(baseUrl, modelName)) {
+            throw new OllamaException("Model '" + modelName + "' is still unavailable after pull");
+        }
         return false;
     }
 
@@ -384,6 +478,41 @@ public class OllamaManagementService {
         }
     }
 
+    private OllamaPullStatus runWithProgressWarnings(
+            final PullOperation operation,
+            final String progressMessageTemplate,
+            final String modelName,
+            final String baseUrl) {
+        final AtomicBoolean done = new AtomicBoolean(false);
+        final Thread progressThread = new Thread(() -> {
+            while (!done.get()) {
+                try {
+                    Thread.sleep(15000L);
+                    if (!done.get()) {
+                        LOG.warning(() -> String.format(progressMessageTemplate, modelName, baseUrl));
+                    }
+                } catch (final InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
+        }, "ollama-model-pull-progress");
+        progressThread.setDaemon(true);
+        progressThread.start();
+
+        try {
+            return operation.run();
+        } finally {
+            done.set(true);
+            progressThread.interrupt();
+        }
+    }
+
+    @FunctionalInterface
+    private interface PullOperation {
+        OllamaPullStatus run();
+    }
+
     OllamaManagementClient getClient(final String baseUrl) {
         final String resolvedBaseUrl = resolveBaseUrl(baseUrl);
         if (resolvedBaseUrl == null || resolvedBaseUrl.isBlank()) {
@@ -393,13 +522,10 @@ public class OllamaManagementService {
     }
 
     String resolveBaseUrl(final String baseUrl) {
-        if (runtimeEndpointService != null) {
-            return runtimeEndpointService.resolveExplicitOrActive(baseUrl);
-        }
         if (baseUrl != null && !baseUrl.isBlank()) {
             return baseUrl.trim();
         }
-        return config.baseUrl();
+        return config.baseUrl().orElse(null);
     }
 
     OllamaManagementClient buildClient(final String resolvedBaseUrl) {

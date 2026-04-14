@@ -26,14 +26,12 @@ type ConfigurationModalsProps = {
   modelsLoading: boolean;
   pullProgress: PullProgressStatus | null;
   runtimeStatus: OllamaRuntimeStatus | null;
-  runtimeSwitching: boolean;
   setConfigOpen: Dispatch<SetStateAction<boolean>>;
   setConfigForm: Dispatch<SetStateAction<ConfigurationForm | null>>;
   refreshModels: () => Promise<void>;
   pullModel: (modelName: string) => Promise<void>;
   deleteModel: (modelName: string) => Promise<void>;
   saveConfiguration: () => Promise<void>;
-  switchRuntimeProvider: (provider: "EXTERNAL" | "INTERNAL") => Promise<void>;
 };
 
 const PROVIDERS: ConfigurationProvider[] = ["OLLAMA"];
@@ -74,14 +72,12 @@ export function ConfigurationModals({
   modelsLoading,
   pullProgress,
   runtimeStatus,
-  runtimeSwitching,
   setConfigOpen,
   setConfigForm,
   refreshModels,
   pullModel,
   deleteModel,
   saveConfiguration,
-  switchRuntimeProvider,
 }: ConfigurationModalsProps) {
   const fieldString = (key: string) => String(configForm?.[key] ?? "");
   const fieldNumber = (key: string) => {
@@ -334,24 +330,6 @@ export function ConfigurationModals({
                 </div>
                 <div style={{ fontSize: 12, opacity: 0.9 }}>
                   Health: {runtimeStatus?.healthy ? "healthy" : "unreachable"}
-                </div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <button
-                    onClick={() =>
-                      switchRuntimeProvider("EXTERNAL").catch(() => {})
-                    }
-                    disabled={runtimeSwitching}
-                  >
-                    Use External Ollama
-                  </button>
-                  <button
-                    onClick={() =>
-                      switchRuntimeProvider("INTERNAL").catch(() => {})
-                    }
-                    disabled={runtimeSwitching}
-                  >
-                    Use Internal Testcontainer
-                  </button>
                 </div>
               </div>
               <div style={{ marginTop: 12, fontSize: 12, opacity: 0.7 }}>

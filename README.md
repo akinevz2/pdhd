@@ -63,6 +63,7 @@ When started, the CLI shows:
 ## Web UI Notes
 
 See `docs/frontend.md` for detailed frontend architecture, API integration, state model, and development workflow.
+For an end-to-end runtime narrative from launch to assistant functionality requests, see `docs/assistant-request-flow.md`.
 For assistant tooling internals and report-ready architecture notes, see `docs/tool-calling-architecture.md`.
 For backend constants and extensibility patterns, see `docs/support-classes.md`.
 For the assistant TUI behaviour specification and pre-rewrite architecture review, see `docs/assistant-menu-rewrite-spec.md`.

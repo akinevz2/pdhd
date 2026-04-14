@@ -6,9 +6,6 @@ import type { WindowState } from "../types";
 import { isImagePath, isPdfPath, rawFileUrl, rawImageUrl } from "../utils";
 import { Window } from "./Window";
 
-const MARKDOWN_SIGNAL_PATTERN =
-  /(^|\n)\s{0,3}#{1,6}\s|(^|\n)\s*[-*+]\s|(^|\n)\s*\d+\.\s|```|\[[^\]]+\]\([^\)]+\)/m;
-
 type AssistantActionPayload = {
   label: string;
   prompt: string;
@@ -19,8 +16,8 @@ export type PaneWindowProps = {
   onClose: () => void;
   onFocus: () => void;
   onMove: (x: number, y: number) => void;
-  onOpenFile: (path: string) => void;
-  onOpenFolderSummary: (path: string) => void;
+  onOpenFile: (path: string, uuid: string) => void;
+  onOpenFolderPreview: (path: string, uuid?: string | null) => void;
   onAssistantAction: (prompt: string) => void;
   assistantActionDisabled?: boolean;
 };
@@ -32,10 +29,71 @@ export function PaneWindow({
   onFocus,
   onMove,
   onOpenFile,
-  onOpenFolderSummary,
+  onOpenFolderPreview,
   onAssistantAction,
   assistantActionDisabled = false,
 }: PaneWindowProps) {
+  const toUnixPath = (value: string): string => value.replace(/\\/g, "/");
+
+  const isExternalAsset = (value: string): boolean =>
+    /^(?:https?:|data:|blob:|mailto:|#)/i.test(value);
+
+  const normalizeAbsolutePath = (value: string): string => {
+    const unix = toUnixPath(value);
+    const isAbsolute = unix.startsWith("/") || /^[A-Za-z]:\//.test(unix);
+    const hasDrive = /^[A-Za-z]:\//.test(unix);
+    const drivePrefix = hasDrive ? unix.slice(0, 2) : "";
+    const body = hasDrive ? unix.slice(2) : unix;
+
+    const segments = body.split("/");
+    const normalized: string[] = [];
+    for (const segment of segments) {
+      if (!segment || segment === ".") {
+        continue;
+      }
+      if (segment === "..") {
+        if (normalized.length > 0) {
+          normalized.pop();
+        }
+        continue;
+      }
+      normalized.push(segment);
+    }
+
+    const prefix = hasDrive ? `${drivePrefix}/` : isAbsolute ? "/" : "";
+    return `${prefix}${normalized.join("/")}`;
+  };
+
+  const resolveMarkdownAssetPath = (assetPath: string): string | null => {
+    if (!assetPath || isExternalAsset(assetPath)) {
+      return null;
+    }
+
+    const selectedPath = windowState.selectedFilePath || "";
+    if (!selectedPath || selectedPath === ".") {
+      return null;
+    }
+
+    const selectedUnix = toUnixPath(selectedPath);
+    const baseDir = selectedUnix.includes("/")
+      ? selectedUnix.slice(0, selectedUnix.lastIndexOf("/")) || "/"
+      : selectedUnix;
+
+    const target = assetPath.startsWith("/")
+      ? assetPath
+      : `${baseDir}/${assetPath}`;
+
+    return normalizeAbsolutePath(target);
+  };
+
+  const markdownImageSrc = (assetPath?: string): string | undefined => {
+    const resolved = resolveMarkdownAssetPath(assetPath || "");
+    if (!resolved) {
+      return assetPath;
+    }
+    return `/api/project/${encodeURIComponent(windowState.project.id)}/raw?path=${encodeURIComponent(resolved)}`;
+  };
+
   const showImage =
     !windowState.fileLoading &&
     !windowState.fileError &&
@@ -47,10 +105,6 @@ export function PaneWindow({
     !windowState.fileError &&
     !!windowState.selectedFilePath &&
     isPdfPath(windowState.selectedFilePath);
-
-  const looksLikeMarkdown = !!windowState.fileContent?.match(
-    MARKDOWN_SIGNAL_PATTERN,
-  );
 
   const isFolderSummaryPath =
     windowState.selectedFilePath === "." ||
@@ -65,9 +119,12 @@ export function PaneWindow({
     !showImage &&
     !showPdf &&
     !!windowState.fileContent &&
-    (!!windowState.fileContentMarkdown ||
-      looksLikeMarkdown ||
-      isFolderSummaryPath);
+    (!!windowState.fileContentMarkdown || isFolderSummaryPath);
+
+  const hasContentSelection =
+    !!windowState.selectedFilePath ||
+    !!windowState.fileLoading ||
+    !!windowState.fileError;
 
   const parseAssistantActionPayload = (
     rawPayload: string,
@@ -121,15 +178,33 @@ export function PaneWindow({
         </button>
       );
     },
+    img({ src, alt, title, ...props }) {
+      const rewrittenSrc = markdownImageSrc(
+        typeof src === "string" ? src : undefined,
+      );
+      return (
+        <img src={rewrittenSrc} alt={alt || ""} title={title} {...props} />
+      );
+    },
   };
 
   const normalizedMarkdownContent = normalizeToolCallMarkup(
     windowState.fileContent || "",
   );
 
+  const repositoryLabel = windowState.project.hasGithubRepository
+    ? "GitHub"
+    : windowState.project.hasGitRepository
+      ? "Git"
+      : "";
+
+  const windowTitle = repositoryLabel
+    ? `${windowState.project.directory} [${repositoryLabel}]`
+    : windowState.project.directory;
+
   return (
     <Window
-      title={windowState.project.directory}
+      title={windowTitle}
       x={windowState.x}
       y={windowState.y}
       z={windowState.z}
@@ -147,12 +222,12 @@ export function PaneWindow({
             !windowState.entriesError &&
             windowState.entries?.map((entry) => (
               <div
-                key={entry.path}
+                key={entry.uuid ?? entry.path}
                 className="file-node"
                 onClick={
                   entry.directory
-                    ? () => onOpenFolderSummary(entry.path)
-                    : () => onOpenFile(entry.path)
+                    ? () => onOpenFolderPreview(entry.path, entry.uuid)
+                    : () => onOpenFile(entry.path, entry.uuid)
                 }
               >
                 <span className="node-entry">
@@ -169,10 +244,13 @@ export function PaneWindow({
         </aside>
 
         <article className="content-pane">
+          {!hasContentSelection && (
+            <pre>Select a file or folder to preview.</pre>
+          )}
           {windowState.fileLoading && (
             <pre>
               {windowState.fileLoadingFolderSummary
-                ? "Loading folder summary..."
+                ? "Analyzing folder structure..."
                 : "Loading file..."}
             </pre>
           )}
@@ -184,8 +262,8 @@ export function PaneWindow({
               <img
                 className="image-preview"
                 src={rawImageUrl(
-                  windowState.project.directory,
-                  windowState.selectedFilePath!,
+                  windowState.project.id,
+                  windowState.selectedFileUuid!,
                 )}
                 alt={windowState.selectedFilePath}
               />
@@ -199,8 +277,8 @@ export function PaneWindow({
               <iframe
                 className="pdf-preview"
                 src={rawFileUrl(
-                  windowState.project.directory,
-                  windowState.selectedFilePath!,
+                  windowState.project.id,
+                  windowState.selectedFileUuid!,
                 )}
                 title={windowState.selectedFilePath}
               />
@@ -223,12 +301,8 @@ export function PaneWindow({
             !windowState.fileError &&
             !showImage &&
             !showPdf &&
-            !showMarkdown && (
-              <pre>
-                {windowState.fileContent ||
-                  "Select a file or folder to view content."}
-              </pre>
-            )}
+            !showMarkdown &&
+            hasContentSelection && <pre>{windowState.fileContent || ""}</pre>}
         </article>
       </div>
     </Window>

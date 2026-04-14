@@ -1,8 +1,22 @@
+/** Raw project entity returned by the backend project API. */
+export type ProjectFolderEntity = {
+  id: number;
+  directory: string;
+  loaded: boolean;
+  gitRepository?: unknown | null;
+  githubRepository?: unknown | null;
+};
+
+export type ProjectRemoteUrlResponse = {
+  remoteUrl?: string | null;
+};
+
 /** Summary of a discovered software project returned by the API. */
 export type ProjectSummary = {
   id: number;
   directory: string;
   hasGitRepository: boolean;
+  hasGithubRepository: boolean;
   loaded: boolean;
   /** Present only on the register response when the directory has no .git folder. */
   warning?: string;
@@ -12,7 +26,6 @@ export type ProjectSummary = {
 export type OllamaRuntimeStatus = {
   runtimeEndpoint: string;
   runtimeProvider: "EXTERNAL" | "INTERNAL";
-  usingTestcontainers: boolean;
   healthy: boolean;
 };
 
@@ -57,7 +70,7 @@ export type ToolTelemetryResponse = {
 /** Response from file-content API endpoint. */
 export type FileContentResponse = {
   filePath: string;
-  content: string;
+  content?: string;
   mimeType: string;
   language: string;
   requiresPdfViewer: boolean;
@@ -66,23 +79,38 @@ export type FileContentResponse = {
 };
 
 /** Response from the CWD API endpoints. */
-export type CwdResponse = {
-  cwd: string;
+type FsBrowserEntryBase = {
+  name: string;
+  path: string;
+};
+
+/** A file row in the filesystem browser. */
+export type FsBrowserFile = FsBrowserEntryBase & {
+  directory: false;
+  uuid: string;
+};
+
+/** A folder row in the filesystem browser. */
+export type FsBrowserFolder = FsBrowserEntryBase & {
+  directory: true;
+  uuid: string;
+  repoUrl?: string | null;
 };
 
 /** A single filesystem row in the simple left-pane browser. */
-export type FsBrowserEntry = {
-  name: string;
+export type FsBrowserEntry = FsBrowserFile | FsBrowserFolder;
+
+/** Response from GET /api/workspace (current working directory view). */
+export type WorkspaceResponse = {
   path: string;
-  directory: boolean;
   repoUrl?: string | null;
+  entries: FsBrowserEntry[];
 };
 
-/** Response from the lightweight filesystem browser endpoint. */
-export type FsListResponse = {
-  path: string;
+/** Response from GET /api/project/{uuid}/browse. */
+export type BrowseResponse = {
+  parentUuid: string;
   entries: FsBrowserEntry[];
-  repoUrl?: string | null;
 };
 
 /** Response from the assistant chat API. */
@@ -132,6 +160,18 @@ export type ChatMessage = {
   id?: string;
 };
 
+/** Shared state for a failed API signal, synchronized between chat and canvas. */
+export type ApiFailureState = {
+  id: string;
+  signal: string;
+  endpoint: string;
+  message: string;
+  statusCode?: number;
+  contentType?: string | null;
+  timestamp: string;
+  iframeWindowIds: number[];
+};
+
 /** Runtime state for an open project explorer window. */
 export type WindowState = {
   id: number;
@@ -140,6 +180,7 @@ export type WindowState = {
   entriesError?: string;
   entries?: FsBrowserEntry[];
   selectedFilePath?: string;
+  selectedFileUuid?: string;
   fileContent?: string;
   fileContentMarkdown?: boolean;
   fileLoading?: boolean;
@@ -162,5 +203,17 @@ export type FileWindowState = {
   error?: string;
   x: number;
   y: number;
+  z: number;
+};
+
+/** Runtime state for a fullscreen HTML response overlay inside the canvas area. */
+export type IframeWindowState = {
+  id: number;
+  failureId?: string;
+  title: string;
+  html: string;
+  signal: string;
+  endpoint: string;
+  statusCode?: number;
   z: number;
 };

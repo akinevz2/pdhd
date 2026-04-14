@@ -2,6 +2,7 @@ package ac.uk.sussex.kn253.repository;
 
 import java.net.URL;
 
+import ac.uk.sussex.kn253.support.BackendSupport;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
 
@@ -12,7 +13,8 @@ import jakarta.persistence.Embeddable;
  */
 @Embeddable
 public class Origin {
-    private static final String GITHUB_HOST = "github.com";
+    // Host constant is centralised in BackendSupport; kept here for quick
+    // local reference but must stay in sync with BackendSupport.GITHUB_HOST.
 
     @Column(nullable = false)
     String name;
@@ -44,7 +46,7 @@ public class Origin {
     }
 
     public boolean isGithub() {
-        return url != null && GITHUB_HOST.equalsIgnoreCase(url.getHost());
+        return url != null && BackendSupport.GITHUB_HOST.equalsIgnoreCase(url.getHost());
     }
 
 }
