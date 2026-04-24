@@ -1,0 +1,15 @@
+model_name,test_case,prompt,response,latency,correctness_score
+gemma4:26b,Capital of France,What is the capital of France?,The capital of France is **Paris**.,10.95799446105957,1
+gemma4:26b,Coding Poem,Write a short poem about coding.,"Lines of logic, dark and bright, A glowing dance in the dead of night. A syntax error, a missing brace, A frantic hunt through empty space.  But when the pattern clicks in place, And functions run with steady grace, A world is born from bits and bytes, Woven through the neon lights.",8.585842370986938,1
+gemma4:26b,Simple Greeting,Say 'Hello World',Hello World,1.049720287322998,1
+gemma4:e4b,Capital of France,What is the capital of France?,The capital of France is **Paris**.,15.66759967803955,1
+gemma4:e4b,Coding Poem,Write a short poem about coding.,"The cursor blinks, a waiting eye, On fields of script where logic lies. A whispered phrase of bracketed might, To weave the darkness into light.  We trade in symbols, structured, clean, A digital, invisible machine. With if and else, the rules defined, A complex logic for the mind.  And when the error flashes red, A stubborn bug inside the thread, We hunt the flaw, line by slow line, Until the perfect function shines.  A simple loop, a seamless trace, And suddenly, the thing takes place. A world we built, unseen, complete, A victory coded, wonderfully sweet.",8.54961609840393,1
+gemma4:e4b,Simple Greeting,Say 'Hello World',Hello World,0.4172847270965576,1
+gemma4:latest,Capital of France,What is the capital of France?,The capital of France is **Paris**.,0.509058952331543,1
+gemma4:latest,Coding Poem,Write a short poem about coding.,"The screen glows white, a waiting slate, A digital world, sealed by code's fate. With bracketed whispers and syntax precise, You build worlds of logic, beyond mere device.  A semicolon's pause, a variable's flow, A structured command, watching the numbers grow. You hunt the stray bug, the misplaced semicolon's flaw, To make the whole program follow natural law.  From empty conjecture to a vibrant cascade, A tapestry woven, meticulously laid. A function defined, a solution in flight— The silent, sweet magic of coding the night.",3.4715569019317627,1
+gemma4:latest,Simple Greeting,Say 'Hello World',Hello World,0.4254899024963379,1
+gpt-oss:20b,Capital of France,What is the capital of France?,The capital of France is **Paris**.,10.65201473236084,1
+gpt-oss:20b,Coding Poem,Write a short poem about coding.,"In a quiet room where screens glow blue,   Bits dance like fireflies, forming clues.   Each line of code, a whispered rhyme,   Turns empty thoughts into a living time.  Variables pulse, functions breathe,   Logic threads through every weave.   From zero's hush to one’s bright shout,   A programmer’s heart beats in every output.",1.6777968406677246,1
+gpt-oss:20b,Simple Greeting,Say 'Hello World',Hello World,1.4611072540283203,1
+qwen3.6:latest,Capital of France,What is the capital of France?,The capital of France is **Paris**.,26.32901430130005,1
+qwen3.6:latest,Simple Greeting,Say 'Hello World',Hello World,20.243924617767334,1

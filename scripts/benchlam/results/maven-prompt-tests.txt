@@ -1,0 +1,65 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ----------------------< ac.uk.sussex.kn253:pdhd >-----------------------
+[INFO] Building pdhd 0.99.53
+[INFO]   from pom.xml
+[INFO] ------------------------------[ quarkus ]-------------------------------
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ pdhd ---
+[INFO] Copying 1 resource from src/main/resources to target/classes
+[INFO] 
+[INFO] --- quarkus:3.34.3:generate-code (default-generate-code) @ pdhd ---
+[INFO] 
+[INFO] --- compiler:3.14.1:compile (default-compile) @ pdhd ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ pdhd ---
+[INFO] Copying 2 resources from src/test/resources to target/test-classes
+[INFO] 
+[INFO] --- quarkus:3.34.3:generate-code-tests (default-generate-code-tests) @ pdhd ---
+[INFO] 
+[INFO] --- compiler:3.14.1:testCompile (default-testCompile) @ pdhd ---
+[INFO] Recompiling the module because of changed source code.
+[INFO] Compiling 27 source files with javac [debug parameters release 25] to target/test-classes
+[INFO] 
+[INFO] --- surefire:3.5.4:test (default-test) @ pdhd ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+2026-04-23 21:04:03,933 WARN  [io.quarkus.runtime.logging.LoggingSetupRecorder] (build-10) Log level FINEST for category 'ac.uk.sussex.kn253.resources.ChatResource' set below minimum logging level DEBUG, promoting it to DEBUG. Set the build time configuration property 'quarkus.log.category."ac.uk.sussex.kn253.resources.ChatResource".min-level' to 'FINEST' to avoid this warning
+2026-04-23 21:04:03,987 WARN  [io.quarkiverse.quinoa.deployment.QuinoaProcessor] (build-9) Quinoa is disabled by default in tests.
+2026-04-23 21:04:04,075 WARN  [io.quarkus.datasource.deployment.devservices.DevServicesDatasourceProcessor] (build-22) Unable to start Dev Services for default datasource as this datasource type (sqlite) does not support Dev Services
+2026-04-23 21:04:06,799 WARN  [io.quarkus.runtime.logging.LoggingSetupRecorder] (main) Log level FINEST for category 'ac.uk.sussex.kn253.resources.ChatResource' set below minimum logging level DEBUG, promoting it to DEBUG. Set the build time configuration property 'quarkus.log.category."ac.uk.sussex.kn253.resources.ChatResource".min-level' to 'FINEST' to avoid this warning
+[INFO] Running ac.uk.sussex.kn253.prompts.BrowseDirectoryPromptTest
+2026-04-23 21:04:08,987 WARN  [io.quarkus.runtime.logging.LoggingSetupRecorder] (main) Log level FINEST for category 'ac.uk.sussex.kn253.resources.ChatResource' set below minimum logging level DEBUG, promoting it to DEBUG. Set the build time configuration property 'quarkus.log.category."ac.uk.sussex.kn253.resources.ChatResource".min-level' to 'FINEST' to avoid this warning
+2026-04-23 21:04:10,535 INFO  [ac.uk.sussex.kn253.services.ai.ProjectAssistantProducer] (main) Tool dispatch check passed: 9 unique tool names across 3 modules
+2026-04-23 21:04:10,907 INFO  [ac.uk.sussex.kn253.services.TelemetryService] (main) Telemetry persistence confirmed: tool_telemetry=0 rows, model_call_telemetry=0 rows
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 8.687 s -- in ac.uk.sussex.kn253.prompts.BrowseDirectoryPromptTest
+[INFO] Running ac.uk.sussex.kn253.prompts.GitMetadataPromptTest
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.611 s -- in ac.uk.sussex.kn253.prompts.GitMetadataPromptTest
+[INFO] Running ac.uk.sussex.kn253.prompts.PathAnalysisPromptTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.196 s -- in ac.uk.sussex.kn253.prompts.PathAnalysisPromptTest
+[INFO] Running ac.uk.sussex.kn253.prompts.ReadFilePromptTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.205 s -- in ac.uk.sussex.kn253.prompts.ReadFilePromptTest
+[INFO] Running ac.uk.sussex.kn253.prompts.WebSearchPromptTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.753 s -- in ac.uk.sussex.kn253.prompts.WebSearchPromptTest
+[INFO] Running ac.uk.sussex.kn253.prompts.WorkingDirectoryPromptTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.122 s -- in ac.uk.sussex.kn253.prompts.WorkingDirectoryPromptTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 36, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  30.781 s
+[INFO] Finished at: 2026-04-23T21:04:18Z
+[INFO] ------------------------------------------------------------------------
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by org.sqlite.SQLiteJDBCLoader in an unnamed module (file:/home/vscode/.m2/repository/org/xerial/sqlite-jdbc/3.46.1.3/sqlite-jdbc-3.46.1.3.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+

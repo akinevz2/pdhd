@@ -1,0 +1,247 @@
+[
+    {
+        "name": "browse-directory: non-recursive listing format",
+        "prompt": "You are a filesystem assistant. A user asked: 'List the contents of /home/user/projects'. The directory contains a file called 'pom.xml', a file called 'README.md', and a subdirectory called 'src'. Produce only the directory listing. Begin the first line with 'Directory: /home/user/projects'. Prefix each file entry with '[F]' and each directory entry with '[D]'.",
+        "verification": {
+            "type": "regex",
+            "pattern": "\\[F\\].*pom\\.xml"
+        }
+    },
+    {
+        "name": "browse-directory: recursive flat list format",
+        "prompt": "You are a filesystem assistant. A user asked: 'List all files recursively under /project'. The directory contains src/main/App.java and docs/README.md. Produce only the recursive listing. Begin with 'Directory: /project' then 'Files listed: 2 (limit 200)' then one relative file path per line.",
+        "verification": {
+            "type": "regex",
+            "pattern": "Files listed:"
+        }
+    },
+    {
+        "name": "read-file: output header format",
+        "prompt": "A file-reading tool has returned content. Format the complete output for reading /home/user/projects/README.md lines 1 to 3, where the content is exactly 'Hello World'. The first line of the output must begin with 'File:' and include the absolute path and '[lines 1–3]'. Then show the file content.",
+        "verification": {
+            "type": "regex",
+            "pattern": "File:.*README\\.md"
+        }
+    },
+    {
+        "name": "read-file: truncation note format",
+        "prompt": "A file-reading tool returned content that was truncated. The file was /home/user/data/large.txt. The content was cut after 24000 characters. Produce only the truncation note line that would appear at the end of the output. It must contain the word 'truncated' and the character limit.",
+        "verification": {
+            "type": "regex",
+            "pattern": "(?i)truncated"
+        }
+    },
+    {
+        "name": "working-directory: get cwd returns absolute path",
+        "prompt": "A 'get current working directory' tool must return only an absolute filesystem path. Respond with a single example absolute path and nothing else. The path must start with /.",
+        "verification": {
+            "type": "regex",
+            "pattern": "^/"
+        }
+    },
+    {
+        "name": "working-directory: change cwd confirmation message",
+        "prompt": "A change-working-directory command succeeded. The new directory is /home/user/projects/src. Produce only the single-line confirmation message, nothing else. The message must contain the phrase 'changed to' and the full path.",
+        "verification": {
+            "type": "regex",
+            "pattern": "changed to"
+        }
+    },
+    {
+        "name": "path-analysis: metadata report includes type field",
+        "prompt": "Produce a path analysis report for the file /home/user/projects/pom.xml. Include the following labelled fields on separate lines: Path, Type, Exists, Size, Modified, and a Preview section showing one line of content. The Type field value must be 'file'.",
+        "verification": {
+            "type": "regex",
+            "pattern": "(?i)Type:\\s*(file|regular file)"
+        }
+    },
+    {
+        "name": "path-analysis: report for directory includes children count",
+        "prompt": "Produce a path analysis report for the directory /home/user/projects. The directory has 14 immediate children. Include labelled fields: Path, Type (directory), Exists (true), Children (14), and a Preview section listing 3 child names. Keep the format consistent.",
+        "verification": {
+            "type": "regex",
+            "pattern": "(?i)Children:\\s*14|14\\s*children"
+        }
+    },
+    {
+        "name": "git-metadata: git log output format",
+        "prompt": "Format a git log output for the repository at /home/user/projects showing 3 recent commits. The output must begin with exactly: 'Git log: /home/user/projects  (last 3 commits)'. Each commit line must be: short-hash  date  subject. Invent plausible values.",
+        "verification": {
+            "type": "regex",
+            "pattern": "Git log:"
+        }
+    },
+    {
+        "name": "git-metadata: git status output format",
+        "prompt": "Format a git status output for the repository /home/user/projects. The output must begin with 'Git status: /home/user/projects' on its own line. Show two modified files. Use realistic git status formatting.",
+        "verification": {
+            "type": "regex",
+            "pattern": "Git status:"
+        }
+    },
+    {
+        "name": "git-metadata: error for non-git directory",
+        "prompt": "A git metadata tool was called on /tmp/plain-dir which is not inside any git repository. Produce only the error message that the tool returns. It must start with 'Error:' and mention 'git repository'.",
+        "verification": {
+            "type": "regex",
+            "pattern": "(?i)Error:.*git"
+        }
+    },
+    {
+        "name": "web-search: summarised result format",
+        "prompt": "Format the output of a web search for the query 'Quarkus dependency injection'. The output must begin with: 'Web search: \"Quarkus dependency injection\"'. Then include a 'Summary:' section with one paragraph and a 'Sources:' section with two numbered URLs.",
+        "verification": {
+            "type": "regex",
+            "pattern": "Web search:.*Quarkus"
+        }
+    },
+    {
+        "name": "web-search: raw snippets format when summarise is false",
+        "prompt": "Format the output of a web search for 'Java Optional best practices' with summarise=false and maxResults=2. Begin with 'Web search: \"Java Optional best practices\"  (2 results)'. Then list two results each with a number, title, URL, and excerpt.",
+        "verification": {
+            "type": "regex",
+            "pattern": "\\(2 results\\)"
+        }
+    },
+    {
+        "name": "write-file: confirmation message format",
+        "prompt": "A file write operation succeeded. The file written was /home/user/projects/report.txt containing 1024 characters. Produce only the single-line confirmation message. It must start with 'Written:' and include the absolute path and the character count.",
+        "verification": {
+            "type": "regex",
+            "pattern": "Written:.*report\\.txt"
+        }
+    },
+    {
+        "name": "write-file: overwrite refused error message",
+        "prompt": "A file write operation was refused because the file /home/user/projects/notes.txt already exists and overwrite=false. Produce only the error message. It must start with 'Error writing file:' and mention 'already exists' and the file path.",
+        "verification": {
+            "type": "regex",
+            "pattern": "(?i)Error writing file:.*already exists"
+        }
+    },
+    {
+        "name": "semantic-search: scored chunk output format",
+        "prompt": "Format the output of a semantic embedding search for the query 'entry point' in project 1. Show 2 results. Begin with 'Embedding context for query: \"entry point\"'. Each result must begin with a similarity score in square brackets like [0.92], followed by the source file path on the same line, then an indented text excerpt on the next line.",
+        "verification": {
+            "type": "regex",
+            "pattern": "\\[0\\.\\d{2}\\]"
+        }
+    },
+    {
+        "name": "semantic-search: no embeddings error message",
+        "prompt": "A semantic search was attempted for project 42 but no embeddings have been stored yet for that project. Produce only the message the tool returns. It must mention 'No embeddings found' and the project id 42.",
+        "verification": {
+            "type": "regex",
+            "pattern": "(?i)No embeddings found.*42|42.*No embeddings"
+        }
+    },
+    {
+        "name": "summarise: folder summary produces structured markdown",
+        "prompt": "Generate a markdown summary for a Java project at /home/user/pdhd. The folder contains: src/main/java/ (application source), docs/ (specifications), pom.xml (Maven build file), README.md. Write a structured markdown summary with: a level-1 heading, an overview paragraph, and a bullet list of at least three key components.",
+        "verification": {
+            "type": "judge",
+            "rubric": "Does the response contain a markdown level-1 heading (#), at least one bullet list, and mention both the Java source and the Maven build? Return 1 if all three are present, 0 otherwise.",
+            "judge_model": "gemma4:latest"
+        }
+    },
+    {
+        "name": "project-discovery: listing includes hasGit field",
+        "prompt": "A project discovery scan of /home/user found two git repositories. Format an output listing both. For each entry include: absolutePath, name, hasGit (true or false), and remoteUrl. First: /home/user/pdhd, name pdhd, hasGit true, remote https://github.com/user/pdhd.git. Second: /home/user/notes, name notes, hasGit true, no remote (null).",
+        "verification": {
+            "type": "regex",
+            "pattern": "(?i)hasGit|has_git|has git"
+        }
+    },
+    {
+        "name": "project-knowledge: cache confirmation message",
+        "prompt": "A knowledge cache operation succeeded for project 1. The note was 342 characters long and was tagged 'structure'. Produce only the confirmation message. It must contain the phrase 'Knowledge cached' and reference the project id 1 and the tag 'structure'.",
+        "verification": {
+            "type": "regex",
+            "pattern": "(?i)Knowledge cached"
+        }
+    },
+    {
+        "name": "project-knowledge: recall output ordered by recency",
+        "prompt": "Format a knowledge recall response for project 2 which has two stored notes. Note A (tag: 'structure', stored 2026-04-21): 'Entry point is PdhdLauncher.java.' Note B (tag: 'purpose', stored 2026-04-20): 'This is a filesystem explorer agent.' Return most recent first. Each note must show its timestamp, tag, and text.",
+        "verification": {
+            "type": "judge",
+            "rubric": "Does the response show Note A (structure, 2026-04-21) before Note B (purpose, 2026-04-20)? Return 1 if the order is correct and both notes are present, 0 otherwise.",
+            "judge_model": "gemma4:latest"
+        }
+    },
+    {
+        "name": "move-rename: confirmation message format",
+        "prompt": "A file move operation succeeded. Source: /home/user/projects/old-name.txt. Destination: /home/user/projects/new-name.txt. Produce only the confirmation message. It must start with 'Moved:' and show both absolute paths separated by an arrow (use → or ->).",
+        "verification": {
+            "type": "regex",
+            "pattern": "(?i)Moved:.*new-name\\.txt"
+        }
+    },
+    {
+        "name": "move-rename: destination-inside-source error",
+        "prompt": "A move operation was rejected because the destination /home/user/projects/src/backup is inside the source directory /home/user/projects/src. Produce only the error message. It must start with 'Error moving:' and say that the destination is inside the source.",
+        "verification": {
+            "type": "regex",
+            "pattern": "(?i)Error moving:.*inside"
+        }
+    },
+    {
+        "name": "archive: confirmation message format",
+        "prompt": "An archive operation succeeded. Source: /home/user/projects. Destination: /home/user/backup/projects.tar.gz. 50 files and 8 directories were archived. Compressed size: 4.2 MB. Produce only the confirmation message. It must start with 'Archived:' and include both paths, the entry counts, and the compressed size.",
+        "verification": {
+            "type": "regex",
+            "pattern": "(?i)Archived:.*projects\\.tar\\.gz"
+        }
+    },
+    {
+        "name": "archive: unsupported format error",
+        "prompt": "An archive operation was called with destination /home/user/backup/projects.rar which uses an unsupported format. Produce only the error message. It must start with 'Error archiving:' and mention 'unsupported format'.",
+        "verification": {
+            "type": "regex",
+            "pattern": "(?i)Error archiving:.*unsupported"
+        }
+    },
+    {
+        "name": "create-plan-report: plan has all four required sections",
+        "prompt": "Create a project plan document for a Java command-line AI assistant called PDHD. The plan must have exactly these four section headings in markdown: 'Objective', 'Open Work Streams', 'Prioritised Next Steps', and 'Risks and Blockers'. Keep each section to two bullet points.",
+        "verification": {
+            "type": "judge",
+            "rubric": "Does the response contain all four section headings: Objective, Open Work Streams, Prioritised Next Steps, and Risks and Blockers? Return 1 if all four are present, 0 otherwise.",
+            "judge_model": "gemma4:latest"
+        }
+    },
+    {
+        "name": "create-plan-report: report has all five required sections",
+        "prompt": "Create a project status report for a Java command-line AI assistant called PDHD. The report must contain exactly these five section headings in markdown: 'Executive Summary', 'Project Structure', 'Current State', 'Gaps', and 'Recommendations'. Keep each section to one sentence.",
+        "verification": {
+            "type": "judge",
+            "rubric": "Does the response contain all five section headings: Executive Summary, Project Structure, Current State, Gaps, and Recommendations? Return 1 if all five are present, 0 otherwise.",
+            "judge_model": "gemma4:latest"
+        }
+    },
+    {
+        "name": "Capital of France",
+        "prompt": "What is the capital of France?",
+        "verification": {
+            "type": "regex",
+            "pattern": "Paris"
+        }
+    },
+    {
+        "name": "Coding Poem",
+        "prompt": "Write a short poem about coding.",
+        "verification": {
+            "type": "judge",
+            "rubric": "Evaluate if the poem is creative and mentions coding elements. Return only '1' for pass or '0' for fail.",
+            "judge_model": "llama3"
+        }
+    },
+    {
+        "name": "Simple Greeting",
+        "prompt": "Say 'Hello World'",
+        "verification": {
+            "type": "regex",
+            "pattern": "Hello World"
+        }
+    }
+]

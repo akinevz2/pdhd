@@ -1,0 +1,20 @@
+model_name,test_case,prompt,response,latency,correctness_score
+devstral:latest,Capital of France,What is the capital of France?,The capital of France is Paris.,30.311326503753662,1
+devstral:latest,Coding Poem,Write a short poem about coding.,"In realms where silicon minds reside, Where algorithms dance side by side, Through lines of code that twist and bend, We craft our visions to transcend.  With keyboard's click, and screen's soft glow, In binary whispers, secrets flow. From simple loops to structures grand, We build our worlds in this sweet land.",20.033144235610962,1
+devstral:latest,Simple Greeting,Say 'Hello World',Hello World! How can I assist you today?,3.650263786315918,1
+gemma4:latest,Capital of France,What is the capital of France?,The capital of France is **Paris**.,22.005553007125854,1
+gemma4:latest,Coding Poem,Write a short poem about coding.,"A glow-lit desk, a silent hum, Where logic's whispers have become The patterned grace of bracketed might, Illuminating code's pure light.  From curly braces and slanting line, A world of function, sharp and fine. With semicolons, commas neatly placed, A digital landscape interlaced.  We build and break, we test and trace, The logic flow, the sweet embrace Of working scripts that dance and run, A small command 'til day is done.",2.045642137527466,1
+gemma4:latest,Simple Greeting,Say 'Hello World',Hello World,0.4269232749938965,1
+glm-4.7-flash:latest,Capital of France,What is the capital of France?,The capital of France is **Paris**.,27.363681077957153,1
+glm-4.7-flash:latest,Coding Poem,Write a short poem about coding.,"The cursor waits upon the screen, To wake a dream from digital steam. With logic loops and syntax tight, We build the world in shades of white.  No room for error, no room for doubt, As complex ideas flow out. A perfect line, a working whole, A digital soul to call one's own.  It starts with chaos, turns to art, The soul of computation in the heart.",57.161092042922974,1
+glm-4.7-flash:latest,Simple Greeting,Say 'Hello World',Hello World,8.958828687667847,1
+llama3.1:8b-instruct-q4_K_M,Capital of France,What is the capital of France?,The capital of France is Paris.,11.898680448532104,1
+llama3.1:8b-instruct-q4_K_M,Coding Poem,Write a short poem about coding.,"Here is a short poem about coding:  Lines of code, a symphony sweet A dance of 1s and 0s at my feet I weave a tapestry, intricate and fine Bringing life to screens, a digital shrine  With each keystroke, a problem unfolds Solved by logic, young and old The thrill of creation, the rush of might Coding's magic, shining bright.",1.557419776916504,1
+llama3.1:8b-instruct-q4_K_M,Simple Greeting,Say 'Hello World',"Hello, World!",0.26530957221984863,0
+llama3.1:latest,Capital of France,What is the capital of France?,The capital of France is Paris.,0.32222795486450195,1
+llama3.1:latest,Coding Poem,Write a short poem about coding.,"Here is a short poem about coding:  Lines of code, a digital dream A world of logic, where I can scheme 0s and 1s dance, in a rhythmic beat As I bring ideas to life, with each keystroke neat  The screen comes alive, as my code takes flight A symphony of syntax, a wondrous sight With every line, a thought is made real In the world of coding, my creativity can reveal.",1.687650442123413,1
+llama3.1:latest,Simple Greeting,Say 'Hello World',"Hello, World!",0.26844358444213867,0
+qwen3.6:35b-a3b,Capital of France,What is the capital of France?,The capital of France is Paris.,39.628517389297485,1
+qwen3.6:35b-a3b,Simple Greeting,Say 'Hello World',Hello World,17.37160015106201,1
+qwen3.6:35b-a3b-q4_K_M,Capital of France,What is the capital of France?,The capital of France is Paris.,16.02565360069275,1
+qwen3.6:35b-a3b-q4_K_M,Simple Greeting,Say 'Hello World',Hello World,27.05747151374817,1

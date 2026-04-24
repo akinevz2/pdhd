@@ -1,0 +1,21 @@
+model_name,test_case,prompt,response,latency,correctness_score
+devstral:latest,Capital of France,What is the capital of France?,The capital of France is Paris.  Would you like to know more about Paris or have any other questions related to France?,32.497212648391724,1
+devstral:latest,Coding Poem,Write a short poem about coding.,"In realms where silicon hearts do beat, Where logic's song in circuits meet, There coders dance with algorithms' grace, In binary whispers finding their space.  With keystrokes soft on keyboards they play, Crafting worlds from lines of ballet. From simple loops to structures grand, They weave the future, hand in hand.",19.212353229522705,1
+devstral:latest,Simple Greeting,Say 'Hello World',Hello World! How can I assist you today?,3.494647979736328,1
+gemma4:latest,Capital of France,What is the capital of France?,The capital of France is **Paris**.,21.593563556671143,1
+gemma4:latest,Coding Poem,Write a short poem about coding.,"A canvas bright, the monitor glows, Where structured logic carefully flows. With brackets neat and semicolons true, A digital language I build just for you.  I chase the bugs in the hidden deep maze, Through failed attempts and debugging haze. A semicolon lost, a comma misplaced, A faulty loop that must be embraced.  Until the last bracket finally clicks, And the script runs clean, precise, and quick. A world from pure logic, a breath from the screen— The silent, sweet magic of code between.",8.340887784957886,1
+gemma4:latest,Simple Greeting,Say 'Hello World',Hello World,0.6077620983123779,1
+glm-4.7-flash:latest,Capital of France,What is the capital of France?,The capital of France is **Paris**.,22.414169788360596,1
+glm-4.7-flash:latest,Coding Poem,Write a short poem about coding.,"The cursor blinks, a silent heart, A digital, logical art. From curly braces to open lines, We build the worlds of future times. To hunt a bug and fix the flaw, To master syntax, laws, and flaw. Then, the program comes alive, With all the thought that we survive.",57.13828754425049,1
+glm-4.7-flash:latest,Simple Greeting,Say 'Hello World',Hello World,13.07629108428955,1
+llama3.1:8b-instruct-q4_K_M,Capital of France,What is the capital of France?,The capital of France is Paris.,11.810104608535767,1
+llama3.1:8b-instruct-q4_K_M,Coding Poem,Write a short poem about coding.,"Here is a short poem about coding:  Lines of code, like keys on a page Syntax sweet, but errors turn the stage To frustration's dark and troubled night But with each fix, a new light takes flight  The debug dance, a waltz of trial and test Until the program hums, and all is best In this digital realm, I find my home Where ones and zeros are the language known.",1.6063673496246338,1
+llama3.1:8b-instruct-q4_K_M,Simple Greeting,Say 'Hello World',Hello World!,0.2573277950286865,1
+llama3.1:latest,Capital of France,What is the capital of France?,The capital of France is Paris.,0.3222391605377197,1
+llama3.1:latest,Coding Poem,Write a short poem about coding.,"Here is a short poem about coding:  Lines of code, I weave with care A tapestry of logic, beyond compare 1s and 0s dance upon the screen As my mind creates, and problems are unseen  I debug and retry, through trials and strife Until the solution emerges, in all its digital life With each new line, a dream takes flight And code comes alive, in all its light.",1.5732946395874023,1
+llama3.1:latest,Simple Greeting,Say 'Hello World',"Hello, World!",0.28284502029418945,0
+qwen3.6:35b-a3b,Capital of France,What is the capital of France?,The capital of France is Paris.,38.694515228271484,1
+qwen3.6:35b-a3b,Coding Poem,Write a short poem about coding.,"Upon the screen, the cursor blinks, A steady pulse in silicon dreams. With loops and functions, tightly linked, We weave the fabric of our schemes.  Through tangled bugs and errors deep, We wake the giants from their sleep. The final build, a silent hum, Where logic sings and dreams become.",162.18441319465637,1
+qwen3.6:35b-a3b,Simple Greeting,Say 'Hello World',Hello World,30.366198301315308,1
+qwen3.6:35b-a3b-q4_K_M,Capital of France,What is the capital of France?,The capital of France is Paris.,25.715915203094482,1
+qwen3.6:35b-a3b-q4_K_M,Simple Greeting,Say 'Hello World',Hello World,16.794341802597046,1

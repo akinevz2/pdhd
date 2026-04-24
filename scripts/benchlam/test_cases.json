@@ -1,0 +1,27 @@
+[
+  {
+    "name": "Capital of France",
+    "prompt": "What is the capital of France?",
+    "verification": {
+      "type": "regex",
+      "pattern": "Paris"
+    }
+  },
+  {
+    "name": "Coding Poem",
+    "prompt": "Write a short poem about coding.",
+    "verification": {
+      "type": "judge",
+      "rubric": "Evaluate if the poem is creative and mentions coding elements. Return only '1' for pass or '0' for fail.",
+      "judge_model": "llama3"
+    }
+  },
+  {
+    "name": "Simple Greeting",
+    "prompt": "Say 'Hello World'",
+    "verification": {
+      "type": "regex",
+      "pattern": "Hello World"
+    }
+  }
+]
