@@ -18,14 +18,14 @@ the recommendations.
 
 ## Content types and TTL
 
-| Content type                                               | Cache location             | TTL                              | Invalidation trigger                                       |
-| ---------------------------------------------------------- | -------------------------- | -------------------------------- | ---------------------------------------------------------- |
-| Structured file summary (`StructuredSummary`)              | `structured_summary` table | Indefinite until content changes | File write detected (content-hash mismatch on next upsert) |
-| Project folder listing (`ProjectFolder`)                   | `project_folder` table     | Session-lived                    | Explicit project close / `DELETE /api/project/{id}`        |
-| GitHub metadata (`GithubMetadata`)                         | `github_metadata` table    | Indefinite until re-enriched     | Manual refresh or project reload                           |
-| In-memory directory listing (`listDirectoryContents` tool) | None – always live         | N/A                              | No caching; each call hits the filesystem                  |
-| In-memory file read (`readFile` tool)                      | None – always live         | N/A                              | No caching; each call hits the filesystem                  |
-| Web-search results (`searchWeb` tool)                      | None – always live         | N/A                              | No caching; each call is a fresh HTTP request              |
+| Content type                                               | Cache location             | TTL                                          | Invalidation trigger                                                                                    |
+| ---------------------------------------------------------- | -------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Structured file summary (`StructuredSummary`)              | `structured_summary` table | Indefinite until content changes             | File write detected (content-hash mismatch on next upsert)                                              |
+| Project registration and open-state (`ProjectFolder`)      | `project_folder` table     | Row persists; `loaded` flag is session-lived | `DELETE /api/project/close` clears `loaded`; reopening reuses the existing row by directory             |
+| GitHub metadata (`GithubMetadata`)                         | `github_metadata` table    | Indefinite once stored                       | No automatic refresh path exists; metadata is only fetched when a project has no stored GitHub metadata |
+| In-memory directory listing (`listDirectoryContents` tool) | None – always live         | N/A                                          | No caching; each call hits the filesystem                                                               |
+| In-memory file read (`readFile` tool)                      | None – always live         | N/A                                          | No caching; each call hits the filesystem                                                               |
+| Web-search results (`searchWeb` tool)                      | None – always live         | N/A                                          | No caching; each call is a fresh HTTP request                                                           |
 
 ---
 

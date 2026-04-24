@@ -108,3 +108,44 @@ The documentation plan still references deliverables that are not yet present as
 Cache operations (`cacheFileContent`, `cachePathAnalysis`, `cacheFolderManifest`) now throw `UnsupportedOperationException` when CDI persistence context is unavailable. This exception is caught at call sites but not always logged to the user.
 
 **Observation**: Errors are silently swallowed in production use, hiding failures from developers/report writers.
+
+## Phase 4 Constraints (2026-04-20)
+
+### GitMetadataTools: git subprocess dependency
+
+**Issue**: All five `GitMetadataTools` tools spawn a `git` subprocess. If `git`
+is not installed in the runtime environment, every tool in this category returns
+a structured error string instead of useful output.
+
+**Impact**: Benchmark scenarios that exercise repository metadata enrichment
+will fail with a predictable error message (`git … failed – directory may not
+be a git repository or git is not installed`) rather than silently producing
+empty or misleading output. The telemetry record's `success` column will be
+`false` and `errorClass` will be `java.lang.IllegalStateException`.
+
+**Mitigation**: The dev-container used in this project includes `git`; the
+constraint primarily affects stripped runtime images. Add a startup check
+analogous to the `gh` CLI warning in `GithubMetadataService` if a
+git-less deployment environment becomes a concern.
+
+### GitMetadataTools: workspace-containment guard may reject valid external repos
+
+**Issue**: `resolveRepoDir` validates that the target directory is inside an
+allowed workspace root via `CwdService#isFolderContained`. Repositories
+mounted or symlinked outside the canonical workspace root will be rejected
+with an `argumentValidationFailure` error.
+
+**Impact**: Minor UX friction when the assistant tries to inspect a path
+outside the registered project set. The assistant should be instructed to
+use `getOpenProjectDirectories` or `change_working_directory` first to
+establish a valid workspace root before calling git tools.
+
+### Origin#isGitlab matches subdomains of gitlab.com
+
+**Issue**: `Origin#isGitlab()` returns `true` for any host ending in
+`.gitlab.com` (e.g., hosted runners or self-hosted instances with a
+`gitlab.com` TLD). This is intentional but may produce unexpected matches
+if an unrelated host coincidentally ends in `.gitlab.com`.
+
+**Mitigation**: Use `BackendSupport.GITLAB_HOST` directly for exact-match
+checks; use `isGitlab()` only where subdomain matching is acceptable.

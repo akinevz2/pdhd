@@ -8,7 +8,7 @@ Superseded status:
 
 ## Goal
 
-Give `OutputPane` a `BufferedOutputStream` and `InputField` a `BufferedInputStream`, wire them as I/O for a new `ChatTUI`-owned `chatTerminal`, disable echo on `mainTerminal`, and use existing `ChatRepaintEvent` for repaint notification.
+Give `OutputPane` a `BufferedOutputStream` and `InputField` a `BufferedInputStream`, wire them as I/O for a new `ChatTUI`-owned `chatTerminal`, and disable echo on `mainTerminal`.
 
 ## File
 
@@ -62,10 +62,11 @@ Give `OutputPane` a `BufferedOutputStream` and `InputField` a `BufferedInputStre
 - Add: `Attributes` (org.jline.terminal), `TerminalBuilder` (org.jline.terminal)
 - Remove: `ByteBuffer` (java.nio)
 
-## ChatRepaintEvent wiring (no change needed)
+## Historical event note
 
-- Existing `repaint()` → `dispatch(element)` → fires `ChatRepaintEvent(element)` → `onChatRepaint` → `redrawAll()`
-- Children call `repaint()` after data changes — this mechanism is already correct
+- Earlier versions of this plan referenced `ChatRepaintEvent` for repaint notification.
+- That event record is no longer present in `ac.uk.sussex.kn253.events`.
+- The current events package contains only `CwdResolvedEvent` and `ModelConfigEvent`, so this plan should not be read as documentation for an active CDI repaint flow.
 
 ## Verification
 

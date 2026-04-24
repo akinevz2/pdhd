@@ -9,119 +9,57 @@
 
 ## Executive Summary
 
-This report documents four closely coupled feature implementations completed in April 2026 that collectively improve application reliability and user experience during startup and error scenarios:
+This report documents four closely coupled feature implementations completed in April 2026. Features 1, 2, and 3 are now historical because the startup path was simplified on 2026-04-09; Feature 4 remains current.
 
 1. **Testcontainers Fallback for Empty/Unavailable Ollama URLs** _(superseded 2026-04-09)_ — automatic internal Docker container provisioning when the configured Ollama endpoint is missing or unreachable
 2. **Live Ollama Workstation Integration Tests** _(superseded 2026-04-09)_ — test suite improvements to fail (not skip) when required models are unavailable, ensuring live environment validation
 3. **Startup Progress Visibility** _(superseded 2026-04-09)_ — explicit logging and heartbeat intervals during container startup and model pulls, resolving silent blocking issues
 4. **Frontend Error Handling and Chat-Log Hiding** — generic error display mechanism for operation failures with automatic chat log suppression
 
-These features combine to provide a production-ready startup path and improved error diagnostics for operators and end users.
+Taken together, these changes document the original April 2026 work while preserving the current startup behavior and the still-current error-handling behavior.
 
 ---
 
-## Feature 1: Testcontainers Fallback for Empty/Unavailable Base URL _(superseded 2026-04-09)_
+## Feature 1: Pre-CDI Ollama Bootstrap _(current implementation)_
 
-> **Status: Superseded.** The implementation described in this section — Testcontainers auto-provisioning and model pull at startup — was removed on 2026-04-09. The current startup mechanism is a health-check only; see [docs/operation-summary-2026-04-09.md](operation-summary-2026-04-09.md). The subsections below are retained for historical reference.
+This section now reflects the implementation that is actually in the codebase.
 
-### Objective
+### Entry Point
 
-Enable PDHD to run in production without a pre-configured external Ollama endpoint. When `pdhd.ollama.base-url` is not set or the configured endpoint is unreachable, the application automatically provisions a Testcontainers Ollama image as a fallback, while ensuring required models are pulled before service initialization.
+**Files**:
 
-### Architectural Context
+- [src/main/java/ac/uk/sussex/kn253/PdhdLauncher.java](src/main/java/ac/uk/sussex/kn253/PdhdLauncher.java)
+- [src/main/java/ac/uk/sussex/kn253/bootstrap/PreCdiOllamaBootstrap.java](src/main/java/ac/uk/sussex/kn253/bootstrap/PreCdiOllamaBootstrap.java)
 
-The application follows a **pre-CDI bootstrap** pattern to resolve dependencies before Quarkus CDI lifecycle begins:
+`PdhdLauncher.main()` conditionally invokes `PreCdiOllamaBootstrap.prepareForLaunch(args)` before `Quarkus.run(...)`. The bootstrap path is used for normal launches such as the default `webui` flow, while help/version recovery paths are bypassed.
 
-- **Bootstrap Phase** (pre-CDI): Resolve endpoint health, optionally start containers, ensure model availability
-- **CDI Phase** (runtime): All services initialized with known-healthy endpoint and available models
+### Current Behavior
 
-This separation ensures that the first assistant request executes without encountering missing dependencies or unreachable endpoints.
+`PreCdiOllamaBootstrap.prepareForLaunch()` performs the following steps only:
 
-### Implementation Details
+1. Skip bootstrap for help/version commands.
+2. Load `pdhd.ollama.base-url` through `BootstrapConfig.load()` using this precedence:
 
-#### Pre-CDI Bootstrap Entry Point
+- system property `pdhd.ollama.base-url`
+- environment variable `PDHD_OLLAMA_BASE_URL`
+- profile-specific property `%<profile>.pdhd.ollama.base-url`
+- unqualified `pdhd.ollama.base-url`
 
-**File**: [src/main/java/ac/uk/sussex/kn253/bootstrap/PreCdiOllamaBootstrap.java](src/main/java/ac/uk/sussex/kn253/bootstrap/PreCdiOllamaBootstrap.java)
+3. Throw `IllegalStateException("Ollama base URL is not configured")` if the value is absent or blank.
+4. Probe `GET <baseUrl>/api/tags` and require HTTP 200.
+5. On success, set `pdhd.ollama.base-url` and `pdhd.ollama.bootstrap.base-url` as system properties.
 
-The `PreCdiOllamaBootstrap.prepareForLaunch()` method implements the following logic:
+The bootstrap does not start containers, prompt the user, or provision models.
 
-1. **Configuration Load**: Read persisted settings for `pdhd.ollama.base-url`, `pdhd.ollama.model-name`, and `pdhd.ollama.embedding-model-name`.
+### Validation Evidence
 
-2. **Endpoint Validation**:
-   - If a configured base URL exists and is healthy (HTTP 200 on `/api/tags`), proceed with that endpoint.
-   - If the configured base URL is unreachable, **fail fast** with a clear error message (prevents silent configuration errors).
-   - If no base URL is configured:
-     - **Production profile** (`quarkus.profile=prod`): Prompt the user to confirm internal container startup.
-     - **Development profile** (`quarkus.profile=dev`) or other profiles: Throw an error (inline defaults expected for non-prod).
-
-3. **Container Startup** (if fallback triggered):
-   - Instantiate `OllamaContainer` with configured image (default: `ollama/ollama:latest`).
-   - Start the container and capture the exposed endpoint (e.g., `http://127.0.0.1:XXXXX`).
-   - Verify health before proceeding.
-
-4. **Model Provisioning**:
-   - Collect required models from config: chat model (`modelName`) and embedding model (`embeddingModelName`).
-   - For each required model:
-     - Query availability via `isModelAvailable(baseUrl, modelName)`.
-     - If missing, pull via `pullModel(baseUrl, modelName)` with retry logic.
-     - Verify availability post-pull; fail startup if pull did not complete successfully.
-
-5. **System Properties**:
-   - Set `pdhd.ollama.base-url` with the resolved active endpoint.
-   - Set bootstrap markers: `pdhd.ollama.bootstrap.base-url` and `pdhd.ollama.bootstrap.models-ready=true`.
-
-These properties are then read by CDI services during initialization.
-
-#### BaseUrl-Aware Model Ensurance
-
-**File**: [src/main/java/ac/uk/sussex/kn253/services/OllamaManagementService.java](src/main/java/ac/uk/sussex/kn253/services/OllamaManagementService.java)
-
-Two overloaded methods support explicit base URL targeting:
-
-```java
-public boolean isModelAvailable(final String baseUrl, final String modelName)
-public boolean ensureModelAvailable(final String baseUrl, final String modelName)
-```
-
-- `isModelAvailable(baseUrl, modelName)` queries the model list against a specific endpoint.
-- `ensureModelAvailable(baseUrl, modelName)` pulls if missing and verifies post-pull availability.
-
-These methods are used both during bootstrap and in tests to support multi-endpoint scenarios.
-
-#### Startup Coordinator Integration
-
-**File**: [src/main/java/ac/uk/sussex/kn253/services/OllamaStartupCoordinator.java](src/main/java/ac/uk/sussex/kn253/services/OllamaStartupCoordinator.java)
-
-The `OllamaStartupCoordinator.prepare(commandName)` method bridges pre-CDI bootstrap and CDI runtime:
-
-- Loads persisted model configuration.
-- Invokes management service methods with explicit base URLs to ensure models on the active runtime endpoint.
-- For non-`configure` commands, **fails startup** if model provisioning fails (strict).
-- For the `configure` command, **logs warnings and continues** (permissive, allows reconfiguration).
-
-### Failure Semantics
-
-- **External endpoint configured but unreachable**: Fail startup immediately with clear message.
-- **External endpoint configured and reachable, but required model pull fails**: Fail startup immediately (for non-`configure` commands).
-- **No endpoint configured, production profile** → User declines container confirmation: Fail startup with message.
-- **No endpoint configured, production profile** → User confirms: Proceed with internal container.
-- **No endpoint configured, test/dev profile**: Fail startup with message (inline defaults expected for tests, `%dev` defaults for active development).
-
-### Validation Evidence (as of supersession, 2026-04-09)
-
-> The original 5-test suite was replaced. The current test file contains 3 tests. See [docs/operation-summary-2026-04-09.md](operation-summary-2026-04-09.md) for the current test table.
-
-**Test File**: [src/test/java/ac/uk/sussex/kn253/bootstrap/PreCdiOllamaBootstrapTest.java](../src/test/java/ac/uk/sussex/kn253/bootstrap/PreCdiOllamaBootstrapTest.java)
-
-Current test cases (3 tests):
+**Test File**: [src/test/java/ac/uk/sussex/kn253/bootstrap/PreCdiOllamaBootstrapTest.java](src/test/java/ac/uk/sussex/kn253/bootstrap/PreCdiOllamaBootstrapTest.java)
 
 | Test Case                                      | Scenario                        | Expected Outcome                                    |
 | ---------------------------------------------- | ------------------------------- | --------------------------------------------------- |
 | `failsWhenBaseUrlNotConfigured`                | `pdhd.ollama.base-url` absent   | `IllegalStateException` containing "not configured" |
 | `failsWhenBaseUrlUnreachable`                  | URL present, endpoint unhealthy | `IllegalStateException` containing "unreachable"    |
 | `succeedsAndSetsSystemPropertiesWhenReachable` | URL present and healthy         | Both system properties set to configured URL        |
-
-_(Original test table for the 5-test Testcontainers-era suite omitted — superseded.)_
 
 ## Feature 2: Live Ollama Workstation Integration Tests _(superseded 2026-04-09)_
 
@@ -628,10 +566,12 @@ CI/CD pipeline runs OllamaWorkstationIntegrationTest
 
 ### Development Workflow
 
-1. **With Configured External Ollama** (e.g., `host.docker.internal:11434`):
-   - Set `pdhd.ollama.base-url=http://host.docker.internal:11434` in `%dev` profile.
-   - Ensure required models are pre-pulled on the external instance.
-   - Startup will verify endpoint health; no model provisioning is performed.
+1. **With Configured External Ollama**:
+
+- Set `pdhd.ollama.base-url` to a reachable Ollama endpoint for the active profile.
+- The checked-in defaults are `%dev=http://host.docker.internal:11434` and the unqualified default `http://localhost:11434`.
+- Ensure required models are pre-pulled on the external instance.
+- Startup will verify endpoint health; no model provisioning is performed.
 
 2. **Without Configured External Ollama**:
    - Leave `pdhd.ollama.base-url` unset or empty in `%dev` profile.
@@ -657,18 +597,18 @@ CI/CD pipeline runs OllamaWorkstationIntegrationTest
 
 ## Summary of Changes by File
 
-| Component | File Path                                                                                                                                                          | Change     | Purpose                                                                                                                                                      |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Bootstrap | [src/main/java/ac/uk/sussex/kn253/bootstrap/PreCdiOllamaBootstrap.java](src/main/java/ac/uk/sussex/kn253/bootstrap/PreCdiOllamaBootstrap.java)                     | New        | Pre-CDI endpoint health verification (health-check only; no container provisioning or model pulls)                                                           |
-| Services  | [src/main/java/ac/uk/sussex/kn253/services/OllamaManagementService.java](src/main/java/ac/uk/sussex/kn253/services/OllamaManagementService.java)                   | Extended   | Added `isModelAvailable(baseUrl, model)` overload for endpoint-aware health checks _(original `ensureModelAvailable` and pull heartbeat removed 2026-04-09)_ |
-| Services  | ~~src/main/java/ac/uk/sussex/kn253/services/OllamaTestcontainersService.java~~                                                                                     | Removed    | Removed 2026-04-09 — Testcontainers container-startup service no longer exists                                                                               |
-| Services  | [src/main/java/ac/uk/sussex/kn253/services/OllamaStartupCoordinator.java](src/main/java/ac/uk/sussex/kn253/services/OllamaStartupCoordinator.java)                 | Refactored | Implements startup preparation logic using management service baseUrl overloads                                                                              |
-| Tests     | [src/test/java/ac/uk/sussex/kn253/bootstrap/PreCdiOllamaBootstrapTest.java](src/test/java/ac/uk/sussex/kn253/bootstrap/PreCdiOllamaBootstrapTest.java)             | New        | Bootstrap success and failure paths                                                                                                                          |
-| Tests     | [src/test/java/ac/uk/sussex/kn253/services/OllamaWorkstationIntegrationTest.java](src/test/java/ac/uk/sussex/kn253/services/OllamaWorkstationIntegrationTest.java) | New        | Live endpoint and model availability tests                                                                                                                   |
-| Tests     | [src/test/java/ac/uk/sussex/kn253/services/OllamaStartupCoordinatorTest.java](src/test/java/ac/uk/sussex/kn253/services/OllamaStartupCoordinatorTest.java)         | Extended   | Startup coordinator model provision and fallback scenarios                                                                                                   |
-| Tests     | [src/test/java/ac/uk/sussex/kn253/services/OllamaManagementServiceTest.java](src/test/java/ac/uk/sussex/kn253/services/OllamaManagementServiceTest.java)           | Extended   | BaseUrl-aware model availability and provisioning tests                                                                                                      |
-| Frontend  | [src/main/webui/src/App.tsx](src/main/webui/src/App.tsx)                                                                                                           | Enhanced   | Error handling in `openFolderSummary()` sets `chatBlockingError` on failures                                                                                 |
-| Frontend  | [src/main/webui/src/components/ChatDock.tsx](src/main/webui/src/components/ChatDock.tsx)                                                                           | Enhanced   | Conditional rendering of error notice and chat log based on `chatBlockingError`                                                                              |
+| Component | File Path                                                                                                                                                          | Change     | Purpose                                                                                                   |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------- | --------------------------------------------------------------------------------------------------------- |
+| Bootstrap | [src/main/java/ac/uk/sussex/kn253/bootstrap/PreCdiOllamaBootstrap.java](src/main/java/ac/uk/sussex/kn253/bootstrap/PreCdiOllamaBootstrap.java)                     | New        | Pre-CDI endpoint health verification (health-check only; no container provisioning or model pulls)        |
+| Services  | [src/main/java/ac/uk/sussex/kn253/services/OllamaManagementService.java](src/main/java/ac/uk/sussex/kn253/services/OllamaManagementService.java)                   | Extended   | Historical endpoint-aware model checks; bootstrap no longer invokes model availability or pull operations |
+| Services  | ~~src/main/java/ac/uk/sussex/kn253/services/OllamaTestcontainersService.java~~                                                                                     | Removed    | Removed 2026-04-09 — Testcontainers container-startup service no longer exists                            |
+| Services  | [src/main/java/ac/uk/sussex/kn253/services/OllamaStartupCoordinator.java](src/main/java/ac/uk/sussex/kn253/services/OllamaStartupCoordinator.java)                 | Refactored | Runtime startup validation aligned with the health-check-only bootstrap path                              |
+| Tests     | [src/test/java/ac/uk/sussex/kn253/bootstrap/PreCdiOllamaBootstrapTest.java](src/test/java/ac/uk/sussex/kn253/bootstrap/PreCdiOllamaBootstrapTest.java)             | New        | Bootstrap success and failure paths                                                                       |
+| Tests     | [src/test/java/ac/uk/sussex/kn253/services/OllamaWorkstationIntegrationTest.java](src/test/java/ac/uk/sussex/kn253/services/OllamaWorkstationIntegrationTest.java) | New        | Live endpoint and model availability tests                                                                |
+| Tests     | [src/test/java/ac/uk/sussex/kn253/services/OllamaStartupCoordinatorTest.java](src/test/java/ac/uk/sussex/kn253/services/OllamaStartupCoordinatorTest.java)         | Refactored | Startup coordinator reachability and `configure`-command tolerance scenarios                              |
+| Tests     | [src/test/java/ac/uk/sussex/kn253/services/OllamaManagementServiceTest.java](src/test/java/ac/uk/sussex/kn253/services/OllamaManagementServiceTest.java)           | Extended   | BaseUrl-aware model availability and provisioning tests                                                   |
+| Frontend  | [src/main/webui/src/App.tsx](src/main/webui/src/App.tsx)                                                                                                           | Enhanced   | Error handling in `openFolderSummary()` sets `chatBlockingError` on failures                              |
+| Frontend  | [src/main/webui/src/components/ChatDock.tsx](src/main/webui/src/components/ChatDock.tsx)                                                                           | Enhanced   | Conditional rendering of error notice and chat log based on `chatBlockingError`                           |
 
 ---
 
@@ -676,5 +616,5 @@ CI/CD pipeline runs OllamaWorkstationIntegrationTest
 
 - [Architecture Overview](docs/architecture.md) — CDI and lifecycle structure
 - [Ollama Fallback Completion Fix](docs/ollama-fallback-completion-fix.md) — Earlier design specification for fallback logic
-- [Assistant Request Flow](docs/assistant-request-flow.md) — End-to-end request path and startup behavior
+- [Operation Summary (2026-04-09)](docs/operation-summary-2026-04-09.md) — Current startup simplification and bootstrap behavior
 - [Frontend Documentation](docs/frontend.md) — React/TypeScript UI architecture

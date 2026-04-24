@@ -10,8 +10,8 @@ Environment: see [environment-spec.md](environment-spec.md)
 
 This file defines the canonical set of benchmark prompts used to produce
 repeatable latency, tool failure, and task-success measurements for the PDHD
-assistant. Run them via `scripts/benchmark.sh` to produce a dated metrics
-artifact.
+assistant. Run them via `scripts/benchlam/benchmark_ollama.py` to produce
+dated metrics artifacts.
 
 ---
 
@@ -129,3 +129,53 @@ artifact.
 - S08 security check pass rate = 100 %.
 - Telemetry rows exist in `tool_telemetry` for every tool invoked.
 - Benchmark script completes without manual intervention.
+
+---
+
+## Methodology controls
+
+The following variables are explicitly controlled across all benchmark runs to
+ensure that observed differences in latency and accuracy are attributable to
+the system under test rather than extraneous factors.
+
+### Model selection
+
+- **Cross-host comparison runs** use a single shared model — `gemma4:latest` —
+  present on both hosts (minifridge:11434 and ws-cvn:11434). This eliminates
+  model-capability differences as a confound when comparing host-level
+  performance.
+- **Per-host model surveys** (run separately) test all models available on a
+  single host. Results from these runs are not mixed with cross-host comparison
+  data in the same figure.
+- The benchmark runner accepts `--models <tag>` and `--exclude-models <csv>`
+  flags so that the exact model set is declared explicitly at invocation time
+  and recorded in the SQLite `benchmark_runs` table for auditability.
+
+### Context window
+
+- All runs use the Ollama server default context window for the selected model.
+  For `gemma4:latest` this is **128 k tokens**, which exceeds all test-case
+  prompts and responses by several orders of magnitude.
+- No context-window override is passed to the Ollama API. This ensures the
+  same effective context limit applies across both hosts and across all
+  iterations of a batch run.
+- The context window size in effect for each run is documented in
+  [environment-spec.md](environment-spec.md).
+
+### Temperature and sampling
+
+- Temperature is fixed at **0.5** for all runs (see `environment-spec.md`).
+  This provides a reproducible balance between determinism and natural
+  language variation without being so low that responses degenerate to
+  repetitive output.
+- No other sampling parameters (top-k, top-p, repeat penalty) are overridden;
+  the Ollama server defaults apply uniformly.
+
+### Iteration count and statistical depth
+
+- Each batch comprises **12 independent iterations** per host, giving at least
+  12 latency observations per test case per host. This is sufficient to compute
+  a meaningful median and interquartile range while remaining tractable within
+  a single evening's compute budget.
+- Each iteration is a separate process invocation with a fresh HTTP connection,
+  so connection-pool warm-up effects do not persist across iterations.

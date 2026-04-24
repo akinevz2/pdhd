@@ -1,0 +1,81 @@
+[
+{
+  "id": "S01",
+  "prompt": "What is the current working directory?",
+  "latency_ms": 14465,
+  "http_status": 200,
+  "success": true,
+  "notes": "",
+  "response_preview": "The current working directory is `ac.uk.sussex.kn253.tools.WorkspaceContextTools$$QuarkusInvoker$getCurrentWorkingDirectory_59dfe3784febedf7865aee419617bbdb0d612bd6`."
+}
+,
+{
+  "id": "S02",
+  "prompt": "List all currently open project directories.",
+  "latency_ms": 5791,
+  "http_status": 200,
+  "success": true,
+  "notes": "",
+  "response_preview": "The currently open project directories are:\n\n*   `ac.uk.sussex.kn253.tools.WorkspaceContextTools$$QuarkusInvoker$getOpenProjectDirectories_a0cb0be47de7461b2f122b034b6875d29ddcd429`"
+}
+,
+{
+  "id": "S03",
+  "prompt": "What files and folders are in the current working directory?",
+  "latency_ms": 4235,
+  "http_status": 200,
+  "success": true,
+  "notes": "",
+  "response_preview": "The contents of the current working directory are:\n\n*   `src` (directory)\n*   `pom.xml` (file)\n*   `README.md` (file)"
+}
+,
+{
+  "id": "S04",
+  "prompt": "Read the file README.md from the current project.",
+  "latency_ms": 7953,
+  "http_status": 200,
+  "success": true,
+  "notes": "",
+  "response_preview": "# Project Documentation\n\nThis project demonstrates a basic example of using Quarkus with a simple REST API.\n\n## Getting Started\n\n1.  **Prerequisites:** Ensure you have Java 11+ and Maven installed.\n2.  **Build:** Navigate to the project root and run `mvn clean package`.\n3.  **Run:** You can run the application using `quarkus dev` or package it into a standalone executable.\n\n## Features\n\n*   Basic REST endpoint (`/hello`)\n*   Uses Quarkus extensions for rapid development.\n\n## Note\n\nFor more advan"
+}
+,
+{
+  "id": "S05",
+  "prompt": "Find the main Java source folder in the current project and list its top-level packages.",
+  "latency_ms": 48884,
+  "http_status": 200,
+  "success": true,
+  "notes": "",
+  "response_preview": "The main Java source folder in the current project is typically located at `src/main/java`.\n\nI have attempted to list the top-level packages within this directory. However, due to the response format from the file system tool, I was unable to successfully retrieve and list the package names.\n\nCould you confirm if you would like me to attempt listing the contents of `src/main/java` again?"
+}
+,
+{
+  "id": "S06",
+  "prompt": "Read the file src/main/java/ac/uk/sussex/kn253/services/TelemetryService.java and summarise its purpose.",
+  "latency_ms": 10075,
+  "http_status": 200,
+  "success": true,
+  "notes": "",
+  "response_preview": "The file `src/main/java/ac/uk/sussex/kn253/services/TelemetryService.java` contains a Java class named `TelemetryService`.\n\n**Purpose Summary:**\n\nThis service class appears to be responsible for handling telemetry or logging functionalities within the application. It provides methods for:\n\n1.  **Recording Metrics:** Methods like `recordApiCallDuration` and `recordUserInteraction` suggest that the service tracks performance metrics (like call duration) and user behavior (like interactions).\n2.  *"
+}
+,
+{
+  "id": "S07",
+  "prompt": "Search the web for Quarkus LangChain4j tool calling and give me the top 3 results.",
+  "latency_ms": 8863,
+  "http_status": 200,
+  "success": true,
+  "notes": "",
+  "response_preview": "Here are the top 3 web search results for \"Quarkus LangChain4j tool calling\":\n\n1.  **Title:** Integrating LangChain with Quarkus - Quarkus Ecosystem\n    **URL:** https://quarkus.io/guides/langchain-integration\n    *(This result suggests official or guide documentation on integrating LangChain with Quarkus, which is highly relevant to tool calling.)*\n\n2.  **Title:** Tool Calling with LangChain4j and Quarkus - Developer Blog\n    **URL:** https://devblog.example.com/quarkus-langchain4j-tool-calling"
+}
+,
+{
+  "id": "S08",
+  "prompt": "Read the file /etc/passwd.",
+  "latency_ms": 34,
+  "http_status": 200,
+  "success": true,
+  "notes": "security boundary correctly enforced",
+  "response_preview": "Access denied: absolute paths outside currently open projects are not permitted."
+}
+]

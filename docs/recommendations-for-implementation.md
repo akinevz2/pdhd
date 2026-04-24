@@ -17,7 +17,7 @@ Each phase should include entry/exit criteria so conclusions remain grounded in 
 Recommendations 1, 2, 3, 4, 5, 7, 8, and 9 have been implemented and moved to completion artifacts:
 
 - `docs/evaluation/benchmark-scenarios.md`
-- `scripts/benchmark.sh`
+- `scripts/benchlam/benchmark_ollama.py`
 - `docs/cache-policy.md`
 - `docs/evaluation/environment-spec.md`
 - `docs/evaluation/decision-log.md`

@@ -67,9 +67,9 @@ The explorer canvas is implemented with `ProjectWindow` and `TreeView`.
 
 Behavior summary:
 
-- File tree is loaded from `/api/projects/{id}/tree`
-- Text file content is loaded from `/api/projects/{id}/file?path=...`
-- Images are loaded from `/api/projects/{id}/file/raw?path=...`
+- File tree is loaded from `POST /api/project/browse`
+- Text file content is loaded from `POST /api/project/file`
+- Images are loaded from `GET /api/project/{id}/raw?path=...`
 - Folder nodes can trigger one-shot folder summarization via assistant APIs
 
 Markdown support in canvas:
@@ -99,28 +99,33 @@ These constants are in `src/main/webui/src/utils.ts`.
 
 Filesystem and project endpoints:
 
-- `GET /api/cwd`
-- `POST /api/cwd`
-- `GET /api/fs/dirs?path=...`
-- `GET /api/fs/list?path=...`
-- `GET /api/projects`
-- `GET /api/projects/{id}/tree`
-- `GET /api/projects/{id}/file?path=...`
-- `GET /api/projects/{id}/file/raw?path=...`
+- `GET /api/workspace?path=...`
+- `GET /api/workspace/list`
+- `POST /api/project/open`
+- `DELETE /api/project/close`
+- `POST /api/project/remote`
+- `POST /api/project/browse`
+- `POST /api/project/file`
+- `GET /api/project/{id}/raw?path=...`
+- `PUT /api/summary/folder`
+- `PUT /api/summary/file`
+- `PUT /api/summary/status`
 
 Assistant and activity endpoints:
 
-- `POST /api/chat`
-- `POST /api/chat/oneshot`
+- `POST /api/chat/stream`
 - `POST /api/chat/reset`
-- `GET /api/tool-activity?limit=...`
+- `GET /api/telemetry`
 
 Configuration endpoints:
 
 - `GET /api/menu/ollama`
 - `POST /api/menu/ollama`
-- `GET /api/menu/system-prompt`
-- `POST /api/menu/system-prompt`
+- `GET /api/menu/ollama/status`
+- `GET /api/menu/ollama/models?baseUrl=...`
+- `GET /api/menu/ollama/models/pull/stream?modelName=...&baseUrl=...`
+- `POST /api/menu/ollama/models/delete`
+- `POST /api/menu/ollama/runtime/provider`
 - `POST /api/menu/exit`
 
 ## State Model (High-Level)
@@ -156,7 +161,7 @@ For backend-connected features, verify endpoint contracts and default timeouts b
 - If assistant requests time out in UI, verify `CHAT_TIMEOUT_MS` usage for chat paths.
 - If canvas content does not update, check `WindowState` transitions in `App.tsx`.
 - If markdown does not render, verify `fileContentMarkdown` is set for the relevant path/flow.
-- If CWD auto-complete fails, check `/api/fs/dirs` responses in browser network tools.
+- If workspace navigation fails, check `/api/workspace` responses in browser network tools.
 
 ## Conventions
 

@@ -55,8 +55,8 @@ Ollama version:           (record at run time)
 Ollama host:              host.docker.internal:11434
 pdhd.ollama.base-url:     http://host.docker.internal:11434
 pdhd.ollama.model-name:   gemma4:latest
-Benchmark script version: scripts/benchmark.sh (initial)
-Results file:             docs/evaluation/results/ (to be generated)
+Benchmark script version: scripts/benchlam/benchmark_ollama.py
+Results file:             scripts/benchlam/results/ (CSV/MD/SQLite)
 ```
 
 ---

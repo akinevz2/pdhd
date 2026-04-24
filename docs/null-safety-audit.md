@@ -9,11 +9,13 @@
 
 Identified and documented null-returning methods across the application. This audit tracks patterns where methods return `null` instead of raising exceptions or using Optional/empty collections. Goal: Eliminate unsafe null returns and improve error semantics.
 
+> Note: the `RepoService`/`GitRepository`/`GithubRepository` findings below are historical. The current codebase uses `GithubMetadataService` together with the persisted `GitFolder` and `GithubMetadata` entities in `ac.uk.sussex.kn253.repository`; the documented `RepoService` API is no longer present.
+
 ---
 
 ## Null-Returning Methods Inventory
 
-### 1. **RepoService** (Multiple null returns for optional metadata)
+### 1. **RepoService** (Historical; superseded)
 
 **File**: `src/main/java/ac/uk/sussex/kn253/services/RepoService.java`
 

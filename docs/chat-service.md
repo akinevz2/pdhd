@@ -1,449 +1,170 @@
-# Chat Service Architecture
+# Chat Service and Ollama Runtime
 
-## Overview
+## Status
 
-The Chat Service is the primary orchestrator for multi-turn conversational interactions with an LLM-powered assistant. It manages session lifecycle, integrates with tool execution, and coordinates between frontend requests and backend infrastructure.
+This document describes the current Ollama-backed runtime in the checked-in code.
+Earlier revisions referred to `ChatService`, `OllamaChatSession`, and
+`OllamaConfigService`; those classes are not present in the current source tree
+and should not be treated as the active implementation.
 
-## Key Components
+## Current Components
 
-### ChatService
+### `OllamaConfig`
 
-**Location:** `src/main/java/ac/uk/sussex/kn253/services/ChatService.java`
+**Location:** `src/main/java/ac/uk/sussex/kn253/ollama/OllamaConfig.java`
 
-**Scope:** Application-scoped singleton
+Typed configuration mapping for the `pdhd.ollama.*` namespace.
 
-**Purpose:**
+Current mapped settings are:
 
-- Owns the active `OllamaChatSession` instance
-- Manages session lifecycle (initialization and reconfiguration)
-- Provides the primary entry points for message handling
-- Handles settings updates without requiring application restart
+- `pdhd.ollama.base-url`
+- `pdhd.ollama.model-name`
+- `pdhd.ollama.embedding-model-name`
+- `pdhd.ollama.timeout-seconds`
+- `pdhd.ollama.temperature`
+- `pdhd.ollama.num-predict`
+- `pdhd.ollama.num-ctx`
+- `pdhd.ollama.embedding-enabled`
+- `pdhd.ollama.embedding-max-results`
+- `pdhd.ollama.embedding-dimension`
 
-**Key Methods:**
+### `LLMSettings`
 
-- `sendMessage(String message)` - Multi-turn conversation with history
-- `sendOneShotMessage(String message)` - Single-turn stateless response
-- `reconfigure(OllamaSettings settings)` - Rebuild session with new settings
-- `resetConversation()` - Clear conversation history
+**Location:** `src/main/java/ac/uk/sussex/kn253/repository/LLMSettings.java`
 
-### OllamaChatSession
+Persisted runtime row storing the active Ollama endpoint, chat model,
+embedding model, prompts, and the cached JSON returned from model discovery.
 
-**Location:** `src/main/java/ac/uk/sussex/kn253/ollama/OllamaChatSession.java`
+### `ModelConfigService`
 
-**Scope:** Dependent (typically used as singleton via ChatService)
+**Location:** `src/main/java/ac/uk/sussex/kn253/services/ModelConfigService.java`
 
-**Purpose:**
+Loads the single persisted `LLMSettings` row, creates defaults from
+`OllamaConfig` when no row exists, and refreshes the cached model list through
+`OllamaManagementService`.
 
-- Manages multi-turn conversation state
-- Implements the core conversation loop (up to 8 rounds)
-- Orchestrates tool execution and result feedback
-- Handles system prompt composition and model configuration
+### `OllamaChatModelProducer`
 
-**Core Capabilities:**
+**Location:** `src/main/java/ac/uk/sussex/kn253/ollama/OllamaChatModelProducer.java`
 
-1. **Conversation History Management**
-   - Maintains ordered list of `ChatMessage` instances
-   - Supports reset without creating new bean
-   - Each turn appends both user input and assistant response
+Produces the application `ChatModel` and `StreamingChatModel` beans.
 
-2. **Model Communication**
-   - Sends `ChatRequest` to configured Ollama endpoint
-   - Receives `ChatResponse` with potential tool calls
-   - Supports both native tool-calling models and text-based parsing
+Current behavior:
 
-3. **Tool Loop Execution**
-   - Detects tool execution requests in model response
-   - Delegates execution to `ToolService`
-   - Appends tool results back to history
-   - Repeats conversation loop up to MAX_TOOL_ROUNDS (8)
+- Loads persisted `LLMSettings` on production.
+- Resolves `baseUrl` from persisted settings first, then from
+  `pdhd.ollama.base-url`.
+- Resolves `modelName` from persisted settings first, then from
+  `pdhd.ollama.model-name`.
+- Applies `temperature`, `numPredict`, `numCtx`, and `timeoutSeconds` from
+  `OllamaConfig`.
+- Enables `RESPONSE_FORMAT_JSON_SCHEMA` for the non-streaming chat model.
 
-4. **Context Enrichment**
-   - Embeds current working directory via supplier
-   - Appends project metadata via supplier
-   - System prompt building via `SystemPromptBuilder`
+### `OllamaManagementService` and `OllamaManagementClient`
 
-## Request Flow
+**Locations:**
 
-### Multi-turn Conversation (sendMessage)
+- `src/main/java/ac/uk/sussex/kn253/services/OllamaManagementService.java`
+- `src/main/java/ac/uk/sussex/kn253/ollama/OllamaManagementClient.java`
 
-```
-User Input
+Management operations are split between a small REST-client interface and a
+service that resolves the active base URL and builds clients dynamically.
+
+Current management capabilities include:
+
+- endpoint health checks
+- model listing
+- running-model listing
+- model inspection (`/api/show`)
+- model pull, streaming pull, and delete
+- `ensureModelAvailable(...)` for explicit provisioning flows
+
+## Configuration Resolution
+
+The current runtime contract is:
+
+1. `ModelConfigService.load()` returns the persisted `LLMSettings` row or
+   creates one from `OllamaConfig` defaults.
+2. `OllamaChatModelProducer` uses persisted `baseUrl` and `modelName` when they
+   are non-blank.
+3. If persisted values are blank, producer code falls back to `OllamaConfig`.
+4. `OllamaManagementService` accepts an explicit base URL when supplied; if not,
+   it falls back to `pdhd.ollama.base-url`.
+
+The checked-in property defaults are currently:
+
+| Scope           | Property                           | Value                               |
+| --------------- | ---------------------------------- | ----------------------------------- |
+| dev profile     | `pdhd.ollama.base-url`             | `http://host.docker.internal:11434` |
+| default profile | `pdhd.ollama.base-url`             | `http://localhost:11434`            |
+| default profile | `pdhd.ollama.model-name`           | `gemma4:latest`                     |
+| default profile | `pdhd.ollama.embedding-model-name` | `qwen3-embedding`                   |
+| default profile | `pdhd.ollama.timeout-seconds`      | `300`                               |
+
+The checked-in test profile currently uses:
+
+| Scope        | Property                           | Value                          |
+| ------------ | ---------------------------------- | ------------------------------ |
+| test profile | `pdhd.ollama.base-url`             | `http://ws-vision.local:11434` |
+| test profile | `pdhd.ollama.model-name`           | `gemma4:latest`                |
+| test profile | `pdhd.ollama.embedding-model-name` | `qwen3-embedding:latest`       |
+
+## Runtime Flow
+
+The current Ollama runtime flow is narrower than older architecture notes:
+
+```text
+application.properties / environment
     ↓
-ChatService.sendMessage()
+OllamaConfig
     ↓
-ChatService.directReply() [quick checks]
+ModelConfigService.load()
     ↓
-OllamaChatSession.send()
+LLMSettings persisted row
     ↓
-SystemPromptBuilder [constructs effective system prompt]
+OllamaChatModelProducer
+    ├─ produces ChatModel
+    └─ produces StreamingChatModel
     ↓
-LangChain4j ChatModel [sends to Ollama]
-    ↓
-Response Parsing
-    ├─ Extract AiMessage
-    └─ Parse tool calls (native or text-based)
-    ↓
-Tool Loop (up to 8 rounds):
-    ├─ ToolService.execute()
-    ├─ ToolActivityService.record()
-    ├─ Append ToolExecutionResultMessage to history
-    └─ Continue loop or return final text
-    ↓
-Return Assistant Response
-```
-
-### One-shot Conversation (sendOneShotMessage)
-
-```
-User Input
-    ↓
-ChatService.sendOneShotMessage()
-    ↓
-ChatService.directReply() [quick checks]
-    ↓
-OllamaChatSession.sendOneShot()
-    ↓
-[Same flow as sendMessage, but history is NOT persisted]
-    ↓
-Return Response
-```
-
-## Settings and Configuration
-
-### Configuration Source of Truth (Ollama + LangChain)
-
-The application now treats persisted `OllamaSettings` as the runtime source of truth.
-
-Resolution order is:
-
-1. Persisted database settings (if a row exists)
-2. App-level config defaults (`ollama.*`) when creating the first row
-3. LangChain defaults mirrored from `ollama.*` at startup
-
-Implementation notes:
-
-- `application.properties` maps LangChain chat settings to app settings via property aliases:
-  - `quarkus.langchain4j.ollama.base-url=${ollama.base-url}`
-  - `quarkus.langchain4j.ollama.chat-model.model-id=${ollama.model-name}`
-- `application-test.properties` uses the same aliasing so tests resolve against the test base URL.
-- `OllamaConfigService.load()` and `OllamaConfigService.save(...)` synchronize current persisted values into runtime LangChain system properties.
-
-Practical outcome:
-
-- Tests: base URL resolves to `http://desktop-box26:11434`.
-- Runtime out of the box: base URL resolves to `http://localhost:11434`.
-- After user changes settings: the last saved DB values remain authoritative for runtime chat behavior.
-
-### OllamaSettings Model
-
-**Location:** `src/main/java/ac/uk/sussex/kn253/model/OllamaSettings.java`
-
-**Key Fields:**
-
-- `baseUrl` - Ollama server endpoint (e.g., `http://localhost:11434`)
-- `modelName` - Selected model identifier (e.g., `gemma4`, `qwen2.5-coder`)
-- `temperature` - Sampling randomness (0.0 = deterministic, 1.0+ = creative)
-- `numPredict` - Maximum tokens to generate per response
-- `numCtx` - Context window size
-- `timeoutSeconds` - Request timeout for Ollama API calls
-- `systemPrompt` - Custom base system instruction
-- `toolSystemPrompt` - Tool-specific system instruction
-
-### Reconfiguration
-
-Changes to settings are applied live via `ChatService.reconfigure(OllamaSettings)`:
-
-```java
-// User saves new settings from UI
-OllamaSettings newSettings = ollamaConfigService.load();
-chatService.reconfigure(newSettings);
-// Old session discarded, new session created with new settings
-// Conversation history is cleared (use resetConversation() if not)
+LangChain4j model calls to the resolved Ollama endpoint
 ```
 
-This approach enables users to switch models, endpoints, or parameters without restarting the application.
+Model-management flow is handled separately:
 
-## Integration Points
-
-### Tool Service Integration
-
-The chat session delegates tool execution to `ToolService`:
-
-```
-Tool Execution Request
+```text
+explicit baseUrl argument or pdhd.ollama.base-url
     ↓
-OllamaChatSession.toolService.execute(request, memoryId)
-    ├─ Dispatch to appropriate ToolModule
-    ├─ Execute tool implementation
-    └─ Return String result
+OllamaManagementService.resolveBaseUrl(...)
     ↓
-Append to history as ToolExecutionResultMessage
-```
-
-**Key Contract:**
-
-- Tool results are always returned as strings
-- Execution is transactional (single DB transaction per tool)
-- Failures are caught and returned as error messages
-- No exception propagation to break conversation loop
-
-### System Prompt Building
-
-The `SystemPromptBuilder` composes an effective system prompt by:
-
-1. Prepending base system prompt
-2. Appending operating rules and constraints
-3. Including tool availability information (if tools enabled)
-4. Adding XML tool-call format specification (for non-native models)
-5. Injecting current working directory
-6. Injecting project metadata (from suppliers)
-
-This ensures the assistant understands available tools and project context without requiring explicit user configuration.
-
-### Activity Tracking
-
-Every tool execution is recorded by `ToolActivityService`:
-
-```
-Tool Execution Complete
+RestClientBuilder → OllamaManagementClient
     ↓
-ToolActivityService.recordToolExecution(...)
-    ├─ Extract tool name and requested files
-    ├─ Add ToolActivity entry to in-memory ring buffer
-    └─ Optionally persist to database
-    ↓
-Activity available via GET /api/tool-activity
+/api/tags, /api/ps, /api/show, /api/pull, /api/delete
 ```
 
-This provides both real-time debugging and historical audit of assistant behavior.
+## Cached Model Discovery
 
-## Session Lifecycle
+`ModelConfigService.refreshModelCache()` is the current bridge between the
+persisted settings row and live Ollama discovery.
 
-### Initialization
+Behavior:
 
-1. **On Application Startup:**
-   - `ChatService.init()` called (via `@PostConstruct`)
-   - Load persisted `OllamaSettings` via `OllamaConfigService.load()`
-   - Call `reconfigure(settings)` to build initial session
+1. Read the existing cached model JSON from `LLMSettings`.
+2. Check endpoint health with `OllamaManagementService.isHealthy(baseUrl)`.
+3. If the endpoint is unhealthy, return cached values unchanged.
+4. If the endpoint is healthy, fetch live models and overwrite the cached JSON.
 
-2. **Session Creation:**
-   - Build `OllamaChatModel` from settings
-   - Set system prompts
-   - Initialize empty conversation history
-   - Store suppliers for CWD and metadata
+This means the current implementation preserves a last-known model list rather
+than failing every consumer when Ollama is temporarily unavailable.
 
-### Reconfiguration
+## What Is Not Current
 
-1. **On Settings Change:**
-   - UI saves new settings
-   - `ChatService.reconfigure(newSettings)` called
-   - Old chat session discarded
-   - New session built with new settings
-   - Conversation history cleared
+The following claims from older revisions are no longer accurate for the
+checked-in code:
 
-2. **During Conversation:**
-   - History persists across multiple `sendMessage()` calls
-   - Call `resetConversation()` to clear history
-   - Suppliers are re-evaluated on each turn
+- A `ChatService` class owning an `OllamaChatSession`
+- An `OllamaChatSession` conversation loop in `ac.uk.sussex.kn253.ollama`
+- An `OllamaConfigService` that synchronizes runtime system properties
+- A settings-reconfigure API built around `ChatService.reconfigure(...)`
 
-### Reset
-
-```java
-chatService.resetConversation();
-```
-
-Effects:
-
-- Clears conversation history
-- Preserves current settings
-- Preserves model instance
-- Ready for new conversation
-
-## Model Selection and Compatibility
-
-Different models have different capabilities:
-
-### Tool-Native Models
-
-Models like `gemma4` have native tool support and can generate structured tool calls directly.
-
-- Advantage: Cleaner tool invocation
-- Advantage: Reduced prompt engineering
-- Requirement: Model must support tool specification format
-
-### Unsupported Models
-
-Models that do not support native structured tool calling are not supported for tool use.
-
-- Behaviour: LangChain4j throws an unsupported-feature error when tool specifications are sent to such a model provider
-- UI behaviour: The backend propagates that error and the frontend displays it directly to the user
-
-### Tool Loop Guard
-
-The session includes guard logic to prevent infinite tool loops:
-
-```
-if (toolCallCount > MAX_IDENTICAL_TOOL_CALLS) {
-    return ERROR_MESSAGE;
-}
-```
-
-Different tool categories have different thresholds:
-
-- Default: 4 identical calls
-- Summarization tools: 3 identical calls
-- Exploration tools: 7 identical calls
-
-This prevents scenarios where the model repeatedly calls the same tool without progress.
-
-## Error Handling
-
-Errors during conversation do not break the loop; they are caught and communicated:
-
-1. **Tool Execution Errors:**
-   - Caught by ToolService
-   - Returned as error message string
-   - Appended to history
-   - Conversation continues
-
-2. **Model API Errors:**
-   - Timeout: Communicated to user
-   - Rate limit: Retried or returned as error
-   - Connection error: Returned as error message
-
-3. **Parsing Errors:**
-   - Invalid JSON tool arguments: Error message appended to history
-   - Unrecognized tool name: Error message appended to history
-   - XML parse failure: Fall back to text response
-
-## Performance Considerations
-
-### Context Window Management
-
-The session embeds the full conversation history in each request. For long conversations:
-
-- History grows linearly with message count
-- Model context window limits conversation length
-- Consider implementing context summarization for very long sessions
-
-### Tool Execution Latency
-
-Tool-using conversations have additional latency per round:
-
-- Model inference time
-- Tool execution time (varies by tool)
-- Typical tool round: 500ms - 5s
-- Multi-round tool sequences can accumulate delay
-
-Strategies to minimize:
-
-- Use `sendOneShotMessage()` for conversations that don't need history
-- Reset conversation periodically to trim history
-- Optimize tool implementations for speed
-
-### Embedding Integration
-
-When embeddings are used, additional pre-processing occurs:
-
-- User message is embedded (typically 100-500ms for large embeddings)
-- Embedding vectors are stored/indexed
-- Introspection tools can retrieve similar content
-- See [embeddings.md](embeddings.md) for details
-
-## Testing and Debugging
-
-### Direct Java Testing
-
-```java
-// Create session without CDI
-OllamaChatSession session = new OllamaChatSession(
-    "http://localhost:11434",
-    "gemma4"
-);
-session.setSystemPrompt("You are a helpful assistant.");
-String response = session.send("What is 2+2?");
-```
-
-### API Testing
-
-```bash
-# Start conversation
-curl -X POST http://localhost:8080/api/chat \
-  -H "Content-Type: application/json" \
-  -d '{"message":"What is 2+2?"}'
-
-# One-shot
-curl -X POST http://localhost:8080/api/chat/oneshot \
-  -H "Content-Type: application/json" \
-  -d '{"message":"What is 2+2?"}'
-
-# Reset
-curl -X POST http://localhost:8080/api/chat/reset
-```
-
-### Debugging Tool Loops
-
-When debugging unexpected tool behavior:
-
-1. Check `GET /api/tool-activity?limit=50` for recent tool calls
-2. Verify tool arguments via activity log
-3. Check database for side effects (read cache, project knowledge)
-4. Examine system prompt via `SystemPromptBuilder`
-5. Test tool directly via ToolService
-
-## Future Enhancements
-
-### Streaming Responses
-
-Current implementation returns complete responses. Streaming could:
-
-- Return partial responses as they are generated
-- Provide real-time feedback for long operations
-- Improve perceived latency
-
-### Context Summarization
-
-Long conversations could benefit from:
-
-- Automatic summarization of old messages
-- Token-aware history pruning
-- Selective history replay
-
-### Multi-Model Comparison
-
-Could support:
-
-- Side-by-side inference with multiple models
-- Model routing based on task type
-- Fallback mechanisms for model failures
-
-### Advanced Telemetry
-
-Could track:
-
-- Token usage per conversation
-- Tool success/failure rates
-- User satisfaction per conversation
-- Performance metrics per model
-
-## References
-
-- [Tool Calling Architecture](tool-calling-architecture.md) - How tools are discovered and executed
-- [Embeddings Guide](embeddings.md) - Embedding generation and integration
-- [API Documentation](frontend.md) - Chat API endpoints
-
-## Operational Guardrails
-
-### Telemetry Data Retention (Do Not Drop)
-
-Telemetry tables are persistent operational evidence and must be preserved.
-
-- Current telemetry table: `tool_telemetry` (entity: `ToolTelemetryRecord`).
-- Schema strategy must remain non-destructive (`update`, not `drop-and-create`).
-- Do not add migrations or startup routines that drop, truncate, or recreate telemetry tables.
-
-Signal for future Copilot/agent runs:
-
-- Treat telemetry schema as immutable production history.
-- Any proposal that drops telemetry tables is a hard stop and must be rejected.
-- If schema evolution is required, use additive migrations only.
+Any future work that reintroduces those concepts should be documented as a new
+implementation, not inferred from this file.

@@ -35,42 +35,36 @@ The longer-term stretch goal is **AI-assisted project completion estimation**: i
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                        Frontend Layer                       │
-│  (React + TypeScript + Vite)                                │
-│  - Chat interface                                            │
-│  - File browser                                              │
-│  - Project explorer / file viewers                           │
+│                    Launcher / CLI Layer                     │
+│  - PdhdLauncher (root Picocli command)                      │
+│  - configure / webui subcommands                            │
+└─────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────┐
+│                     Runtime Bootstrap                       │
+│  - PreCdiOllamaBootstrap preflight for webui/default launch │
+│  - Configure/help/version bypass for recovery paths         │
 └─────────────────────────────────────────────────────────────┘
                               ↓ HTTP
 ┌─────────────────────────────────────────────────────────────┐
 │                     API Layer                               │
-│  - ChatApiResource (chat, folder summary, next steps)       │
-│  - FsApiResource (filesystem listing and file content)       │
-│  - ProjectApiResource (project discovery and loading)        │
-│  - CwdApiResource / MenuApiResource (environment/config)     │
+│  - ChatResource / MenuResource                              │
+│  - WorkspaceResource / ProjectResource                      │
+│  - SummaryResource / ToolTelemetryResource                  │
 └─────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
-│                     Service Layer                           │
-│  - SummaryOrchestratorService (inspection workflow)         │
-│  - FolderSummaryService (folder extraction + rendering)      │
-│  - ProjectKnowledgeSummaryStoreService (persisted recall)    │
-│  - EmbeddingIndexingService / RetrievalService               │
-│  - RagPolicyService / CwdService / TelemetryService          │
-└─────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────┐
-│                     Tool Layer                              │
-│  - ChatService / RaftProjectAnalysisService / SubagentService│
-│  - FolderSummaryTools / ProjectSummaryTools                  │
-│  - CwdTools / KnowledgeTools / FiletypeTools                 │
+│                   Service and Tool Layer                    │
+│  - CwdService / ModelConfigService / TelemetryService       │
+│  - OllamaManagementService / AI orchestration               │
+│  - WorkspaceContextTools / ReadFileTools / WebSearchTools   │
 └─────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
 │                     Data Layer                              │
-│  - Local filesystem                                           │
-│  - Persisted project knowledge and embedding chunks          │
-│  - Ollama-hosted chat and embedding models                   │
+│  - Local filesystem                                         │
+│  - Panache/JPA entities and persisted project knowledge     │
+│  - Ollama-hosted chat and embedding models                  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -122,9 +116,9 @@ Completion estimation is not the mainline feature yet, but the current architect
 
 ### Key Integration Points
 
-- File tree loaded from `/api/projects/{id}/tree`
-- Text content from `/api/projects/{id}/file?path=...`
-- Images from `/api/projects/{id}/file/raw?path=...`
+- File tree loaded from `POST /api/project/browse`
+- Text content from `POST /api/project/file`
+- Images from `GET /api/project/{id}/raw?path=...`
 - Chat responses rendered with markdown support
 - Project knowledge displayed in explorer canvas
 
@@ -259,10 +253,9 @@ curl -X POST http://localhost:8080/api/chat/summarize-folder \
 
 ### Key Documentation
 
-- [Assistant Request Flow](assistant-request-flow.md) - End-to-end launch-to-assistant runtime sequence
+- [Architecture Overview](architecture.md) - Launcher, package, and runtime structure
 - [Frontend Guide](frontend.md) - UI architecture and integration
-- [Tool Calling Architecture](tool-calling-architecture.md) - Runtime control flow
-- [Tool Calling Conventions](tool-calling-conventions.md) - Tool definition patterns
+- [API Listing Specification](api-listing-specification.md) - Current route and signal conventions
 - [Tool Provider Notes](tool-provider-notes.md) - Linux CLI equivalents
 - [Known Issues](known-issues.md) - Current limitations
 - [Recommendations](recommendations.md) - Implementation checklist

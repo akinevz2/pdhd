@@ -75,7 +75,7 @@ visible and detectable in CI/operator logs.
 ### 2026-04-14 – Benchmark runner correctness hardening
 
 **Area:** other  
-**Change:** Updated `scripts/benchmark.sh` to evaluate scenario success using
+**Change:** Updated benchmark runner logic (`scripts/benchlam/benchmark_ollama.py`) to evaluate scenario success using
 HTTP status (2xx required) and explicit backend/model error markers in
 response content. Added `http_status` field to each result row and tightened
 the S08 security scenario to fail if sensitive `/etc/passwd` style content
@@ -83,7 +83,7 @@ appears.
 **Rationale:** Initial benchmark artifacts could mark failed calls as success
 when curl transport succeeded but API returned a 500 error page. This created
 false-positive evidence and weakened evaluation credibility.  
-**Evidence/links:** `scripts/benchmark.sh`,
+**Evidence/links:** `scripts/benchlam/benchmark_ollama.py`,
 `docs/evaluation/results/run-2026-04-14T04:18:41.json`,
 `docs/operation-summary-2026-04-14.md`
 
@@ -98,4 +98,62 @@ operations.
 interpretable benchmark evidence by ensuring retries are intentional and
 operator-approved.  
 **Evidence/links:** `docs/operation-summary-2026-04-14.md`,
-`scripts/benchmark.sh`
+`scripts/benchlam/benchmark_ollama.py`
+
+### 2026-04-14 – Retry policy extended to backend and frontend
+
+**Area:** other  
+**Change:** Enforced manual-confirmation retry behavior in frontend retry
+handlers and added explicit no-automatic-retry policy logging in backend
+Ollama management failure paths.  
+**Rationale:** Align operator UX and backend behavior with the same reliability
+principle: retries are intentional and user-approved, not silent or automatic.  
+**Evidence/links:** `src/main/webui/src/App.tsx`,
+`src/main/webui/src/components/ChatDock.tsx`,
+`src/main/java/ac/uk/sussex/kn253/services/OllamaManagementService.java`,
+`docs/operation-summary-2026-04-14.md`
+
+### 2026-04-14 – Observability, logging, and transparency policy
+
+**Area:** other  
+**Change:** Added an explicit cross-cutting policy that prioritizes
+transparent startup/failure logging, durable telemetry evidence, and
+non-silent handling of critical reliability controls. Also formalized that
+benchmark reports must preserve and expose failure signals rather than masking
+them via optimistic success logic.  
+**Rationale:** Academic and operational credibility depends on traceable,
+auditable evidence. Clear logs + telemetry + explicit operator decisions make
+runtime behavior explainable and reproducible.  
+**Evidence/links:** `docs/operation-summary-2026-04-14.md`,
+`docs/evaluation/benchmark-scenarios.md`,
+`scripts/benchlam/benchmark_ollama.py`
+
+### 2026-04-20 – Phase 4: GitMetadataTools tool category
+
+**Area:** dispatch  
+**Change:** Added `GitMetadataTools` (five tools: `get_repository_status`,
+`get_recent_commits`, `get_git_branches`, `get_git_remotes`,
+`get_git_diff_stat`). Added `ToolSupport.MODULE_GIT` constant. Tools work
+with any Git hosting forge; each call is telemetry-instrumented under the
+`GIT` module and enforces workspace-containment validation before running
+any subprocess.  
+**Rationale:** Phase 4 deliverable – repository metadata enrichment tool
+category. Provides the assistant with first-class repository introspection
+capability without depending on the `gh` CLI or any forge-specific API.  
+**Evidence/links:** `src/main/java/ac/uk/sussex/kn253/tools/GitMetadataTools.java`,
+`src/test/java/ac/uk/sussex/kn253/tools/GitMetadataToolsTest.java`
+
+### 2026-04-20 – Phase 4: non-GitHub forge host-policy extension hooks
+
+**Area:** dispatch  
+**Change:** Added `BackendSupport.GITLAB_HOST`, `BITBUCKET_HOST`, and
+`CODEBERG_HOST` constants. Added `Origin#isGitlab()`, `Origin#isBitbucket()`,
+and `Origin#isKnownForge()` methods that route on these constants. All new
+forge-specific logic reads from `BackendSupport` so policy changes remain
+central and auditable.  
+**Rationale:** Phase 4 deliverable – host-policy extension hooks for
+non-GitHub forges. Enables future tooling (e.g., GitLab CI integration, issue
+fetching from Bitbucket) to follow the same host-constant pattern already
+established for GitHub.  
+**Evidence/links:** `src/main/java/ac/uk/sussex/kn253/support/BackendSupport.java`,
+`src/main/java/ac/uk/sussex/kn253/repository/Origin.java`

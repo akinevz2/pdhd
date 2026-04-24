@@ -1,6 +1,6 @@
 # Frontend Feature Verification
 
-Date: 2026-04-10
+Date: 2026-04-15
 
 ## Scope
 
@@ -11,80 +11,66 @@ This report verifies the current end-to-end status of these frontend features:
 - Previewing a file
 - Summarising a file
 - Summarising a folder
-- Summarising a project
+- Viewing loaded projects
 
 The verification is code-contract based (frontend expected routes/protocols vs backend implemented entrypoints).
 
 ## Verification Method
 
-- Frontend expectations were verified from `App.tsx`, `websocket.ts`, and `utils.ts`.
-- Backend availability was verified from Java REST route declarations and websocket endpoint searches under `src/main/java`.
-- A full backend route scan was run with ripgrep for `@Path(...)`, websocket markers, and relevant route/protocol strings.
+- Frontend expectations were verified from `App.tsx`, `signalDefinitions.ts`, `PaneWindow.tsx`, and the configuration hooks.
+- Backend availability was verified from the resource dispatchers under `src/main/java/ac/uk/sussex/kn253/resources`.
+- Verification was based on current signal definitions and the suffix-dispatch resource contract.
 
 ## Feature Status Matrix
 
-| Feature               | Frontend contract                                                                                                 | Backend counterpart                                                                         | Status            |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ----------------- |
-| Chat                  | REST streaming `POST /api/chat/stream` with JSON `{ message }`, consumed token-by-token in `sendChatMessage(...)` | REST endpoint exists at `/api/chat/stream` and returns streaming text (`text/event-stream`) | Working           |
-| Open GitHub repo link | Client-side `openExternalUrl(repoUrl)` after `isBrowsableRepoUrl(...)` check                                      | No backend required                                                                         | Working           |
-| Preview file          | `SIGNALS.PROJECT_FILE` -> `GET /api/project/{uuid}/file?entryUuid=...`                                            | No matching backend `@Path` for `/api/project/{uuid}/file` found                            | Broken end-to-end |
-| Summarise file        | Uses file-open flow to fetch file content from `PROJECT_FILE`; summary display relies on the same content path    | No matching backend project-file endpoint found                                             | Broken end-to-end |
-| Summarise folder      | WebSocket message `{ type: "summarize-folder", projectUuid, uuid }`                                               | No websocket endpoint found to consume typed websocket messages                             | Broken end-to-end |
-| Summarise project     | Frontend protocol includes `{ type: "project-next-steps", projectUuid, uuid }`                                    | No websocket endpoint found to consume this message type                                    | Broken end-to-end |
+| Feature                 | Frontend contract                                                                                       | Backend counterpart                                                      | Status  |
+| ----------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ------- |
+| Chat                    | `POST /api/chat/stream` with JSON `{ message }`, consumed incrementally in `sendChatMessage(...)`       | `ChatResource` dispatches `/stream` and returns a streaming text body    | Working |
+| Open GitHub repo link   | Client-side `openExternalUrl(repoUrl)` after `isBrowsableRepoUrl(...)` check                            | No backend required                                                      | Working |
+| Preview file            | `SIGNALS.PROJECT_FILE` -> `POST /api/project/file`; raw assets use `GET /api/project/{id}/raw?path=...` | `ProjectResource` dispatches `/file` and `/{id}/raw`                     | Working |
+| Summarise file/folder   | `SIGNALS.SUMMARY_FILE`, `SIGNALS.SUMMARY_FOLDER`, and `SIGNALS.SUMMARY_STATUS`                          | `SummaryResource` dispatches `/file`, `/folder`, and `/status`           | Working |
+| Viewing loaded projects | `SIGNALS.WORKSPACE_LIST` and `SIGNALS.PROJECT_BROWSE`                                                   | `WorkspaceResource` and `ProjectResource` dispatch `/list` and `/browse` | Working |
 
 ## Detailed Findings
 
-1. Frontend REST contract registration is broader than backend route availability.
+1. The current frontend contract is signal-based rather than the older `/api/fs`, `/api/projects`, and `/api/cwd` route set.
 
-`App.tsx` registers signals for:
+`signalDefinitions.ts` registers these resource-backed signals:
 
 - `/api/workspace`
-- `/api/project`
-- `/api/project/{uuid}/browse`
-- `/api/project/{uuid}/file?entryUuid=...`
+- `/api/workspace/list`
+- `/api/project/open`
+- `/api/project/close`
+- `/api/project/remote`
+- `/api/project/browse`
+- `/api/project/file`
+- `/api/summary/folder`
+- `/api/summary/file`
+- `/api/summary/status`
 - `/api/chat/reset`
-
-The backend route scan in `src/main/java` found API resources for:
-
-- `/api/chat` (message + stream)
-- `/api/menu` (ollama/config/runtime/model endpoints)
-
-No matching backend paths were found for `/api/project/{uuid}/file`, `/api/project/{uuid}/browse`, `/api/workspace`, or `/api/chat/reset` during this verification pass.
 
 2. Chat is now aligned to backend streaming REST endpoints.
 
 - Frontend `sendChatMessage(...)` streams from `POST /api/chat/stream`.
-- Backend exposes `/api/chat/stream` in `ChatApiResource` and returns incremental text chunks.
-- Chat no longer depends on `/ws/chat` for standard conversational streaming.
+- `ChatResource` dispatches `/api/chat/stream` and `/api/chat/reset`.
+- The response is consumed as an incremental text stream rather than an SSE-only contract.
 
-Result: core chat streaming is operational with the current backend route contract.
+3. File preview and markdown asset loading are routed through project signals.
 
-3. Folder/project summarisation protocol is defined in frontend but has no discovered server dispatch.
+- File content loads via `POST /api/project/file`.
+- Raw binary and embedded markdown assets load via `GET /api/project/{id}/raw?path=...`.
 
-Frontend websocket message types include:
+4. Folder summarisation is exposed through REST signals.
 
-- `summarize-folder`
-- `project-next-steps`
-
-No backend websocket endpoint was found to receive and route these messages.
-
-4. Summarisation persistence pipeline exists but is not exposed by discovered API/websocket entrypoints.
-
-`FileSummarisationPipelineService` exists with:
-
-- `summariseFileAndStore(...)`
-- `summariseFolderAndStore(...)`
-
-No production route handler discovered in this pass invokes these methods.
+- The frontend uses `summary:folder`, `summary:file`, and `summary:status`.
+- `SummaryResource` invokes `FileSummarisationPipelineService` for folder summaries and persisted file subsummaries.
 
 ## Conclusion
 
 Current requested feature verification result:
 
-- 2/6 features verified working: chat streaming and opening a GitHub repo link (client-only).
-- 4/6 features are currently broken end-to-end due to missing backend entrypoints or websocket protocol gaps for summary flows.
-
-This report reflects current code contracts as of 2026-04-10 and does not include remediation implementation.
+- The current signal-backed frontend features verified in this pass are wired to matching backend resource dispatchers.
+- Legacy websocket helper typings still exist in `websocket.ts`, but they no longer describe the primary summary/chat path used by the UI.
 
 ## Related Docs
 
