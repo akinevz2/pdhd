@@ -47,3 +47,9 @@ nb-configuration.xml
 # TLS Certificates
 .certs/
 
+logs/pdhd.log
+logs/pdhd.log.1
+logs/pdhd.log.2
+logs/pdhd.log.3
+logs/pdhd.log.4
+logs/pdhd.log.5
