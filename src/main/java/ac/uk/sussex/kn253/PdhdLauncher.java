@@ -27,8 +27,30 @@ public class PdhdLauncher implements QuarkusApplication, Runnable {
     private CommandLine commandLine;
 
     public static void main(final String[] args) {
-        PreCdiOllamaBootstrap.prepareForLaunch(args);
+        if (shouldRunBootstrap(args)) {
+            PreCdiOllamaBootstrap.prepareForLaunch(args);
+        }
         Quarkus.run(PdhdLauncher.class, args);
+    }
+
+    static boolean shouldRunBootstrap(final String[] args) {
+        if (args == null || args.length == 0) {
+            return true;
+        }
+        final String command = args[0];
+        if (command == null) {
+            return true;
+        }
+        final String normalized = command.trim();
+        if (normalized.isEmpty()) {
+            return true;
+        }
+        return !"configure".equalsIgnoreCase(normalized)
+                && !"-h".equals(normalized)
+                && !"--help".equals(normalized)
+                && !"-V".equals(normalized)
+                && !"--version".equals(normalized)
+                && !"help".equalsIgnoreCase(normalized);
     }
 
     @Override

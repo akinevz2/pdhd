@@ -3,6 +3,7 @@ import type { ToolActivityItem, ToolTelemetryItem } from "../types";
 
 type TopMenuAndModalsProps = {
   menuButtons?: ReactNode;
+  statusContent?: ReactNode;
   modalContent?: ReactNode;
   onOpenDebug: () => void;
   onOpenTelemetry: () => void;
@@ -25,6 +26,7 @@ type TopMenuAndModalsProps = {
 
 export function TopMenuAndModals({
   menuButtons,
+  statusContent,
   modalContent,
   onOpenDebug,
   onOpenTelemetry,
@@ -55,13 +57,12 @@ export function TopMenuAndModals({
         </button>
         <button
           className="menu-btn menu-btn-exit"
-          onClick={() => {
-            onExit().catch(() => {});
-          }}
+          onClick={() => onExit().catch(() => {})}
         >
           Exit
         </button>
       </nav>
+      {statusContent}
       {modalContent}
 
       {debugOpen && (
@@ -211,9 +212,7 @@ export function TopMenuAndModals({
             </div>
             <div className="modal-footer">
               <button
-                onClick={() => {
-                  onRefreshTelemetry().catch(() => {});
-                }}
+                onClick={() => onRefreshTelemetry().catch(() => {})}
                 disabled={telemetryLoading}
               >
                 {telemetryLoading ? "Refreshing..." : "Refresh"}

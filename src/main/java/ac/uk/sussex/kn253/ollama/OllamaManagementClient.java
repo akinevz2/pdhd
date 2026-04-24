@@ -10,20 +10,14 @@ import jakarta.ws.rs.core.Response;
  * MicroProfile REST Client for the Ollama management API.
  *
  * <p>
- * The base URL is configured via {@code ollama.base-url} in
- * {@code application.properties}.
- * Register this client in your properties:
+ * In the checked-in runtime, instances are built on demand by
+ * {@code OllamaManagementService} via {@code RestClientBuilder} using the
+ * resolved Ollama base URL.
  *
  * <pre>
- * quarkus.rest-client.pdhd.ollama.management.url=${pdhd.ollama.base-url}
- * </pre>
- *
- * <p>
- * Inject it with:
- *
- * <pre>
- * {@literal @}RestClient
- * OllamaManagementClient client;
+ * RestClientBuilder.newBuilder()
+ *         .baseUri(URI.create(resolvedBaseUrl))
+ *         .build(OllamaManagementClient.class)
  * </pre>
  *
  * <p>

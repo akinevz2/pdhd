@@ -18,6 +18,8 @@ export type PaneWindowProps = {
   onMove: (x: number, y: number) => void;
   onOpenFile: (path: string, uuid: string) => void;
   onOpenFolderPreview: (path: string, uuid?: string | null) => void;
+  onGenerateFolderSummary: (path: string, uuid?: string | null) => void;
+  onShowFolderSubsummaries: (path: string, uuid?: string | null) => void;
   onAssistantAction: (prompt: string) => void;
   assistantActionDisabled?: boolean;
 };
@@ -30,6 +32,8 @@ export function PaneWindow({
   onMove,
   onOpenFile,
   onOpenFolderPreview,
+  onGenerateFolderSummary,
+  onShowFolderSubsummaries,
   onAssistantAction,
   assistantActionDisabled = false,
 }: PaneWindowProps) {
@@ -125,6 +129,22 @@ export function PaneWindow({
     !!windowState.selectedFilePath ||
     !!windowState.fileLoading ||
     !!windowState.fileError;
+
+  const showSummaryControls =
+    isFolderSummaryPath &&
+    !!windowState.selectedFilePath &&
+    !!windowState.selectedFileUuid;
+
+  const summaryIndicatorLabel =
+    windowState.folderSummaryStatus === "generated"
+      ? "Summary stored"
+      : windowState.folderSummaryStatus === "generating"
+        ? "Generating summary"
+        : windowState.folderSummaryStatus === "error"
+          ? "Summary generation failed"
+          : "No generated summary";
+
+  const isShowingSubsummaries = windowState.folderViewMode === "subsummaries";
 
   const parseAssistantActionPayload = (
     rawPayload: string,
@@ -303,6 +323,52 @@ export function PaneWindow({
             !showPdf &&
             !showMarkdown &&
             hasContentSelection && <pre>{windowState.fileContent || ""}</pre>}
+
+          {showSummaryControls && (
+            <div className="folder-summary-actions">
+              <span
+                className={`summary-indicator summary-indicator-${windowState.folderSummaryStatus || "idle"}`}
+                aria-label={summaryIndicatorLabel}
+                title={summaryIndicatorLabel}
+              />
+              <button
+                className="folder-summary-button"
+                disabled={
+                  assistantActionDisabled ||
+                  windowState.fileLoading ||
+                  windowState.folderSummaryStatus === "generating"
+                }
+                onClick={() =>
+                  onGenerateFolderSummary(
+                    windowState.selectedFilePath || ".",
+                    windowState.selectedFileUuid,
+                  )
+                }
+              >
+                Generate Summary
+              </button>
+              <button
+                className="folder-summary-button"
+                disabled={assistantActionDisabled || windowState.fileLoading}
+                onClick={() => {
+                  if (isShowingSubsummaries) {
+                    onOpenFolderPreview(
+                      windowState.selectedFilePath || ".",
+                      windowState.selectedFileUuid,
+                    );
+                    return;
+                  }
+
+                  onShowFolderSubsummaries(
+                    windowState.selectedFilePath || ".",
+                    windowState.selectedFileUuid,
+                  );
+                }}
+              >
+                {isShowingSubsummaries ? "Show Preview" : "Show Subsummaries"}
+              </button>
+            </div>
+          )}
         </article>
       </div>
     </Window>

@@ -5,18 +5,27 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.lang.reflect.Proxy;
 import java.util.List;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import ac.uk.sussex.kn253.repository.LLMSettings;
 import ac.uk.sussex.kn253.repository.OllamaModelInfo;
+import io.quarkus.logging.Log;
 import jakarta.persistence.EntityManager;
 
 class ModelConfigServiceTest {
 
+    @BeforeEach
+    void setup() {
+        Log.warn(
+                "The following test will log an error about the Ollama endpoint being unhealthy, which is expected and can be ignored.");
+    }
+
     @Test
     void refreshModelCacheReturnsCachedWhenEndpointUnhealthy() throws Exception {
+
         final ObjectMapper mapper = new ObjectMapper().findAndRegisterModules();
         final LLMSettings settings = settingsWithCache(mapper, "http://offline:11434", List.of(model("cached-model")));
 

@@ -3,7 +3,6 @@ package ac.uk.sussex.kn253.services;
 import static dev.langchain4j.model.chat.Capability.RESPONSE_FORMAT_JSON_SCHEMA;
 import static org.junit.jupiter.api.Assertions.*;
 
-import java.net.URI;
 import java.time.Duration;
 import java.util.*;
 
@@ -21,7 +20,6 @@ import jakarta.inject.Inject;
 @QuarkusTest
 class OllamaWorkstationIntegrationTest {
 
-    private static final String REQUIRED_HOST = "host.docker.internal";
     private static final String LIVE_MODEL_OVERRIDE_PROPERTY = "ollama.live.model";
 
     interface LiveChatAssistant {
@@ -42,8 +40,8 @@ class OllamaWorkstationIntegrationTest {
     void requireLiveOllamaHostAndModel() {
         final String baseUrl = ollamaConfig.baseUrl().orElse("");
 
-        Assumptions.assumeTrue(isRequiredHost(baseUrl),
-                () -> "Live workstation tests require host " + REQUIRED_HOST + " but got " + baseUrl);
+        Assumptions.assumeTrue(!baseUrl.isBlank(),
+            "Live workstation tests require pdhd.ollama.base-url to be configured");
         Assumptions.assumeTrue(ollamaManagementService.isHealthy(baseUrl),
                 () -> "Ollama is unreachable at " + baseUrl);
 
@@ -114,16 +112,4 @@ class OllamaWorkstationIntegrationTest {
                 .toList();
     }
 
-    private static boolean isRequiredHost(final String baseUrl) {
-        if (baseUrl == null || baseUrl.isBlank()) {
-            return false;
-        }
-        try {
-            final URI uri = URI.create(baseUrl);
-            final String host = uri.getHost();
-            return REQUIRED_HOST.equalsIgnoreCase(host);
-        } catch (final Exception e) {
-            return false;
-        }
-    }
 }

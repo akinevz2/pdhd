@@ -15,8 +15,8 @@ import io.smallrye.config.*;
  * the standard MicroProfile naming convention, e.g.:
  * 
  * <pre>
- *   OLLAMA_BASE_URL=http://my-gpu-box:11434
- *   OLLAMA_MODEL_NAME=gemma4
+ *   PDHD_OLLAMA_BASE_URL=http://my-gpu-box:11434
+ *   PDHD_OLLAMA_MODEL_NAME=gemma4
  * </pre>
  */
 @ConfigMapping(prefix = "pdhd.ollama")
@@ -42,7 +42,7 @@ public interface OllamaConfig {
 
     /** Request timeout in seconds for chat / generate calls. */
     @WithName("timeout-seconds")
-    @WithDefault("120")
+    @WithDefault("300")
     int timeoutSeconds();
 
     /** Temperature (0.0 – 2.0). Higher = more creative. */

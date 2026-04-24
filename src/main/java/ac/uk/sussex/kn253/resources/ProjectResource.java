@@ -21,7 +21,7 @@ import jakarta.ws.rs.core.Response;
 @ApplicationScoped
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
-public class ProjectApiResource {
+public class ProjectResource {
 
     @Inject
     CwdService cwdService;
@@ -31,6 +31,22 @@ public class ProjectApiResource {
 
     public record OpenProjectRequest(String directory) {
 
+    }
+
+    public record ProjectIdRequest(long projectId) {
+    }
+
+    public record BrowseProjectRequest(long projectId, String parentUuid) {
+    }
+
+    public record ProjectFileRequest(long projectId, String entryUuid) {
+    }
+
+    public record ProjectSignalRequest(
+            String directory,
+            long projectId,
+            String parentUuid,
+            String entryUuid) {
     }
 
     public record FileContentResponse(
@@ -59,60 +75,56 @@ public class ProjectApiResource {
             List<FsEntry> entries) {
     }
 
-    @GET
-    @Transactional
-    public List<ProjectFolder> listOpenProjects() {
-        return ProjectFolder.list("loaded", true);
+    private ProjectFolder openImpl(final OpenProjectRequest request) {
+        final ProjectFolder project = resolveProject(request);
+        project.setLoaded(true);
+        githubMetadataService.tryEnrichWithGithubMetadata(project);
+        return project;
     }
 
-    @POST
-    @Transactional
-    public ProjectFolder openProject(final OpenProjectRequest request) {
-        return open(request);
-    }
-
-    @GET
-    @jakarta.ws.rs.Path("/{id}/remote-url")
-    @Transactional
-    public ProjectRemoteUrlResponse getProjectRemoteUrl(@PathParam("id") final long id) {
+    private ProjectRemoteUrlResponse remoteImpl(final ProjectIdRequest request) {
+        if (request == null || request.projectId() <= 0) {
+            throw new BadRequestException("projectId is required");
+        }
+        final long id = request.projectId();
         final ProjectFolder project = findProjectOrThrow(id);
         return new ProjectRemoteUrlResponse(resolveRemoteUrl(project));
     }
 
-    @GET
-    @jakarta.ws.rs.Path("/{id}/browse")
-    @Transactional
-    public BrowseResponse browseProject(
-            @PathParam("id") final long id,
-            @QueryParam("parentUuid") final String parentUuid) {
+    private BrowseResponse browseImpl(final BrowseProjectRequest request) {
+        if (request == null || request.projectId() <= 0) {
+            throw new BadRequestException("projectId is required");
+        }
+        final long id = request.projectId();
+        final String parentUuid = request.parentUuid();
         final ProjectFolder project = findProjectOrThrow(id);
         final Path root = Path.of(project.getDirectory()).toAbsolutePath().normalize();
         final Path target = resolvePathByUuid(root, parentUuid);
 
-        if (target == null || !Files.exists(target) || !Files.isDirectory(target)) {
-            throw new WebApplicationException("Folder not found", Response.Status.NOT_FOUND);
+        if (target == null || !cwdService.isFolderContained(target)) {
+            throw new NotFoundException("Folder not found");
         }
 
         final String repoUrl = resolveRemoteUrl(project);
         return new BrowseResponse(parentUuid == null ? "" : parentUuid, listEntries(target, repoUrl));
     }
 
-    @GET
-    @jakarta.ws.rs.Path("/{id}/file")
-    @Transactional
-    public FileContentResponse getProjectFile(
-            @PathParam("id") final long id,
-            @QueryParam("entryUuid") final String entryUuid) {
-        if (entryUuid == null || entryUuid.isBlank()) {
-            throw new WebApplicationException("entryUuid is required", Response.Status.BAD_REQUEST);
+    private FileContentResponse fileImpl(final ProjectFileRequest request) {
+        if (request == null || request.projectId() <= 0) {
+            throw new BadRequestException("projectId is required");
         }
+        if (request.entryUuid() == null || request.entryUuid().isBlank()) {
+            throw new BadRequestException("entryUuid is required");
+        }
+        final long id = request.projectId();
+        final String entryUuid = request.entryUuid();
 
         final ProjectFolder project = findProjectOrThrow(id);
         final Path root = Path.of(project.getDirectory()).toAbsolutePath().normalize();
         final Path target = resolvePathByUuid(root, entryUuid);
 
         if (target == null || !Files.exists(target)) {
-            throw new WebApplicationException("File not found", Response.Status.NOT_FOUND);
+            throw new NotFoundException("File not found");
         }
 
         final Path fileName = target.getFileName();
@@ -129,7 +141,7 @@ public class ProjectApiResource {
         }
 
         if (Files.isDirectory(target)) {
-            throw new WebApplicationException("File not found", Response.Status.NOT_FOUND);
+            throw new NotFoundException("File not found");
         }
 
         try {
@@ -150,29 +162,79 @@ public class ProjectApiResource {
                     requiresImageViewer,
                     requiresMarkdownViewer);
         } catch (final Exception e) {
-            throw new WebApplicationException("Failed to read file", Response.Status.INTERNAL_SERVER_ERROR);
+            throw new InternalServerErrorException("Failed to read file");
         }
     }
 
-    @GET
-    @jakarta.ws.rs.Path("/{id}/raw")
+    private Response closeImpl(final ProjectIdRequest request) {
+        if (request == null || request.projectId() <= 0) {
+            throw new BadRequestException("projectId is required");
+        }
+        final long id = request.projectId();
+        final ProjectFolder project = findProjectOrThrow(id);
+        project.setLoaded(false);
+        return Response.accepted(project).build();
+    }
+
+    @POST
+    @jakarta.ws.rs.Path("/open")
     @Transactional
-    public Response getProjectRawFile(
-            @PathParam("id") final long id,
+    public ProjectFolder open(final OpenProjectRequest request) {
+        return openImpl(request);
+    }
+
+    @POST
+    @jakarta.ws.rs.Path("/remote")
+    @Transactional
+    public ProjectRemoteUrlResponse remote(final ProjectIdRequest request) {
+        return remoteImpl(request);
+    }
+
+    @POST
+    @jakarta.ws.rs.Path("/browse")
+    @Transactional
+    public BrowseResponse browse(final BrowseProjectRequest request) {
+        return browseImpl(request);
+    }
+
+    @POST
+    @jakarta.ws.rs.Path("/file")
+    @Transactional
+    public FileContentResponse file(final ProjectFileRequest request) {
+        return fileImpl(request);
+    }
+
+    @DELETE
+    @jakarta.ws.rs.Path("/close")
+    @Transactional
+    public Response close(final ProjectIdRequest request) {
+        return closeImpl(request);
+    }
+
+    @GET
+    @Transactional
+    public Response raw(
+            @QueryParam("id") final Long id,
             @QueryParam("path") final String path) {
+        if (id == null || id <= 0) {
+            throw new BadRequestException("id is required");
+        }
+        return getProjectRawFile(id, path);
+    }
+
+    private Response getProjectRawFile(
+            final long id,
+            final String path) {
         if (path == null || path.isBlank()) {
-            throw new WebApplicationException("path is required", Response.Status.BAD_REQUEST);
+            throw new BadRequestException("path is required");
         }
 
         final ProjectFolder project = findProjectOrThrow(id);
         final Path root = Path.of(project.getDirectory()).toAbsolutePath().normalize();
         final Path requested = Path.of(path).toAbsolutePath().normalize();
 
-        if (!requested.startsWith(root)) {
-            throw new WebApplicationException("Path is outside project root", Response.Status.BAD_REQUEST);
-        }
-        if (!Files.exists(requested) || Files.isDirectory(requested)) {
-            throw new WebApplicationException("File not found", Response.Status.NOT_FOUND);
+        if (!requested.startsWith(root) || !cwdService.isFileContained(requested)) {
+            throw new BadRequestException("Invalid project file path");
         }
 
         try {
@@ -181,24 +243,8 @@ public class ProjectApiResource {
             final String mediaType = mimeType == null || mimeType.isBlank() ? "application/octet-stream" : mimeType;
             return Response.ok(bytes, mediaType).build();
         } catch (final Exception e) {
-            throw new WebApplicationException("Failed to read raw file", Response.Status.INTERNAL_SERVER_ERROR);
+            throw new InternalServerErrorException("Failed to read raw file");
         }
-    }
-
-    private ProjectFolder open(final OpenProjectRequest request) {
-        final ProjectFolder project = resolveProject(request);
-        project.setLoaded(true);
-        githubMetadataService.tryEnrichWithGithubMetadata(project);
-        return project;
-    }
-
-    @DELETE
-    @jakarta.ws.rs.Path("/{id}")
-    @Transactional
-    public Response closeProject(@PathParam("id") final long id) {
-        final ProjectFolder project = findProjectOrThrow(id);
-        project.setLoaded(false);
-        return Response.accepted(project).build();
     }
 
     private ProjectFolder resolveProject(final OpenProjectRequest request) {
@@ -206,7 +252,7 @@ public class ProjectApiResource {
             return cwdService.getCurrentProject();
         }
 
-        final String resolvedDirectory = java.nio.file.Path.of(request.directory()).toAbsolutePath().normalize()
+        final String resolvedDirectory = Path.of(request.directory()).toAbsolutePath().normalize()
                 .toString();
         final ProjectFolder existing = ProjectFolder.<ProjectFolder>find("directory", resolvedDirectory).firstResult();
         if (existing != null) {
@@ -223,7 +269,7 @@ public class ProjectApiResource {
     private ProjectFolder findProjectOrThrow(final long id) {
         final ProjectFolder project = ProjectFolder.<ProjectFolder>findById(id);
         if (project == null) {
-            throw new WebApplicationException("Project not found", Response.Status.NOT_FOUND);
+            throw new NotFoundException("Project not found");
         }
         return project;
     }
@@ -340,7 +386,7 @@ public class ProjectApiResource {
         if (directory == null || directory.isBlank()) {
             return null;
         }
-        if (!Files.exists(java.nio.file.Path.of(directory))) {
+        if (!Files.exists(Path.of(directory))) {
             return null;
         }
         try {

@@ -56,8 +56,12 @@ public class OllamaManagementService {
 
     private static final Logger LOG = Logger.getLogger(OllamaManagementService.class.getName());
     private static final Duration HEALTH_FAILURE_LOG_COOLDOWN = Duration.ofSeconds(30);
+    private static final Duration MIN_HEALTH_TIMEOUT = Duration.ofSeconds(2);
+    private static final Duration MAX_HEALTH_TIMEOUT = Duration.ofSeconds(10);
 
     private final Map<String, Instant> lastHealthFailureLogAt = new ConcurrentHashMap<>();
+
+    private static final String MANUAL_RETRY_POLICY_NOTE = "Automatic retries are disabled by policy; retry only after explicit user confirmation.";
 
     @Inject
     OllamaConfig config;
@@ -138,12 +142,32 @@ public class OllamaManagementService {
         final String endpoint = normalizedBaseUrl.endsWith("/")
                 ? normalizedBaseUrl + "api/tags"
                 : normalizedBaseUrl + "/api/tags";
+        final Duration healthTimeout = resolveHealthTimeout();
         final HttpRequest request = HttpRequest.newBuilder(URI.create(endpoint))
+                .timeout(healthTimeout)
                 .GET()
                 .build();
-        final HttpResponse<Void> response = HttpClient.newHttpClient()
+        final HttpClient client = HttpClient.newBuilder()
+                .connectTimeout(healthTimeout)
+                .build();
+        final HttpResponse<Void> response = client
                 .send(request, HttpResponse.BodyHandlers.discarding());
         return response.statusCode();
+    }
+
+    private Duration resolveHealthTimeout() {
+        final int configuredSeconds = config.timeoutSeconds();
+        if (configuredSeconds <= 0) {
+            return Duration.ofSeconds(5);
+        }
+        final Duration configured = Duration.ofSeconds(configuredSeconds);
+        if (configured.compareTo(MIN_HEALTH_TIMEOUT) < 0) {
+            return MIN_HEALTH_TIMEOUT;
+        }
+        if (configured.compareTo(MAX_HEALTH_TIMEOUT) > 0) {
+            return MAX_HEALTH_TIMEOUT;
+        }
+        return configured;
     }
 
     private String normalizeBaseUrl(final String baseUrl) {
@@ -192,6 +216,7 @@ public class OllamaManagementService {
             return response.getModels() != null ? response.getModels() : Collections.emptyList();
         } catch (final Exception e) {
             LOG.severe(() -> String.format("Failed to list Ollama models: %s", e.getMessage()));
+            LOG.warning(MANUAL_RETRY_POLICY_NOTE);
             return Collections.emptyList();
         }
     }
@@ -296,6 +321,7 @@ public class OllamaManagementService {
             }
             return status;
         } catch (final Exception e) {
+            LOG.warning(() -> String.format("Pull failed for model '%s'. %s", modelName, MANUAL_RETRY_POLICY_NOTE));
             throw new OllamaException("Failed to pull model '" + modelName + "'", e);
         }
     }
@@ -365,6 +391,8 @@ public class OllamaManagementService {
         } catch (final OllamaException e) {
             throw e;
         } catch (final Exception e) {
+            LOG.warning(() -> String.format("Streaming pull failed for model '%s'. %s", modelName,
+                    MANUAL_RETRY_POLICY_NOTE));
             throw new OllamaException("Failed to pull model '" + modelName + "'", e);
         }
     }
@@ -390,6 +418,8 @@ public class OllamaManagementService {
         } catch (final OllamaException e) {
             throw e;
         } catch (final Exception e) {
+            LOG.warning(() -> String.format("Delete failed for model '%s'. %s", modelName,
+                    MANUAL_RETRY_POLICY_NOTE));
             throw new OllamaException("Failed to delete model '" + modelName + "'", e);
         }
     }
@@ -448,9 +478,13 @@ public class OllamaManagementService {
                 elapsedSeconds,
                 pullStatus != null ? pullStatus.getStatus() : "unknown"));
         if (!pullStatus.isSuccess() && !isModelAvailable(baseUrl, modelName)) {
+            LOG.warning(() -> String.format("Model availability check failed for '%s'. %s", modelName,
+                    MANUAL_RETRY_POLICY_NOTE));
             throw new OllamaException("Pull did not complete successfully for model '" + modelName + "'");
         }
         if (!isModelAvailable(baseUrl, modelName)) {
+            LOG.warning(() -> String.format("Model '%s' still unavailable after pull. %s", modelName,
+                    MANUAL_RETRY_POLICY_NOTE));
             throw new OllamaException("Model '" + modelName + "' is still unavailable after pull");
         }
         return false;

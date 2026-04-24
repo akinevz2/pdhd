@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 
 import org.junit.jupiter.api.Test;
 
@@ -76,6 +77,47 @@ class ReadFileToolsTest {
             assertTrue(result.startsWith("Access denied:"));
         } finally {
             Files.deleteIfExists(tempFile);
+        }
+    }
+
+    @Test
+    @Transactional
+    void readFileAllowsRelativePathWithinCwd() {
+        ProjectFolder.deleteAll();
+
+        final String result = readFileTools.readFile("README.md");
+
+        assertTrue(!result.startsWith("Access denied:"));
+        assertTrue(!result.startsWith("Error reading file:"));
+    }
+
+    @Test
+    @Transactional
+    void readFileDeniesRelativeTraversalOutsideOpenProject() throws Exception {
+        ProjectFolder.deleteAll();
+
+        final Path openProjectDir = Files.createTempDirectory("pdhd-readfile-project-traversal-");
+        try {
+            final ProjectFolder project = new ProjectFolder();
+            project.setDirectory(openProjectDir.toAbsolutePath().normalize().toString());
+            project.setLoaded(true);
+            project.persist();
+
+            final Path outsideTemp = Files.createTempFile("pdhd-readfile-outside-traversal-", ".txt");
+            try {
+                final Path relativeEscape = Paths.get("..")
+                        .resolve(outsideTemp.getParent().getFileName())
+                        .resolve(outsideTemp.getFileName())
+                        .normalize();
+
+                final String result = readFileTools.readFile(relativeEscape.toString());
+
+                assertTrue(result.startsWith("Access denied:") || result.startsWith("Error reading file:"));
+            } finally {
+                Files.deleteIfExists(outsideTemp);
+            }
+        } finally {
+            Files.deleteIfExists(openProjectDir);
         }
     }
 }

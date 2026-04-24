@@ -3,9 +3,11 @@ package ac.uk.sussex.kn253.tools;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 
 import ac.uk.sussex.kn253.repository.ProjectFolder;
+import ac.uk.sussex.kn253.services.CwdService;
 import ac.uk.sussex.kn253.services.TelemetryService;
 import ac.uk.sussex.kn253.support.ToolSupport;
 import dev.langchain4j.agent.tool.P;
@@ -18,11 +20,14 @@ import jakarta.transaction.Transactional;
 public class ReadFileTools {
 
     @Inject
+    CwdService cwdService;
+
+    @Inject
     TelemetryService telemetryService;
 
-    @Tool("Read the contents of a file at the given absolute path. The file must be within a currently open project.")
+    @Tool("Read the contents of a file from an absolute or relative path. The tool normalizes and enforces project-boundary security internally.")
     @Transactional
-    public String readFile(@P("Absolute path to the file") final String path) {
+    public String readFile(@P("Path to the file (absolute or relative)") final String path) {
         final long started = System.nanoTime();
         String result = null;
         String errorClass = null;
@@ -33,8 +38,7 @@ public class ReadFileTools {
                 result = "Error: path must not be blank";
                 return result;
             }
-            final Path normalized = Path.of(path).toAbsolutePath().normalize();
-            requireInsideOpenProject(normalized);
+            final Path normalized = resolvePathInsideAllowedRoots(path);
             result = Files.readString(normalized);
             return result;
         } catch (final SecurityException e) {
@@ -63,14 +67,58 @@ public class ReadFileTools {
         }
     }
 
-    private void requireInsideOpenProject(final Path filePath) {
-        final List<ProjectFolder> openProjects = ProjectFolder.list("loaded", true);
-        final boolean inside = openProjects.stream()
-                .map(p -> Path.of(p.getDirectory()))
-                .anyMatch(filePath::startsWith);
+    private Path resolvePathInsideAllowedRoots(final String requestedPath) {
+        final Path rawPath = Path.of(requestedPath);
+        final List<Path> allowedRoots = getAllowedRoots();
+
+        if (rawPath.isAbsolute()) {
+            final Path normalized = rawPath.toAbsolutePath().normalize();
+            requireInsideAllowedRoots(normalized, allowedRoots);
+            return normalized;
+        }
+
+        Path firstScopedCandidate = null;
+        for (final Path root : allowedRoots) {
+            final Path candidate = root.resolve(rawPath).toAbsolutePath().normalize();
+            if (!candidate.startsWith(root)) {
+                continue;
+            }
+            if (firstScopedCandidate == null) {
+                firstScopedCandidate = candidate;
+            }
+            if (Files.exists(candidate)) {
+                return candidate;
+            }
+        }
+
+        if (firstScopedCandidate != null) {
+            return firstScopedCandidate;
+        }
+
+        throw new SecurityException(
+                "Access denied: " + rawPath + " is not within any currently open project");
+    }
+
+    private void requireInsideAllowedRoots(final Path filePath, final List<Path> allowedRoots) {
+        final boolean inside = allowedRoots.stream().anyMatch(filePath::startsWith);
         if (!inside) {
             throw new SecurityException(
                     "Access denied: " + filePath + " is not within any currently open project");
         }
+    }
+
+    private List<Path> getAllowedRoots() {
+        final List<Path> roots = new ArrayList<>();
+        if (cwdService != null && cwdService.getCurrentWorkingDirectory() != null) {
+            roots.add(cwdService.getCurrentWorkingDirectory().toAbsolutePath().normalize());
+        }
+        final List<ProjectFolder> openProjects = ProjectFolder.list("loaded", true);
+        for (final ProjectFolder project : openProjects) {
+            if (project == null || project.getDirectory() == null || project.getDirectory().isBlank()) {
+                continue;
+            }
+            roots.add(Path.of(project.getDirectory()).toAbsolutePath().normalize());
+        }
+        return roots.stream().distinct().toList();
     }
 }

@@ -17,6 +17,7 @@ import com.sun.net.httpserver.*;
 
 import ac.uk.sussex.kn253.repository.LLMSettings;
 import ac.uk.sussex.kn253.services.ModelConfigService;
+import ac.uk.sussex.kn253.services.OllamaManagementService;
 import dev.langchain4j.model.chat.ChatModel;
 
 class OllamaChatModelProducerTest {
@@ -48,6 +49,7 @@ class OllamaChatModelProducerTest {
         final OllamaChatModelProducer producer = new OllamaChatModelProducer();
         producer.config = configWithDefaults("http://configured-host:11434");
         producer.modelConfigService = modelConfig;
+        producer.ollamaManagementService = new AlwaysHealthyManagementService();
 
         final ChatModel chatModelA = producer.produceChatModel();
 
@@ -79,6 +81,7 @@ class OllamaChatModelProducerTest {
         final OllamaChatModelProducer producer = new OllamaChatModelProducer();
         producer.config = configWithDefaults(endpointA.baseUrl());
         producer.modelConfigService = modelConfig;
+        producer.ollamaManagementService = new AlwaysHealthyManagementService();
 
         final ChatModel chatModel = producer.produceChatModel();
         assertTrue(chatModel.chat("first").contains("configured-endpoint"));
@@ -122,6 +125,13 @@ class OllamaChatModelProducerTest {
                         yield "";
                     }
                 }));
+    }
+
+    private static final class AlwaysHealthyManagementService extends OllamaManagementService {
+        @Override
+        public boolean isHealthy(final String baseUrl) {
+            return true;
+        }
     }
 
     private static final class MutableSettingsModelConfigService extends ModelConfigService {

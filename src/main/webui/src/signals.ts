@@ -2,13 +2,14 @@ import {
   apiDeleteDetailed,
   apiDetailed,
   apiPostDetailed,
+  apiPutDetailed,
   apiWithTimeoutDetailed,
   HttpResponseError,
 } from "./api";
 
-export type ApiSignalKey = `${string}:${string}`;
+export type ApiSignalKey = string;
 
-type ApiSignalMethod = "GET" | "POST"| "DELETE";
+type ApiSignalMethod = "GET" | "POST" | "PUT" | "DELETE";
 
 type ApiSignalEndpoint<TPayload> = string | ((payload: TPayload) => string);
 
@@ -74,7 +75,7 @@ export function registerApiSignal<TPayload = unknown>(
 }
 
 export function registerApiSignals(
-  entries: ReadonlyArray<[ApiSignalKey, AnySignalDefinition]>,
+  entries: ReadonlyArray<readonly [ApiSignalKey, AnySignalDefinition]>,
 ): void {
   for (const [key, definition] of entries) {
     signalRegistry.set(key, definition);
@@ -212,9 +213,21 @@ async function executeSignalRequest<TPayload, TResult>(
         ? apiWithTimeoutDetailed<TResult>(endpoint, timeoutMs)
         : apiDetailed<TResult>(endpoint);
     case "DELETE":
-      return apiDeleteDetailed<TResult>(endpoint, timeoutMs, mergedHeaders);
+      return apiDeleteDetailed<TResult>(
+        endpoint,
+        timeoutMs,
+        mergedHeaders,
+        payload,
+      );
     case "POST":
       return apiPostDetailed<TPayload, TResult>(
+        endpoint,
+        (payload || {}) as TPayload,
+        timeoutMs,
+        mergedHeaders,
+      );
+    case "PUT":
+      return apiPutDetailed<TPayload, TResult>(
         endpoint,
         (payload || {}) as TPayload,
         timeoutMs,

@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { apiPostTextStream, apiWithTimeout } from "./api";
@@ -15,10 +21,19 @@ import {
   ConfigurationModals,
 } from "./modules/configuration/ConfigurationMenus";
 import { useConfigurationMenus } from "./modules/configuration/useConfigurationMenus";
+import {
+  mergeFailuresById,
+  normalizeApiFailureMessage,
+  RetryableErrorCard,
+  toApiFailureState,
+} from "./modules/error-handling";
 import type {
   ChatMessage,
   FileWindowState,
   FileContentResponse,
+  FolderSummaryStatusResponse,
+  FolderSubsummaryResponse,
+  FolderSummaryResponse,
   FsBrowserEntry,
   IframeWindowState,
   WorkspaceResponse,
@@ -44,19 +59,16 @@ import {
   emitApiSignal,
   getSignalErrors,
   registerApiSignals,
-  retryFailedSignal,
   subscribeSignalErrors,
   subscribeSignalHtmlFrames,
-  type ApiSignalKey,
 } from "./signals";
+import { SIGNALS, getApiSignalDefinitions } from "./signalDefinitions";
 
 const MARKDOWN_FILE_PATTERN = /\.(md|markdown|mdx)$/i;
 const README_FILE_PATTERN = /^readme(\.(md|markdown|mdx|txt))?$/i;
 const ASSISTANT_ACTION_BLOCK_PATTERN = /```assistant-action\s*([\s\S]*?)```/gi;
 const REQUEST_SOURCE_CHAT_INPUT = "chat-input";
 const REQUEST_SOURCE_ASSISTANT_ACTION_BUTTON = "assistant-action-button";
-const CWD_GET_TIMEOUT_MS = 10_000;
-const OLLAMA_STARTUP_STATUS_TIMEOUT_MS = 1_500;
 const OLLAMA_STATUS_POLL_MS = 10_000;
 const MOBILE_LAYOUT_BREAKPOINT_PX = 1120;
 const MIN_LEFT_RAIL_WIDTH_PX = 220;
@@ -76,33 +88,6 @@ type ResizeDragState = {
   startRightWidth: number;
   startChatHeight: number;
 };
-
-function normalizeApiFailureMessage(
-  statusCode: number | undefined,
-  message: string,
-): string {
-  if (typeof statusCode === "number") {
-    return `${statusCode}: API unavailable`;
-  }
-  const statusMatch = /([1-5]\d{2}):\s*API unavailable/.exec(message || "");
-  if (statusMatch) {
-    return `${statusMatch[1]}: API unavailable`;
-  }
-  return message;
-}
-
-function mergeFailuresById(
-  existing: ApiFailureState[],
-  incoming: ApiFailureState[],
-): ApiFailureState[] {
-  const merged = new Map(existing.map((item) => [item.id, item]));
-  for (const item of incoming) {
-    merged.set(item.id, item);
-  }
-  return Array.from(merged.values()).sort((a, b) =>
-    a.timestamp.localeCompare(b.timestamp),
-  );
-}
 
 function estimateTokenCount(text: string): number {
   const matches = text.match(/\S+/g);
@@ -144,18 +129,6 @@ type AssistantActionPayload = {
   label: string;
   prompt: string;
 };
-
-const SIGNALS = {
-  TOOL_TELEMETRY_GET: "telemetry:get",
-  WORKSPACE_GET: "workspace:get",
-  PROJECT_LIST: "project:list",
-  PROJECT_OPEN: "project:open",
-  PROJECT_CLOSE: "project:close",
-  PROJECT_REMOTE_URL: "project:remote-url",
-  PROJECT_BROWSE: "project:browse",
-  PROJECT_FILE: "project:file",
-  CHAT_RESET: "chat:reset",
-} as const satisfies Record<string, ApiSignalKey>;
 
 export function App() {
   const appShellRef = useRef<HTMLElement | null>(null);
@@ -225,31 +198,46 @@ export function App() {
     [chatHeight, leftRailWidth, rightRailWidth],
   );
 
-  const nudgeShellResize = useCallback((type: ShellResizer, direction: -1 | 1) => {
-    if (window.innerWidth <= MOBILE_LAYOUT_BREAKPOINT_PX) {
-      return;
-    }
+  const nudgeShellResize = useCallback(
+    (type: ShellResizer, direction: -1 | 1) => {
+      if (window.innerWidth <= MOBILE_LAYOUT_BREAKPOINT_PX) {
+        return;
+      }
 
-    if (type === "left") {
-      setLeftRailWidth((current) =>
-        clamp(current + direction * 24, MIN_LEFT_RAIL_WIDTH_PX, MAX_LEFT_RAIL_WIDTH_PX),
+      if (type === "left") {
+        setLeftRailWidth((current) =>
+          clamp(
+            current + direction * 24,
+            MIN_LEFT_RAIL_WIDTH_PX,
+            MAX_LEFT_RAIL_WIDTH_PX,
+          ),
+        );
+        return;
+      }
+
+      if (type === "right") {
+        setRightRailWidth((current) =>
+          clamp(
+            current - direction * 24,
+            MIN_RIGHT_RAIL_WIDTH_PX,
+            MAX_RIGHT_RAIL_WIDTH_PX,
+          ),
+        );
+        return;
+      }
+
+      const shellHeight =
+        appShellRef.current?.clientHeight ?? window.innerHeight;
+      const maxChatHeight = Math.max(
+        MIN_CHAT_HEIGHT_PX,
+        Math.floor(shellHeight * MAX_CHAT_HEIGHT_RATIO),
       );
-      return;
-    }
-
-    if (type === "right") {
-      setRightRailWidth((current) =>
-        clamp(current - direction * 24, MIN_RIGHT_RAIL_WIDTH_PX, MAX_RIGHT_RAIL_WIDTH_PX),
+      setChatHeight((current) =>
+        clamp(current - direction * 24, MIN_CHAT_HEIGHT_PX, maxChatHeight),
       );
-      return;
-    }
-
-    const shellHeight = appShellRef.current?.clientHeight ?? window.innerHeight;
-    const maxChatHeight = Math.max(MIN_CHAT_HEIGHT_PX, Math.floor(shellHeight * MAX_CHAT_HEIGHT_RATIO));
-    setChatHeight((current) =>
-      clamp(current - direction * 24, MIN_CHAT_HEIGHT_PX, maxChatHeight),
-    );
-  }, []);
+    },
+    [],
+  );
 
   useEffect(() => {
     const handlePointerMove = (event: PointerEvent) => {
@@ -278,8 +266,12 @@ export function App() {
         return;
       }
 
-      const shellHeight = appShellRef.current?.clientHeight ?? window.innerHeight;
-      const maxChatHeight = Math.max(MIN_CHAT_HEIGHT_PX, Math.floor(shellHeight * MAX_CHAT_HEIGHT_RATIO));
+      const shellHeight =
+        appShellRef.current?.clientHeight ?? window.innerHeight;
+      const maxChatHeight = Math.max(
+        MIN_CHAT_HEIGHT_PX,
+        Math.floor(shellHeight * MAX_CHAT_HEIGHT_RATIO),
+      );
       const nextHeight = clamp(
         dragState.startChatHeight - (event.clientY - dragState.startY),
         MIN_CHAT_HEIGHT_PX,
@@ -355,7 +347,7 @@ export function App() {
     ProjectSummaryType[]
   > => {
     const projects = await emitApiSignal<void, ProjectFolderEntity[]>(
-      SIGNALS.PROJECT_LIST,
+      SIGNALS.WORKSPACE_LIST,
     );
     return Promise.all(projects.map(mapProjectEntityToSummary));
   }, [mapProjectEntityToSummary]);
@@ -372,65 +364,7 @@ export function App() {
   );
 
   useEffect(() => {
-    registerApiSignals([
-      [
-        SIGNALS.TOOL_TELEMETRY_GET,
-        { method: "GET", endpoint: "/api/tool-telemetry" },
-      ],
-      [
-        SIGNALS.WORKSPACE_GET,
-        {
-          method: "GET",
-          timeoutMs: CWD_GET_TIMEOUT_MS,
-          endpoint: (payload: { path?: string }) => {
-            const q = new URLSearchParams();
-            if (payload?.path) q.set("path", payload.path);
-            const s = q.toString();
-            return s ? `/api/workspace?${s}` : "/api/workspace";
-          },
-        },
-      ],
-      [SIGNALS.PROJECT_LIST, { method: "GET", endpoint: "/api/project" }],
-      [SIGNALS.PROJECT_OPEN, { method: "POST", endpoint: "/api/project" }],
-      [
-        SIGNALS.PROJECT_CLOSE,
-        {
-          method: "DELETE",
-          endpoint: (payload: { id: number }) => `/api/project/${payload.id}`,
-        },
-      ],
-      [
-        SIGNALS.PROJECT_REMOTE_URL,
-        {
-          method: "GET",
-          endpoint: (payload: { id: number }) =>
-            `/api/project/${payload.id}/remote-url`,
-        },
-      ],
-      [
-        SIGNALS.PROJECT_BROWSE,
-        {
-          method: "GET",
-          endpoint: (payload: { id: number; parentUuid?: string }) => {
-            const q = new URLSearchParams();
-            if (payload.parentUuid) q.set("parentUuid", payload.parentUuid);
-            const s = q.toString();
-            return s
-              ? `/api/project/${payload.id}/browse?${s}`
-              : `/api/project/${payload.id}/browse`;
-          },
-        },
-      ],
-      [
-        SIGNALS.PROJECT_FILE,
-        {
-          method: "GET",
-          endpoint: (payload: { id: number; entryUuid: string }) =>
-            `/api/project/${payload.id}/file?entryUuid=${encodeURIComponent(payload.entryUuid)}`,
-        },
-      ],
-      [SIGNALS.CHAT_RESET, { method: "POST", endpoint: "/api/chat/reset" }],
-    ]);
+    registerApiSignals(getApiSignalDefinitions());
   }, []);
 
   useEffect(() => {
@@ -438,7 +372,6 @@ export function App() {
       try {
         const status = await apiWithTimeout<OllamaRuntimeStatus>(
           "/api/menu/ollama/status",
-          OLLAMA_STARTUP_STATUS_TIMEOUT_MS,
         );
         setOllamaHealthy(status?.healthy ?? null);
         setOllamaEndpoint(status?.runtimeEndpoint || "");
@@ -462,36 +395,14 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    const toFailureState = (signalError: {
-      id: string;
-      signal: string;
-      endpoint: string;
-      message: string;
-      statusCode?: number;
-      contentType?: string | null;
-      timestamp: string;
-    }): ApiFailureState => ({
-      id: signalError.id,
-      signal: signalError.signal,
-      endpoint: signalError.endpoint,
-      message: normalizeApiFailureMessage(
-        signalError.statusCode,
-        signalError.message,
-      ),
-      statusCode: signalError.statusCode,
-      contentType: signalError.contentType,
-      timestamp: signalError.timestamp,
-      iframeWindowIds: [],
-    });
-
     // Capture failures that may have occurred before this component subscribed.
     setApiFailures((prev) =>
-      mergeFailuresById(prev, getSignalErrors().map(toFailureState)),
+      mergeFailuresById(prev, getSignalErrors().map(toApiFailureState)),
     );
 
     const unsubscribe = subscribeSignalErrors((signalError) => {
       setApiFailures((prev) =>
-        mergeFailuresById(prev, [toFailureState(signalError)]),
+        mergeFailuresById(prev, [toApiFailureState(signalError)]),
       );
     });
 
@@ -558,7 +469,7 @@ export function App() {
     setTelemetryLoading(true);
     try {
       const data = await emitApiSignal<void, ToolTelemetryResponse>(
-        SIGNALS.TOOL_TELEMETRY_GET,
+        SIGNALS.TELEMETRY,
       );
       setTelemetryItems(data.items || []);
       setTelemetrySummary(data.summary || "");
@@ -591,7 +502,7 @@ export function App() {
       setBrowserLoading(true);
       try {
         const data = await emitApiSignal<{ path?: string }, WorkspaceResponse>(
-          SIGNALS.WORKSPACE_GET,
+          SIGNALS.WORKSPACE,
           path ? { path } : {},
         );
         const targetPath = data.path || "";
@@ -670,8 +581,8 @@ export function App() {
       return;
     }
     try {
-      await emitApiSignal<{ id: number }, void>(SIGNALS.PROJECT_CLOSE, {
-        id: projectId,
+      await emitApiSignal<{ projectId: number }, void>(SIGNALS.PROJECT_CLOSE, {
+        projectId,
       });
     } catch {
       // non-fatal: local close should still succeed
@@ -724,9 +635,9 @@ export function App() {
       }
       try {
         const response = await emitApiSignal<
-          { id: number; parentUuid?: string },
+          { projectId: number; parentUuid?: string },
           BrowseResponse
-        >(SIGNALS.PROJECT_BROWSE, { id: projectId });
+        >(SIGNALS.PROJECT_BROWSE, { projectId });
         updateWindow(windowId, {
           entries: response.entries || [],
           entriesLoading: false,
@@ -896,9 +807,9 @@ export function App() {
 
       try {
         const file = await emitApiSignal<
-          { id: number; entryUuid: string },
+          { projectId: number; entryUuid: string },
           FileContentResponse
-        >(SIGNALS.PROJECT_FILE, { id: projectId, entryUuid });
+        >(SIGNALS.PROJECT_FILE, { projectId, entryUuid });
         setFileWindows((prev) =>
           prev.map((w) =>
             w.id === id
@@ -994,6 +905,8 @@ export function App() {
         selectedFileUuid: entryUuid,
         fileLoading: true,
         fileLoadingFolderSummary: false,
+        folderSummaryStatus: undefined,
+        folderViewMode: undefined,
         fileContentMarkdown:
           MARKDOWN_FILE_PATTERN.test(relativePath) ||
           README_FILE_PATTERN.test(relativePath),
@@ -1001,9 +914,9 @@ export function App() {
       });
       try {
         const file = await emitApiSignal<
-          { id: number; entryUuid: string },
+          { projectId: number; entryUuid: string },
           FileContentResponse
-        >(SIGNALS.PROJECT_FILE, { id: projectId, entryUuid });
+        >(SIGNALS.PROJECT_FILE, { projectId, entryUuid });
         updateWindow(windowId, {
           fileLoading: false,
           fileLoadingFolderSummary: false,
@@ -1041,8 +954,11 @@ export function App() {
 
       updateWindow(windowId, {
         selectedFilePath: safeRelativePath || ".",
+        selectedFileUuid: entryUuid,
         fileLoading: true,
         fileLoadingFolderSummary: true,
+        folderSummaryStatus: "idle",
+        folderViewMode: "preview",
         fileContentMarkdown: true,
         fileError: undefined,
       });
@@ -1069,10 +985,10 @@ export function App() {
           maxDepth = Math.max(maxDepth, next.depth);
 
           const response = await emitApiSignal<
-            { id: number; parentUuid?: string },
+            { projectId: number; parentUuid?: string },
             BrowseResponse
           >(SIGNALS.PROJECT_BROWSE, {
-            id: projectId,
+            projectId,
             parentUuid: next.uuid,
           });
 
@@ -1123,9 +1039,25 @@ export function App() {
           extensionTable,
         ].join("\n");
 
+        let summaryStatus: "idle" | "generated" = "idle";
+        try {
+          const status = await emitApiSignal<
+            { projectId: number; entryUuid: string },
+            FolderSummaryStatusResponse
+          >(SIGNALS.SUMMARY_STATUS, {
+            projectId,
+            entryUuid,
+          });
+          summaryStatus = status.exists ? "generated" : "idle";
+        } catch {
+          // best effort status check, do not block preview
+        }
+
         updateWindow(windowId, {
           fileLoading: false,
           fileLoadingFolderSummary: false,
+          folderSummaryStatus: summaryStatus,
+          folderViewMode: "preview",
           fileError: undefined,
           fileContent: preview,
           fileContentMarkdown: true,
@@ -1134,6 +1066,132 @@ export function App() {
         updateWindow(windowId, {
           fileLoading: false,
           fileLoadingFolderSummary: false,
+          folderSummaryStatus: "error",
+          folderViewMode: "preview",
+          fileContentMarkdown: false,
+          fileError: undefined,
+        });
+      }
+    },
+    [updateWindow],
+  );
+
+  const generateFolderSummary = useCallback(
+    async (
+      windowId: number,
+      relativePath: string,
+      entryUuid?: string | null,
+      projectId?: number,
+    ) => {
+      if (!entryUuid || !projectId) {
+        return;
+      }
+
+      const safeRelativePath = relativePath || ".";
+      updateWindow(windowId, {
+        selectedFilePath: safeRelativePath,
+        selectedFileUuid: entryUuid,
+        fileLoading: true,
+        fileLoadingFolderSummary: true,
+        folderSummaryStatus: "generating",
+        fileContentMarkdown: true,
+        fileError: undefined,
+      });
+
+      try {
+        const summary = await emitApiSignal<
+          { projectId: number; entryUuid: string },
+          FolderSummaryResponse
+        >(SIGNALS.SUMMARY_FOLDER, { projectId, entryUuid });
+
+        const renderedSummary = summary.fallbackReason
+          ? [
+              "# Summary Notice",
+              "",
+              summary.fallbackReason,
+              "",
+              summary.summary,
+            ].join("\n")
+          : summary.summary;
+
+        updateWindow(windowId, {
+          fileLoading: false,
+          fileLoadingFolderSummary: false,
+          folderSummaryStatus: "generated",
+          fileError: undefined,
+          fileContent: renderedSummary,
+          fileContentMarkdown: true,
+        });
+      } catch {
+        updateWindow(windowId, {
+          fileLoading: false,
+          fileLoadingFolderSummary: false,
+          folderSummaryStatus: "error",
+          fileError: undefined,
+        });
+      }
+    },
+    [updateWindow],
+  );
+
+  const showFolderSubsummaries = useCallback(
+    async (
+      windowId: number,
+      relativePath: string,
+      entryUuid?: string | null,
+      projectId?: number,
+    ) => {
+      if (!entryUuid || !projectId) {
+        return;
+      }
+
+      const safeRelativePath = relativePath || ".";
+      updateWindow(windowId, {
+        selectedFilePath: safeRelativePath,
+        selectedFileUuid: entryUuid,
+        fileLoading: true,
+        fileLoadingFolderSummary: true,
+        folderViewMode: "subsummaries",
+        fileContentMarkdown: true,
+        fileError: undefined,
+      });
+
+      try {
+        const response = await emitApiSignal<
+          { projectId: number; entryUuid: string },
+          FolderSubsummaryResponse
+        >(SIGNALS.SUMMARY_FILE, { projectId, entryUuid });
+
+        const section = [
+          "# Folder Subsummaries",
+          "",
+          `Path: ${response.folderPath}`,
+          `Count: ${response.count}`,
+          "",
+          ...(response.items.length === 0
+            ? ["No file-level subsummaries found yet."]
+            : response.items.flatMap((item, index) => [
+                `## ${index + 1}. ${item.targetPath}`,
+                "",
+                item.purpose || "(no purpose text)",
+                item.updatedAt ? `Updated: ${item.updatedAt}` : "",
+                "",
+              ])),
+        ].join("\n");
+
+        updateWindow(windowId, {
+          fileLoading: false,
+          fileLoadingFolderSummary: false,
+          folderViewMode: "subsummaries",
+          fileContent: section,
+          fileContentMarkdown: true,
+          fileError: undefined,
+        });
+      } catch {
+        updateWindow(windowId, {
+          fileLoading: false,
+          fileLoadingFolderSummary: false,
+          folderViewMode: "subsummaries",
           fileContentMarkdown: false,
           fileError: undefined,
         });
@@ -1149,28 +1207,12 @@ export function App() {
     [updateWindow],
   );
 
-  const [retryMessage, setRetryMessage] = useState<string | null>(null);
-
   const dismissApiError = useCallback((id: string) => {
     dismissSignalFailure(id);
     setApiFailures((prev) => prev.filter((entry) => entry.id !== id));
     setIframeWindows((prev) =>
       prev.filter((windowState) => windowState.failureId !== id),
     );
-  }, []);
-
-  const retryApiError = useCallback(async (id: string) => {
-    try {
-      await retryFailedSignal(id);
-    } catch {
-      // failed retries are surfaced via signal errors
-    } finally {
-      dismissSignalFailure(id);
-      setApiFailures((prev) => prev.filter((entry) => entry.id !== id));
-      setIframeWindows((prev) =>
-        prev.filter((windowState) => windowState.failureId !== id),
-      );
-    }
   }, []);
 
   const parseAssistantActionPayload = useCallback(
@@ -1215,7 +1257,6 @@ export function App() {
         { role: "user", content: message },
         { role: "assistant", content: "", id: placeholderId },
       ]);
-      setRetryMessage(null);
 
       setTimeout(() => {
         if (chatInputRef.current) chatInputRef.current.focus();
@@ -1224,7 +1265,7 @@ export function App() {
       let errorOccurred = false;
       startStreamingStats();
       await apiPostTextStream(
-        "/api/chat/stream",
+        "/api/chat",
         { message },
         {
           onChunk: (fragment) => {
@@ -1240,7 +1281,6 @@ export function App() {
           onError: (detail) => {
             errorOccurred = true;
             setChatUnavailable(true);
-            setRetryMessage(message);
             setChatMessages((prev) =>
               prev.map((msg) =>
                 msg.id === placeholderId
@@ -1248,12 +1288,17 @@ export function App() {
                   : msg,
               ),
             );
+            loadTelemetry().catch(() => {
+              // errors are surfaced by signal failure state
+            });
           },
           onDone: () => {
             if (!errorOccurred) {
               setChatUnavailable(false);
-              setRetryMessage(null);
             }
+            loadTelemetry().catch(() => {
+              // errors are surfaced by signal failure state
+            });
             finishStreamingStats();
             setChatLoading(false);
           },
@@ -1265,6 +1310,7 @@ export function App() {
       chatInput,
       chatLoading,
       finishStreamingStats,
+      loadTelemetry,
       startStreamingStats,
       updateStreamingStats,
     ],
@@ -1374,6 +1420,21 @@ export function App() {
               configLoading={configurationMenus.configLoading}
               onOpenConfiguration={configurationMenus.openConfiguration}
             />
+          }
+          statusContent={
+            menuPanels.pendingExitConfirmation ? (
+              <RetryableErrorCard
+                messages={[
+                  "Exit requested. Click Retry to confirm exit, or Dismiss to cancel.",
+                ]}
+                onDismiss={menuPanels.dismissExitConfirmation}
+                onRetry={() => {
+                  menuPanels.handleExit().catch(() => {
+                    // server shutdown is best-effort
+                  });
+                }}
+              />
+            ) : null
           }
           modalContent={
             <ConfigurationModals
@@ -1622,6 +1683,12 @@ export function App() {
                   win.project.id,
                 )
               }
+              onGenerateFolderSummary={(path, uuid) =>
+                generateFolderSummary(win.id, path, uuid, win.project.id)
+              }
+              onShowFolderSubsummaries={(path, uuid) =>
+                showFolderSubsummaries(win.id, path, uuid, win.project.id)
+              }
               onAssistantAction={(prompt) => {
                 sendChatMessage(
                   prompt,
@@ -1731,16 +1798,15 @@ export function App() {
         <ChatDock
           chatUnavailable={chatUnavailable}
           apiFailures={apiFailures}
+          iframeWindows={iframeWindows}
           chatMessages={chatMessages}
           chatLoading={chatLoading}
           chatInput={chatInput}
-          retryMessage={retryMessage}
           chatLogRef={chatLogRef}
           chatInputRef={chatInputRef}
           setChatUnavailable={setChatUnavailable}
           setChatInput={setChatInput}
           dismissApiError={dismissApiError}
-          retryApiError={retryApiError}
           sendChatMessage={sendChatMessage}
           resetChat={resetChat}
           renderAssistantMarkdown={renderAssistantMarkdown}

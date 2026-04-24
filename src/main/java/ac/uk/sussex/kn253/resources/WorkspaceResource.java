@@ -13,16 +13,23 @@ import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
 
 @jakarta.ws.rs.Path("/api/workspace")
 @ApplicationScoped
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
-public class WorkspaceApiResource {
+public class WorkspaceResource {
 
     @Inject
     CwdService cwdService;
+
+    public record WorkspaceProjectListItem(
+            long id,
+            String directory,
+            boolean loaded,
+            Object gitRepository,
+            Object githubRepository) {
+    }
 
     public record FsEntry(
             String name,
@@ -38,11 +45,21 @@ public class WorkspaceApiResource {
             List<FsEntry> entries) {
     }
 
-    @GET
-    @Transactional
-    public WorkspaceResponse getWorkspace(@QueryParam("path") final String path) {
+    private List<WorkspaceProjectListItem> listProjects() {
+        return ProjectFolder.<ProjectFolder>list("loaded", true).stream()
+                .map(project -> new WorkspaceProjectListItem(
+                        project.id,
+                        project.getDirectory(),
+                        project.isLoaded(),
+                        project.getGitRepository(),
+                        project.getGithubRepository()))
+                .toList();
+    }
+
+    private WorkspaceResponse workspace(final String path) {
         final ProjectFolder cwdProject = cwdService.getCurrentProject();
-        final Path cwdRoot = Path.of(cwdProject.getDirectory()).toAbsolutePath().normalize();
+        final Path cwdRoot = Path.of(cwdProject.getDirectory()).toAbsolutePath()
+                .normalize();
         final Path root = resolveRequestedPath(path, cwdRoot);
 
         final ProjectFolder projectForPath = ProjectFolder.<ProjectFolder>find("directory", root.toString())
@@ -53,14 +70,28 @@ public class WorkspaceApiResource {
         return new WorkspaceResponse(root.toString(), repoUrl, entries);
     }
 
+    @GET
+    @Transactional
+    public WorkspaceResponse get(
+            @QueryParam("path") final String path) {
+        return workspace(path);
+    }
+
+    @GET
+    @jakarta.ws.rs.Path("/list")
+    @Transactional
+    public List<WorkspaceProjectListItem> list() {
+        return listProjects();
+    }
+
     private Path resolveRequestedPath(final String requestedPath, final Path cwdRoot) {
         if (requestedPath == null || requestedPath.isBlank()) {
             return cwdRoot;
         }
 
         final Path path = Path.of(requestedPath).toAbsolutePath().normalize();
-        if (!path.isAbsolute() || !Files.exists(path) || !Files.isDirectory(path)) {
-            throw new WebApplicationException("Invalid workspace path", Response.Status.BAD_REQUEST);
+        if (!path.isAbsolute() || !cwdService.isFolderContained(path)) {
+            throw new BadRequestException("Invalid workspace path");
         }
         return path;
     }

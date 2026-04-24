@@ -3,7 +3,7 @@ package ac.uk.sussex.kn253.events;
 import ac.uk.sussex.kn253.repository.LLMSettings;
 
 /**
- * CDI event published when model configuration changes.
+ * CDI event payload for model-configuration change notifications.
  *
  * @param current the current model configuration
  */

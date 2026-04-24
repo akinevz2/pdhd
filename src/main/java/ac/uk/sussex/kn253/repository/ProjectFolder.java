@@ -10,10 +10,9 @@ import jakarta.persistence.*;
  * JPA entity representing a discovered software project.
  *
  * <p>
- * Each {@code Project} stores the absolute path to its root directory and
- * optional references to its {@link GitFolder} and
- * {@link GithubMetadata} metadata, plus an index of contained folders where
- * keys are folder UUIDs and values are relative folder paths.
+ * Each {@code ProjectFolder} stores the absolute path to its root directory,
+ * optional references to persisted Git and GitHub metadata, and an optional
+ * UUID-to-path index for discovered child folders.
  */
 @Entity
 public class ProjectFolder extends PanacheEntityBase {

@@ -24,6 +24,20 @@ public final class BackendSupport {
     /** Canonical hostname for GitHub. Used by {@code Origin#isGithub()}. */
     public static final String GITHUB_HOST = "github.com";
 
+    /** Canonical hostname for GitLab.com. Used by {@code Origin#isGitlab()}. */
+    public static final String GITLAB_HOST = "gitlab.com";
+
+    /**
+     * Canonical hostname for Bitbucket Cloud. Used by {@code Origin#isBitbucket()}.
+     */
+    public static final String BITBUCKET_HOST = "bitbucket.org";
+
+    /**
+     * Canonical hostname for Codeberg (Forgejo/Gitea public instance).
+     * Used for non-GitHub forge policy routing.
+     */
+    public static final String CODEBERG_HOST = "codeberg.org";
+
     // ── Web-search service ────────────────────────────────────────────────────
 
     /** Config property key that overrides the DuckDuckGo base URL. */

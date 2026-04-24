@@ -1,19 +1,22 @@
 import React from "react";
-import type { ApiFailureState, ChatMessage } from "../types";
+import {
+  RetryableErrorCard,
+  ErrorSummaryCard,
+} from "../modules/error-handling";
+import type { ApiFailureState, ChatMessage, IframeWindowState } from "../types";
 
 export type ChatDockProps = {
   chatUnavailable: boolean;
   apiFailures: ApiFailureState[];
+  iframeWindows: IframeWindowState[];
   chatMessages: ChatMessage[];
   chatLoading: boolean;
   chatInput: string;
-  retryMessage: string | null;
   chatLogRef: React.RefObject<HTMLDivElement>;
   chatInputRef: React.RefObject<HTMLTextAreaElement>;
   setChatUnavailable: (value: boolean) => void;
   setChatInput: (value: string) => void;
   dismissApiError: (id: string) => void;
-  retryApiError: (id: string) => Promise<void>;
   sendChatMessage: (overrideMessage?: string, source?: string) => Promise<void>;
   resetChat: () => Promise<void>;
   renderAssistantMarkdown: (content: string) => React.ReactNode;
@@ -22,16 +25,15 @@ export type ChatDockProps = {
 export function ChatDock({
   chatUnavailable,
   apiFailures,
+  iframeWindows,
   chatMessages,
   chatLoading,
   chatInput,
-  retryMessage,
   chatLogRef,
   chatInputRef,
   setChatUnavailable,
   setChatInput,
   dismissApiError,
-  retryApiError,
   sendChatMessage,
   resetChat,
   renderAssistantMarkdown,
@@ -44,17 +46,6 @@ export function ChatDock({
   );
   const hasNonApiErrorState = nonApiErrorMessages.length > 0;
 
-  const handleRetry = () => {
-    if (retryMessage) {
-      sendChatMessage(retryMessage).catch(() => {
-        // handled in callback
-      });
-      return;
-    }
-
-    setChatUnavailable(false);
-  };
-
   const handleDismiss = () => {
     setChatUnavailable(false);
   };
@@ -63,7 +54,7 @@ export function ChatDock({
     <section className="chat-dock panel">
       <div className="toolbar">
         <strong>Assistant Chat</strong>
-        <button onClick={() => resetChat()} disabled={chatLoading}>
+        <button onClick={resetChat} disabled={chatLoading}>
           Reset
         </button>
       </div>
@@ -102,63 +93,26 @@ export function ChatDock({
             <div className="chat-row assistant">Assistant is thinking...</div>
           )}
 
-          {apiFailures.map((apiFailure) => (
-            <div
-              key={apiFailure.id}
-              className="chat-errors"
-              role="alert"
-              aria-live="polite"
-            >
-              <p className="chat-error">
-                {apiFailure.message} [signal {apiFailure.signal}]
-              </p>
-              <div className="chat-retry-row">
-                <button
-                  className="retry-button"
-                  onClick={() => dismissApiError(apiFailure.id)}
-                  disabled={chatLoading}
-                >
-                  Dismiss
-                </button>
-                <button
-                  className="retry-button"
-                  onClick={() => {
-                    retryApiError(apiFailure.id).catch(() => {
-                      // handled in callback
-                    });
-                  }}
-                  disabled={chatLoading}
-                >
-                  Retry
-                </button>
-              </div>
-            </div>
-          ))}
+          {apiFailures.map((apiFailure) => {
+            const htmlWindow = iframeWindows.find(
+              (w) => w.failureId === apiFailure.id,
+            );
+            return (
+              <ErrorSummaryCard
+                key={apiFailure.id}
+                failure={apiFailure}
+                htmlErrorContent={htmlWindow?.html}
+                onDismiss={dismissApiError}
+              />
+            );
+          })}
 
           {hasNonApiErrorState && (
-            <div className="chat-errors" role="alert" aria-live="polite">
-              {nonApiErrorMessages.map((message, idx) => (
-                <p key={`${message}-${idx}`} className="chat-error">
-                  {message}
-                </p>
-              ))}
-              <div className="chat-retry-row">
-                <button
-                  className="retry-button"
-                  onClick={handleDismiss}
-                  disabled={chatLoading}
-                >
-                  Dismiss
-                </button>
-                <button
-                  className="retry-button"
-                  onClick={handleRetry}
-                  disabled={chatLoading}
-                >
-                  Retry
-                </button>
-              </div>
-            </div>
+            <RetryableErrorCard
+              messages={nonApiErrorMessages}
+              onDismiss={handleDismiss}
+              disabled={chatLoading}
+            />
           )}
         </div>
       </div>

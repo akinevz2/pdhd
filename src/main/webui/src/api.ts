@@ -36,25 +36,9 @@ function resolveRequestUrl(url: string): string {
     return url;
   }
 
-  if (typeof window === "undefined") {
-    return url;
-  }
-
-  // Keep absolute paths for normal root-served apps; prefix when hosted under a proxy subpath.
-  const pathname = window.location.pathname || "/";
-  if (pathname === "/") {
-    return url;
-  }
-
-  const basePath = pathname.endsWith("/")
-    ? pathname.slice(0, -1)
-    : pathname.slice(0, pathname.lastIndexOf("/"));
-
-  if (!basePath || basePath === "/" || url.startsWith(`${basePath}/`)) {
-    return url;
-  }
-
-  return `${basePath}${url}`;
+  // Treat leading-slash URLs as root-absolute API paths.
+  // Prefixing with the current pathname breaks API calls when the SPA route changes.
+  return url;
 }
 
 /**
@@ -129,6 +113,46 @@ export async function apiPostDetailed<TReq, TRes>(
 }
 
 /**
+ * Makes a PUT request with a JSON body and parses the JSON response.
+ * Returns an empty object for 204 No Content responses.
+ */
+export async function apiPut<TReq, TRes>(
+  url: string,
+  body: TReq,
+  timeoutMs?: number,
+  extraHeaders?: Record<string, string>,
+): Promise<TRes> {
+  const response = await apiPutDetailed<TReq, TRes>(
+    url,
+    body,
+    timeoutMs,
+    extraHeaders,
+  );
+  return response.data;
+}
+
+export async function apiPutDetailed<TReq, TRes>(
+  url: string,
+  body: TReq,
+  timeoutMs?: number,
+  extraHeaders?: Record<string, string>,
+): Promise<ApiResponseEnvelope<TRes>> {
+  const response = await fetchWithTimeout(
+    url,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...(extraHeaders || {}) },
+      body: JSON.stringify(body),
+    },
+    timeoutMs,
+  );
+  if (!response.ok) {
+    throw await buildHttpError(response);
+  }
+  return readResponseBody<TRes>(response);
+}
+
+/**
  * Makes a DELETE request and parses the JSON response.
  * Returns an empty object for 204 No Content responses.
  */
@@ -145,12 +169,18 @@ export async function apiDeleteDetailed<TRes>(
   url: string,
   timeoutMs?: number,
   extraHeaders?: Record<string, string>,
+  body?: unknown,
 ): Promise<ApiResponseEnvelope<TRes>> {
+  const hasBody = typeof body !== "undefined";
+  const headers = hasBody
+    ? { "Content-Type": "application/json", ...(extraHeaders || {}) }
+    : extraHeaders || {};
   const response = await fetchWithTimeout(
     url,
     {
       method: "DELETE",
-      headers: extraHeaders || {},
+      headers,
+      ...(hasBody ? { body: JSON.stringify(body) } : {}),
     },
     timeoutMs,
   );

@@ -30,4 +30,10 @@ public final class ToolSupport {
 
     /** Module name used by {@code WebSearchTools}. */
     public static final String MODULE_WEB_SEARCH = "WEB_SEARCH";
+
+    /** Module name used by summary parsing and fallback telemetry. */
+    public static final String MODULE_SUMMARY = "SUMMARY";
+
+    /** Module name used by {@code GitMetadataTools}. */
+    public static final String MODULE_GIT = "GIT";
 }

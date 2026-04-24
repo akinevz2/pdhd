@@ -1,4 +1,11 @@
-import type { Dispatch, ReactNode, SetStateAction } from "react";
+import {
+  useEffect,
+  useState,
+  type Dispatch,
+  type ReactNode,
+  type SetStateAction,
+} from "react";
+import { RetryableErrorCard } from "../error-handling";
 import type {
   OllamaRuntimeStatus,
   OllamaSettingField,
@@ -46,17 +53,13 @@ export function ConfigurationMenuButtons({
   onOpenConfiguration,
 }: ConfigurationMenuButtonsProps) {
   return (
-    <>
-      <button
-        className="menu-btn"
-        onClick={() => {
-          onOpenConfiguration().catch(() => {});
-        }}
-        disabled={configLoading}
-      >
-        {configLoading ? "Loading..." : "Configuration"}
-      </button>
-    </>
+    <button
+      className="menu-btn"
+      onClick={() => onOpenConfiguration().catch(() => {})}
+      disabled={configLoading}
+    >
+      {configLoading ? "Loading..." : "Configuration"}
+    </button>
   );
 }
 
@@ -79,6 +82,11 @@ export function ConfigurationModals({
   deleteModel,
   saveConfiguration,
 }: ConfigurationModalsProps) {
+  const [pendingPullModel, setPendingPullModel] = useState<string | null>(null);
+  const [pendingDeleteModel, setPendingDeleteModel] = useState<string | null>(
+    null,
+  );
+
   const fieldString = (key: string) => String(configForm?.[key] ?? "");
   const fieldNumber = (key: string) => {
     const raw = configForm?.[key];
@@ -92,6 +100,18 @@ export function ConfigurationModals({
       (FIELD_PRIORITY[left.key] ?? 100) - (FIELD_PRIORITY[right.key] ?? 100),
   );
   const selectedModel = fieldString("modelName");
+
+  useEffect(() => {
+    if (pendingPullModel && pendingPullModel !== selectedModel) {
+      setPendingPullModel(null);
+    }
+  }, [pendingPullModel, selectedModel]);
+
+  useEffect(() => {
+    if (pendingDeleteModel && pendingDeleteModel !== selectedModel) {
+      setPendingDeleteModel(null);
+    }
+  }, [pendingDeleteModel, selectedModel]);
 
   const renderField = (field: OllamaSettingField): ReactNode => {
     if (!configForm) {
@@ -179,42 +199,72 @@ export function ConfigurationModals({
             />
           )}
           {supportsManagedModels ? (
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button
-                onClick={() => refreshModels().catch(() => {})}
-                disabled={modelsLoading}
-              >
-                {modelsLoading ? "Refreshing..." : "Refresh Models"}
-              </button>
-              <button
-                onClick={() => {
-                  const requested = window.prompt(
-                    "Pull model",
-                    selectedModel || "",
-                  );
-                  const modelName = requested?.trim();
-                  if (modelName) {
+            <>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button
+                  onClick={() => refreshModels().catch(() => {})}
+                  disabled={modelsLoading}
+                >
+                  {modelsLoading ? "Refreshing..." : "Refresh Models"}
+                </button>
+                <button
+                  onClick={() => {
+                    if (!selectedModel) {
+                      return;
+                    }
+                    setPendingPullModel(selectedModel);
+                  }}
+                  disabled={modelsLoading || !selectedModel}
+                >
+                  Pull Model
+                </button>
+                <button
+                  onClick={() => {
+                    if (!selectedModel) {
+                      return;
+                    }
+                    setPendingDeleteModel(selectedModel);
+                  }}
+                  disabled={modelsLoading || !selectedModel}
+                >
+                  Delete Selected
+                </button>
+              </div>
+              {pendingPullModel && (
+                <RetryableErrorCard
+                  messages={[
+                    `Pull model ${pendingPullModel}? Click Retry to confirm pull, or Dismiss to cancel.`,
+                  ]}
+                  onDismiss={() => setPendingPullModel(null)}
+                  onRetry={() => {
+                    const modelName = pendingPullModel;
+                    setPendingPullModel(null);
+                    if (!modelName) {
+                      return;
+                    }
                     pullModel(modelName).catch(() => {});
-                  }
-                }}
-                disabled={modelsLoading}
-              >
-                Pull Model
-              </button>
-              <button
-                onClick={() => {
-                  if (!selectedModel) {
-                    return;
-                  }
-                  if (window.confirm(`Delete model ${selectedModel}?`)) {
-                    deleteModel(selectedModel).catch(() => {});
-                  }
-                }}
-                disabled={modelsLoading || !selectedModel}
-              >
-                Delete Selected
-              </button>
-            </div>
+                  }}
+                  disabled={modelsLoading}
+                />
+              )}
+              {pendingDeleteModel && (
+                <RetryableErrorCard
+                  messages={[
+                    `Delete model ${pendingDeleteModel}? Click Retry to confirm deletion, or Dismiss to cancel.`,
+                  ]}
+                  onDismiss={() => setPendingDeleteModel(null)}
+                  onRetry={() => {
+                    const modelName = pendingDeleteModel;
+                    setPendingDeleteModel(null);
+                    if (!modelName) {
+                      return;
+                    }
+                    deleteModel(modelName).catch(() => {});
+                  }}
+                  disabled={modelsLoading}
+                />
+              )}
+            </>
           ) : (
             <span className="form-hint">
               Model management is only available for the Ollama provider.

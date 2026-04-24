@@ -1,5 +1,6 @@
 package ac.uk.sussex.kn253.services;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -19,14 +20,72 @@ public class CwdService {
     @Inject
     Event<CwdResolvedEvent> cwdResolvedEvents;
 
-    private final Path cwd;
+    private final Path startupCwd;
+    private volatile Path cwd;
 
     public CwdService() {
-        this.cwd = Path.of(System.getProperty("user.dir"));
+        this.startupCwd = Path.of(System.getProperty("user.dir")).toAbsolutePath().normalize();
+        this.cwd = startupCwd;
     }
 
     public Path getCurrentWorkingDirectory() {
         return cwd;
+    }
+
+    public synchronized Path changeWorkingDirectory(final String directoryPath) {
+        if (directoryPath == null || directoryPath.isBlank()) {
+            throw new IllegalArgumentException("directoryPath is required");
+        }
+
+        final Path target = Path.of(directoryPath).toAbsolutePath().normalize();
+        if (!Files.exists(target)) {
+            throw new IllegalArgumentException("Directory does not exist: " + target);
+        }
+        if (!Files.isDirectory(target)) {
+            throw new IllegalArgumentException("Not a directory: " + target);
+        }
+        if (!isAllowedWorkingDirectory(target)) {
+            throw new IllegalArgumentException("Directory is outside allowed workspace roots: " + target);
+        }
+
+        cwd = target;
+        return cwd;
+    }
+
+    public boolean isFolderContained(final Path path) {
+        return isContained(path) && Files.exists(path) && Files.isDirectory(path);
+    }
+
+    public boolean isFileContained(final Path path) {
+        return isContained(path) && Files.exists(path) && Files.isRegularFile(path);
+    }
+
+    private boolean isContained(final Path path) {
+        if (path == null) {
+            return false;
+        }
+        try {
+            final Path normalized = path.toAbsolutePath().normalize();
+            if (normalized.startsWith(getCurrentWorkingDirectory().toAbsolutePath().normalize())) {
+                return true;
+            }
+            return getOpenProjectDirectories().stream()
+                    .map(Path::of)
+                    .map(candidate -> candidate.toAbsolutePath().normalize())
+                    .anyMatch(normalized::startsWith);
+        } catch (final Exception ignored) {
+            return false;
+        }
+    }
+
+    private boolean isAllowedWorkingDirectory(final Path target) {
+        if (target.startsWith(startupCwd)) {
+            return true;
+        }
+        return getOpenProjectDirectories().stream()
+                .map(Path::of)
+                .map(candidate -> candidate.toAbsolutePath().normalize())
+                .anyMatch(root -> target.startsWith(root) || root.startsWith(target));
     }
 
     @Transactional

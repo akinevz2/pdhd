@@ -3,9 +3,9 @@ import { apiPost } from "../api";
 
 export function useMenuPanels() {
   const [debugOpen, setDebugOpen] = useState(false);
+  const [pendingExitConfirmation, setPendingExitConfirmation] = useState(false);
 
-  const handleExit = useCallback(async () => {
-    if (!window.confirm("Exit the application?")) return;
+  const performExit = useCallback(async () => {
     try {
       await apiPost<Record<string, never>, unknown>("/api/menu/exit", {});
     } catch {
@@ -20,6 +20,7 @@ export function useMenuPanels() {
       } catch {
         // ignore
       }
+
       try {
         window.close();
       } catch {
@@ -28,9 +29,24 @@ export function useMenuPanels() {
     }, 120);
   }, []);
 
+  const handleExit = useCallback(async () => {
+    if (!pendingExitConfirmation) {
+      setPendingExitConfirmation(true);
+      return;
+    }
+    setPendingExitConfirmation(false);
+    await performExit();
+  }, [pendingExitConfirmation, performExit]);
+
+  const dismissExitConfirmation = useCallback(() => {
+    setPendingExitConfirmation(false);
+  }, []);
+
   return {
     debugOpen,
     setDebugOpen,
     handleExit,
+    pendingExitConfirmation,
+    dismissExitConfirmation,
   };
 }

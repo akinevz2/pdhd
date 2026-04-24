@@ -113,6 +113,34 @@ export type BrowseResponse = {
   entries: FsBrowserEntry[];
 };
 
+export type FolderSummaryResponse = {
+  folderPath: string;
+  summary: string;
+  analysedFiles: number;
+  skippedFiles: number;
+  updatedAt?: string | null;
+  fallbackReason?: string | null;
+  persisted: boolean;
+};
+
+export type FolderSubsummaryItem = {
+  targetPath: string;
+  purpose: string;
+  updatedAt?: string | null;
+};
+
+export type FolderSubsummaryResponse = {
+  folderPath: string;
+  count: number;
+  items: FolderSubsummaryItem[];
+};
+
+export type FolderSummaryStatusResponse = {
+  folderPath: string;
+  exists: boolean;
+  updatedAt?: string | null;
+};
+
 /** Response from the assistant chat API. */
 export type AssistantChatResponse = {
   reply: string;
@@ -185,6 +213,8 @@ export type WindowState = {
   fileContentMarkdown?: boolean;
   fileLoading?: boolean;
   fileLoadingFolderSummary?: boolean;
+  folderSummaryStatus?: "idle" | "generating" | "generated" | "error";
+  folderViewMode?: "preview" | "subsummaries";
   fileError?: string;
   x: number;
   y: number;

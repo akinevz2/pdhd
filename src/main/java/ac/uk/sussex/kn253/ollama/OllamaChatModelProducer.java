@@ -2,7 +2,10 @@ package ac.uk.sussex.kn253.ollama;
 
 import static dev.langchain4j.model.chat.Capability.RESPONSE_FORMAT_JSON_SCHEMA;
 
+import java.util.logging.Logger;
+
 import ac.uk.sussex.kn253.services.ModelConfigService;
+import ac.uk.sussex.kn253.services.OllamaManagementService;
 import dev.langchain4j.http.client.jdk.JdkHttpClientBuilder;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
@@ -20,11 +23,17 @@ import jakarta.inject.Inject;
 @ApplicationScoped
 public class OllamaChatModelProducer {
 
+        private static final Logger LOG = Logger.getLogger(OllamaChatModelProducer.class.getName());
+        private static final String DOCKER_INTERNAL_URL = "http://host.docker.internal:11434";
+
         @Inject
         OllamaConfig config;
 
         @Inject
         ModelConfigService modelConfigService;
+
+        @Inject
+        OllamaManagementService ollamaManagementService;
 
         /**
          * Produces the primary ChatModel bean used by @RegisterAiService.
@@ -73,12 +82,20 @@ public class OllamaChatModelProducer {
         }
 
         private String resolveBaseUrl(final String persistedBaseUrl) {
+                // Use persisted URL only if it's reachable; otherwise fall back to
+                // config/default
                 if (persistedBaseUrl != null && !persistedBaseUrl.isBlank()) {
-                        return persistedBaseUrl;
+                        final String trimmed = persistedBaseUrl.trim();
+                        if (ollamaManagementService.isHealthy(trimmed)) {
+                                return trimmed;
+                        }
+                        LOG.fine(() -> "Persisted Ollama endpoint unreachable: " + trimmed
+                                        + "; falling back to config");
                 }
+
                 return config.baseUrl()
                                 .filter(baseUrl -> !baseUrl.isBlank())
-                                .orElseThrow(() -> new IllegalStateException("No Ollama base URL configured."));
+                                .orElse(DOCKER_INTERNAL_URL);
         }
 
         private String resolveModelName(final String configuredModelName) {

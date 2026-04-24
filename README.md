@@ -23,7 +23,7 @@ This explicitly denotes a pre-release stabilization cycle before the first stabl
 
 - Java 25
 - Node.js and npm (for frontend development/build)
-- Optional: Ollama (for assistant chat features)
+- Ollama for `webui` startup and assistant-backed inspection flows
 - Optional: GitHub CLI (`gh`) for GitHub repository metadata lookup
 
 ## Run in Development Mode
@@ -50,34 +50,38 @@ java -jar target/pdhd-0.1.0-runner.jar
 
 The jar starts in production mode and listens on `http://0.0.0.0:8080`.
 
-## Application Modes
+## CLI Commands
 
-When started, the CLI shows:
+The Picocli entry point is `pdhd`.
 
-- `1` Launch assistant
-- `2` Launch web UI
-- `3` Configure Ollama
-- `4` Configure system prompt
-- `5` Exit
+- Running `pdhd` with no arguments defaults to the `webui` subcommand.
+- `pdhd webui` starts Quarkus, performs the launcher preflight check against the configured Ollama endpoint, and prints the local Web UI URL.
+- `pdhd configure` updates persisted Ollama settings non-interactively and skips the launcher preflight so broken Ollama configuration can be repaired.
+
+Example:
+
+```sh
+java -jar target/pdhd-0.1.0-runner.jar configure --base-url http://host.docker.internal:11434 --model llama3.2
+```
 
 ## Web UI Notes
 
 See `docs/frontend.md` for detailed frontend architecture, API integration, state model, and development workflow.
-For an end-to-end runtime narrative from launch to assistant functionality requests, see `docs/assistant-request-flow.md`.
-For assistant tooling internals and report-ready architecture notes, see `docs/tool-calling-architecture.md`.
+For current launcher and package-ownership notes, see `docs/architecture.md`.
+For API route conventions, see `docs/api-listing-specification.md`.
 For backend constants and extensibility patterns, see `docs/support-classes.md`.
 For the assistant TUI behaviour specification and pre-rewrite architecture review, see `docs/assistant-menu-rewrite-spec.md`.
 
 - The top bar shows the current working folder.
 - The left-hand `File Browser` is a compact explorer-style list for the current working folder.
-- Clicking `Refresh` in the file browser calls `/api/fs/list` for the current folder.
+- Refreshing the file browser reloads the current workspace view from the backend workspace endpoints.
 - Clicking `Up` changes the working folder to the parent directory.
 - Clicking a folder row in the file browser navigates into that folder.
 - Directory rows that resolve to a valid GitHub repository link show a visible `↗` pop-out button that opens the repository in the browser.
 - The project explorer window remains action-oriented:
   - `▸` folder runs a one-shot assistant summary for that folder
   - `●` file opens file content
-- Project discovery still starts from the current working folder and discovers Git projects recursively via `/api/projects`.
+- Project discovery still starts from the current working folder and registered/open project state exposed by the backend workspace and project resources.
 - Known projects can then be inspected repeatedly so PDHD can refine and recall their documented purpose over time.
 
 ## Screenshots
@@ -115,7 +119,7 @@ After `change_working_directory` runs:
 
 - `get_current_working_directory` reflects the new working directory.
 - Path-based tools default to the new working directory when `path` is omitted.
-- The Web UI "Working Folder" display updates via `/api/cwd` polling.
+- The Web UI "Working Folder" display updates from the `/api/workspace` view.
 
 ## Run Tests
 
@@ -128,7 +132,7 @@ Run all tests:
 Run a focused test class:
 
 ```sh
-./mvnw -Dtest=ProjectApiResourceTest test
+./mvnw -Dtest=SummaryResourceSubsummaryTest test
 ```
 
 ## Build Frontend Assets
@@ -143,6 +147,6 @@ npm run build
 
 ## Troubleshooting
 
-- If assistant model calls fail, verify Ollama endpoint/model settings in the configuration menu.
+- If assistant model calls fail, verify Ollama endpoint/model settings with the `configure` command.
 - If no projects appear, click `Refresh`; the current working folder should be auto-added on first run.
 - If the repository pop-out button is not shown for a folder, verify that the directory is a Git repository with a browsable `http` or `https` remote.
