@@ -1,3 +1,6 @@
+# Benchmarks
+benchlam_venv/
+
 #Javascript
 node_modules/
 
