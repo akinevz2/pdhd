@@ -233,7 +233,7 @@
         "verification": {
             "type": "judge",
             "rubric": "Evaluate if the poem is creative and mentions coding elements. Return only '1' for pass or '0' for fail.",
-            "judge_model": "llama3"
+            "judge_model": "llama3.1:latest"
         }
     },
     {

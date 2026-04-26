@@ -8,7 +8,7 @@ following the Graph Design Principles in scripts/doc/evidence.md:
                (Box + Strip overlay, annotated with n;
                 incorrect responses marked with a red cross ✕)
 
-  Figure 2  –  Cross-host head-to-head for gemma4:latest
+  Figure 2  –  Cross-host head-to-head for llama3.1:latest (shared model)
                (Box + Strip, faceted by test-case;
                 incorrect responses marked with a red cross ✕)
 
@@ -47,18 +47,33 @@ _SCRIPT_DIR = Path(__file__).parent
 _DEFAULT_DB = _SCRIPT_DIR.parent / "benchlam" / "results" / "benchmark_results.sqlite"
 _DEFAULT_OUT = _SCRIPT_DIR / "output"
 
-# Perceptually-uniform, colourblind-safe two-host palette
+# Perceptually-uniform, colourblind-safe two-host palette.
+# Each entry maps the ollama_host value stored in benchmark_host_snapshot to a
+# display colour and a short human label.  Add a new row whenever the lab
+# network changes or a new machine is introduced.
 HOST_PALETTE = {
-    "http://minifridge:11434": "#4878CF",  # blue
-    "http://ws-cvn:11434": "#D65F5F",      # red
-    "http://10.1.0.254:11434": "#4878CF",  # blue (minifridge by IP)
-    "http://10.1.0.1:11434": "#D65F5F",   # red  (ws-cvn by IP)
+    # Legacy entries (pre-2026-04 lab network)
+    "http://minifridge:11434": "#4878CF",
+    "http://ws-cvn:11434": "#D65F5F",
+    "http://10.1.0.254:11434": "#4878CF",
+    "http://10.1.0.1:11434": "#D65F5F",
+    # Current lab network (192.168.137.x, from 2026-04 onwards)
+    "http://host.docker.internal:11434": "#4878CF",  # blue – local host (dev-container view)
+    "http://192.168.137.1:11434": "#4878CF",          # blue – local host by LAN IP
+    "http://ws-raretower:11434": "#D65F5F",            # red  – second workstation by hostname
+    "http://192.168.137.55:11434": "#D65F5F",          # red  – second workstation by LAN IP
 }
 HOST_LABELS = {
+    # Legacy
     "http://minifridge:11434": "minifridge",
     "http://ws-cvn:11434": "ws-cvn",
     "http://10.1.0.254:11434": "minifridge",
     "http://10.1.0.1:11434": "ws-cvn",
+    # Current
+    "http://host.docker.internal:11434": "minifridge",
+    "http://192.168.137.1:11434": "minifridge",
+    "http://ws-raretower:11434": "ws-raretower",
+    "http://192.168.137.55:11434": "ws-raretower",
 }
 
 
@@ -268,18 +283,21 @@ def figure1_latency_by_model(df: pd.DataFrame, out_dir: Path):
 
 
 # ---------------------------------------------------------------------------
-# Figure 2 – Cross-host head-to-head: gemma4:latest
+# Figure 2 – Cross-host head-to-head: llama3.1:latest
 # ---------------------------------------------------------------------------
+
+_CROSSHOST_MODEL = "llama3.1:latest"
 
 def figure2_crosshost_gemma4(df: pd.DataFrame, out_dir: Path):
     """
-    gemma4:latest only.  Columns = test_case, x = host, y = latency (s).
+    llama3.1:latest only (cross-host comparison model).
+    Columns = test_case, x = host, y = latency (s).
     Side-by-side Box + Strip per host.
     """
     apply_base_style()
-    sub = df[df["model"] == "gemma4:latest"].copy()
+    sub = df[df["model"] == _CROSSHOST_MODEL].copy()
     if sub.empty:
-        print("[fig2] gemma4:latest not found in data, skipping.")
+        print(f"[fig2] {_CROSSHOST_MODEL} not found in data, skipping.")
         return
 
     test_cases = sorted(sub["test_case"].unique())
@@ -328,12 +346,12 @@ def figure2_crosshost_gemma4(df: pd.DataFrame, out_dir: Path):
         sns.despine(ax=ax)
 
     fig.suptitle(
-        "Figure 2 – Cross-Host Latency: gemma4:latest\n"
+        f"Figure 2 – Cross-Host Latency: {_CROSSHOST_MODEL}\n"
         "(Same model, different hardware)",
         fontsize=12, y=1.02,
     )
     fig.tight_layout()
-    out_path = out_dir / "fig2_crosshost_gemma4.png"
+    out_path = out_dir / "fig2_crosshost_llama3.1.png"
     fig.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
     print(f"[saved] {out_path}")

@@ -78,6 +78,7 @@ def run_maven_prompt_tests():
 
 # Configuration
 DEFAULT_OLLAMA_HOST = "http://localhost:11434"
+DEFAULT_PDHD_BASE_URL = "http://localhost:8080"
 OLLAMA_LIST_CMD = ["ollama", "list"]
 OLLAMA_PULL_CMD = ["ollama", "pull"]
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -245,6 +246,14 @@ def normalize_ollama_host(host):
     return normalized.rstrip("/")
 
 
+def normalize_pdhd_base_url(base_url):
+    """Normalizes PDHD base URLs like localhost:8080 to http://localhost:8080."""
+    normalized = base_url.strip()
+    if not normalized.startswith("http://") and not normalized.startswith("https://"):
+        normalized = f"http://{normalized}"
+    return normalized.rstrip("/")
+
+
 def host_slug(host):
     """Builds a filesystem-safe host token for artifact filenames."""
     value = extract_host_for_resolution(host).lower().strip()
@@ -259,6 +268,18 @@ def make_ollama_api_url(host):
 def make_ollama_base_url(host):
     """Builds the normalized Ollama host base URL."""
     return normalize_ollama_host(host)
+
+
+def make_pdhd_chat_url(base_url):
+    """Builds the PDHD chat endpoint URL for benchmark prompts."""
+    return f"{normalize_pdhd_base_url(base_url)}/api/chat"
+
+
+def make_pdhd_menu_url(base_url, operation):
+    """Builds PDHD menu operation URLs."""
+    normalized = normalize_pdhd_base_url(base_url)
+    op = operation if operation.startswith("/") else f"/{operation}"
+    return f"{normalized}/api/menu{op}"
 
 
 def ollama_cli_env(host):
@@ -351,6 +372,97 @@ def query_ollama(model_name, prompt, ollama_api_url):
         return None, 0
 
 
+def query_pdhd(prompt, pdhd_chat_url):
+    """Queries the PDHD chat API for a given prompt."""
+    payload = {
+        "message": prompt,
+    }
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "text/plain",
+    }
+    start_time = time.time()
+    try:
+        response = requests.post(pdhd_chat_url, json=payload, headers=headers, timeout=180)
+        response.raise_for_status()
+        latency = time.time() - start_time
+        return response.text, latency
+    except Exception as e:
+        print(f"Error querying PDHD chat API: {e}")
+        return None, 0
+
+
+def configure_pdhd_ollama_runtime(pdhd_base_url, ollama_host):
+    """Configures PDHD runtime provider to use the requested external Ollama host."""
+    if not ollama_host:
+        return True
+
+    runtime_url = make_pdhd_menu_url(pdhd_base_url, "/ollama/runtime/provider")
+    payload = {
+        "provider": "EXTERNAL",
+        "baseUrl": normalize_ollama_host(ollama_host),
+    }
+
+    try:
+        response = requests.post(runtime_url, json=payload, timeout=20)
+        response.raise_for_status()
+        print(f"[pdhd] Runtime Ollama host set to {payload['baseUrl']}", flush=True)
+        return True
+    except Exception as e:
+        print(f"[pdhd] Failed to set runtime Ollama host via {runtime_url}: {e}", flush=True)
+        return False
+
+
+def get_pdhd_ollama_configuration(pdhd_base_url):
+    """Returns PDHD Ollama configuration payload (best-effort)."""
+    url = make_pdhd_menu_url(pdhd_base_url, "/ollama")
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        payload = response.json()
+        return payload if isinstance(payload, dict) else {}
+    except Exception as exc:
+        print(f"[pdhd] Could not read runtime model configuration from {url}: {exc}", flush=True)
+        return {}
+
+
+def configure_pdhd_model(pdhd_base_url, model_name, base_url=None):
+    """Sets PDHD runtime model name (and optional base URL) before running prompts."""
+    if not model_name:
+        return False
+
+    settings = {
+        "modelName": model_name,
+    }
+    if base_url:
+        settings["baseUrl"] = normalize_ollama_host(base_url)
+
+    payload = {
+        "settings": settings,
+    }
+    config_url = make_pdhd_menu_url(pdhd_base_url, "/ollama")
+    try:
+        response = requests.post(config_url, json=payload, timeout=20)
+        response.raise_for_status()
+        print(f"[pdhd] Runtime model set to {model_name}", flush=True)
+        return True
+    except Exception as exc:
+        print(f"[pdhd] Failed to set runtime model via {config_url}: {exc}", flush=True)
+        return False
+
+
+def reset_pdhd_chat_memory(pdhd_base_url):
+    """Best-effort reset of PDHD chat memory before benchmark run."""
+    url = make_pdhd_chat_url(pdhd_base_url)
+    try:
+        response = requests.delete(url, timeout=10)
+        if response.status_code < 300:
+            print("[pdhd] Cleared chat memory before benchmark run.", flush=True)
+    except Exception:
+        # Non-fatal; benchmark can proceed without reset.
+        pass
+
+
 def safe_get_json(url, timeout_seconds=6):
     """GETs JSON endpoint with timeout and returns parsed object or None."""
     try:
@@ -408,6 +520,38 @@ def probe_host_snapshot(host):
         "max_running_size_vram_bytes": max(size_vram_values) if size_vram_values else 0,
         "tags_payload": json.dumps(tags_payload) if tags_payload is not None else "",
         "ps_payload": json.dumps(ps_payload) if ps_payload is not None else "",
+    }
+
+
+def probe_pdhd_snapshot(base_url):
+    """Collects PDHD host metadata for SQLite logging using existing schema columns."""
+    normalized_base_url = normalize_pdhd_base_url(base_url)
+    resolved_host = extract_host_for_resolution(normalized_base_url)
+    resolved_ip = ""
+    try:
+        resolved_ip = socket.gethostbyname(resolved_host)
+    except Exception:
+        resolved_ip = ""
+
+    api_reachable = False
+    try:
+        health = requests.get(f"{normalized_base_url}/q/health", timeout=6)
+        api_reachable = health.status_code < 500
+    except Exception:
+        api_reachable = False
+
+    return {
+        "ollama_host": normalized_base_url,
+        "resolved_host": resolved_host,
+        "resolved_ip": resolved_ip,
+        "api_reachable": api_reachable,
+        "ollama_version": "",
+        "available_models_count": 0,
+        "running_models_count": 0,
+        "total_running_size_vram_bytes": 0,
+        "max_running_size_vram_bytes": 0,
+        "tags_payload": "",
+        "ps_payload": "",
     }
 
 def verify_response(response, verification):
@@ -478,15 +622,156 @@ def resolve_target_models(host, models_override_csv, all_models, skip_pull=False
     return sorted(available - excluded)
 
 
-def run_benchmark(host, models_override_csv=None, all_models=False, skip_pull=False, test_cases_file=None, exclude_csv=None):
+def resolve_pdhd_target_models(pdhd_base_url, destination_ollama_host, models_override_csv, all_models, exclude_csv=None):
+    """Resolves PDHD benchmark model list from models known on the destination host."""
+    available = set(get_available_models(destination_ollama_host))
+    excluded = {m.strip() for m in (exclude_csv or "").split(",") if m.strip()}
+
+    if not available:
+        print(f"[benchmark] No models discovered on destination host {normalize_ollama_host(destination_ollama_host)}")
+        return []
+
+    if excluded:
+        print(f"[models] Excluding: {', '.join(sorted(excluded))}")
+
+    requested = [m.strip() for m in (models_override_csv or "").split(",") if m.strip()]
+    if requested:
+        missing = [m for m in requested if m not in available]
+        if missing:
+            print(
+                f"[benchmark] Requested PDHD model(s) missing on destination {normalize_ollama_host(destination_ollama_host)}: "
+                f"{', '.join(missing)}"
+            )
+            print(f"[benchmark] Available models: {', '.join(sorted(available))}")
+            return []
+        return [m for m in requested if m not in excluded]
+
+    selectable = sorted(available - excluded)
+    if all_models:
+        return selectable
+
+    config_payload = get_pdhd_ollama_configuration(pdhd_base_url)
+    configured_model = (config_payload.get("modelName") or "").strip()
+    if configured_model and configured_model in selectable:
+        return [configured_model]
+
+    preferred_defaults = ["llama3.1:latest", "qwen3.6:latest", "gemma4:latest"]
+    for candidate in preferred_defaults:
+        if candidate in selectable:
+            print(f"[benchmark] PDHD configured model '{configured_model or 'unset'}' is unavailable; using {candidate}.")
+            return [candidate]
+
+    fallback = selectable[0] if selectable else ""
+    if fallback:
+        print(f"[benchmark] PDHD configured model '{configured_model or 'unset'}' is unavailable; using {fallback}.")
+        return [fallback]
+    return []
+
+
+def preflight_judge_models(test_cases, judge_host, judge_fallback_model=None):
+    """Ensures every judge model exists before running tests.
+
+    When a requested judge model is absent and fallback exists, rewrites that
+    test case to use the fallback model.
+    """
+    available_judges = set(get_available_models(judge_host))
+    if not available_judges:
+        print(f"[judge] No models discovered on judge host {normalize_ollama_host(judge_host)}")
+        return False
+
+    if judge_fallback_model and judge_fallback_model not in available_judges:
+        print(
+            f"[judge] Fallback judge model '{judge_fallback_model}' is not available on "
+            f"{normalize_ollama_host(judge_host)}"
+        )
+        print(f"[judge] Available models: {', '.join(sorted(available_judges))}")
+        return False
+
+    missing = set()
+    rewrites = 0
+    for test_case in test_cases:
+        verification = test_case.get("verification", {})
+        if verification.get("type") != "judge":
+            continue
+
+        requested = (verification.get("judge_model") or "").strip()
+        if requested in available_judges:
+            continue
+
+        if judge_fallback_model:
+            verification["judge_model"] = judge_fallback_model
+            rewrites += 1
+            print(
+                f"[judge] {requested or '<unset>'} not available on {normalize_ollama_host(judge_host)}; "
+                f"using fallback {judge_fallback_model} for test '{test_case.get('name', '<unnamed>')}'."
+            )
+            continue
+
+        missing.add(requested or "<unset>")
+
+    if missing:
+        print(f"[judge] Missing judge model(s) on {normalize_ollama_host(judge_host)}: {', '.join(sorted(missing))}")
+        print(f"[judge] Available models: {', '.join(sorted(available_judges))}")
+        print("[judge] Aborting benchmark. Provide --judge-host and/or --judge-fallback-model.")
+        return False
+
+    if rewrites:
+        print(f"[judge] Applied fallback judge model to {rewrites} test(s).")
+    return True
+
+
+def run_benchmark(
+    host,
+    models_override_csv=None,
+    all_models=False,
+    skip_pull=False,
+    test_cases_file=None,
+    exclude_csv=None,
+    target="ollama",
+    pdhd_base_url=None,
+    pdhd_ollama_host=None,
+    judge_host=None,
+    judge_fallback_model=None,
+):
     run_started_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     run_id = datetime.now().strftime('%Y%m%d_%H%M%S') + "_" + uuid.uuid4().hex[:8]
     ollama_api_url = make_ollama_api_url(host)
-    host_snapshot = probe_host_snapshot(host)
+    pdhd_chat_url = make_pdhd_chat_url(pdhd_base_url or DEFAULT_PDHD_BASE_URL)
+    host_snapshot = probe_host_snapshot(host) if target == "ollama" else probe_pdhd_snapshot(pdhd_base_url or DEFAULT_PDHD_BASE_URL)
 
     resolved_test_cases_file = test_cases_file or DEFAULT_TEST_CASES_FILE
 
-    models = resolve_target_models(host, models_override_csv, all_models, skip_pull=skip_pull, exclude_csv=exclude_csv)
+    with open(resolved_test_cases_file, 'r') as f:
+        test_cases = json.load(f)
+
+    resolved_judge_host = judge_host
+    if not resolved_judge_host:
+        resolved_judge_host = "http://host.docker.internal:11434" if target == "pdhd" else host
+    resolved_judge_host = normalize_ollama_host(resolved_judge_host)
+
+    if not preflight_judge_models(test_cases, resolved_judge_host, judge_fallback_model=judge_fallback_model):
+        return
+
+    judge_api_url = make_ollama_api_url(resolved_judge_host)
+
+    if target == "ollama":
+        models = resolve_target_models(host, models_override_csv, all_models, skip_pull=skip_pull, exclude_csv=exclude_csv)
+    else:
+        if not configure_pdhd_ollama_runtime(pdhd_base_url or DEFAULT_PDHD_BASE_URL, pdhd_ollama_host):
+            print("[benchmark] Aborting: PDHD runtime Ollama host could not be configured.")
+            return
+        reset_pdhd_chat_memory(pdhd_base_url or DEFAULT_PDHD_BASE_URL)
+        if skip_pull:
+            print("[benchmark] --skip-pull is only relevant in --target ollama mode; ignoring.")
+        destination_host = pdhd_ollama_host or host
+        models = resolve_pdhd_target_models(
+            pdhd_base_url or DEFAULT_PDHD_BASE_URL,
+            destination_host,
+            models_override_csv,
+            all_models,
+            exclude_csv=exclude_csv,
+        )
+
     if not models:
         print("No models found to benchmark. Ensure Ollama is running and has models pulled.")
         return
@@ -503,9 +788,6 @@ def run_benchmark(host, models_override_csv=None, all_models=False, skip_pull=Fa
     if not maven_ok:
         print("[benchmark] Continuing with Ollama benchmarks despite test failures.")
 
-    with open(resolved_test_cases_file, 'r') as f:
-        test_cases = json.load(f)
-
     results = []
     
     os.makedirs(RESULTS_DIR, exist_ok=True)
@@ -516,16 +798,21 @@ def run_benchmark(host, models_override_csv=None, all_models=False, skip_pull=Fa
     csv_output_filename = f"benchmark_results_{slug}_{run_id}.csv"
     md_output_filename = f"leaderboard_{slug}_{run_id}.md"
 
-    available_model_set = set(models)
-
     for model in models:
+        if target == "pdhd":
+            if not configure_pdhd_model(pdhd_base_url or DEFAULT_PDHD_BASE_URL, model, base_url=pdhd_ollama_host):
+                print(f"[benchmark] Skipping model {model}: unable to configure PDHD runtime model.")
+                continue
         print(f"Benchmarking model: {model}", flush=True)
         for test_case in test_cases:
             print(f"  Running test: {test_case['name']}", flush=True)
             prompt = test_case['prompt']
             verification = test_case.get('verification', {})
             
-            response, latency = query_ollama(model, prompt, ollama_api_url)
+            if target == "ollama":
+                response, latency = query_ollama(model, prompt, ollama_api_url)
+            else:
+                response, latency = query_pdhd(prompt, pdhd_chat_url)
             
             if response is None:
                 continue
@@ -537,14 +824,10 @@ def run_benchmark(host, models_override_csv=None, all_models=False, skip_pull=Fa
                 correctness_score = 1 if re.search(pattern, response) else 0
             
             elif verification.get("type") == "judge":
-                requested_judge = verification.get("judge_model")
+                judge_model = verification.get("judge_model")
                 rubric = verification.get("rubric")
-                # Fall back to the model under test if the specified judge is unavailable
-                judge_model = requested_judge if requested_judge in available_model_set else model
-                if requested_judge and requested_judge != judge_model:
-                    print(f"  [judge] {requested_judge} not available; using {model} as judge.")
                 judge_prompt = f"Rubric: {rubric}\n\nResponse to evaluate:\n{response}\n\nReturn only '1' if it passes or '0' if it fails."
-                judge_response, _ = query_ollama(judge_model, judge_prompt, ollama_api_url)
+                judge_response, _ = query_ollama(judge_model, judge_prompt, judge_api_url)
                 if judge_response:
                     correctness_score = 1 if '1' in judge_response else 0
                 else:
@@ -622,9 +905,41 @@ def run_benchmark(host, models_override_csv=None, all_models=False, skip_pull=Fa
 def parse_args():
     parser = argparse.ArgumentParser(description="Benchmark Ollama models against prompt test cases.")
     parser.add_argument(
+        "--target",
+        choices=["ollama", "pdhd"],
+        default="ollama",
+        help="Benchmark target type: direct Ollama API or PDHD /api/chat endpoint.",
+    )
+    parser.add_argument(
         "--host",
         default=DEFAULT_OLLAMA_HOST,
         help="Ollama host, e.g. http://localhost:11434 or localhost:11434",
+    )
+    parser.add_argument(
+        "--pdhd-base-url",
+        default=DEFAULT_PDHD_BASE_URL,
+        help="PDHD base URL, e.g. http://localhost:8080 (used when --target pdhd).",
+    )
+    parser.add_argument(
+        "--pdhd-ollama-host",
+        default=None,
+        help="Ollama host to set in PDHD runtime before benchmark prompts (used when --target pdhd).",
+    )
+    parser.add_argument(
+        "--judge-host",
+        default=None,
+        help=(
+            "Ollama host used for judge-model evaluations. "
+            "Defaults to --host in ollama mode and host.docker.internal:11434 in pdhd mode."
+        ),
+    )
+    parser.add_argument(
+        "--judge-fallback-model",
+        default="llama3.1:latest",
+        help=(
+            "Fallback judge model used when a test case requests a missing judge model. "
+            "Set empty string to disable fallback and fail fast on missing judge models."
+        ),
     )
     parser.add_argument(
         "--all-models",
@@ -667,4 +982,9 @@ if __name__ == "__main__":
         skip_pull=args.skip_pull,
         test_cases_file=args.test_cases,
         exclude_csv=args.exclude_models,
+        target=args.target,
+        pdhd_base_url=args.pdhd_base_url,
+        pdhd_ollama_host=args.pdhd_ollama_host,
+        judge_host=args.judge_host,
+        judge_fallback_model=(args.judge_fallback_model.strip() if args.judge_fallback_model else None),
     )

@@ -50,13 +50,35 @@ Security boundary enforcement (`/etc/passwd` access denied) passed in all runs w
 2. `DEFAULT_TOOL_SYSTEM_PROMPT` (single sentence) provides no grounding: no tool list, no path conventions, no error-string contract.
 3. `gemma4:latest` may lack robust function-calling support; a tool-calling-capable model (e.g. `qwen2.5`, `mistral-nemo`) should be validated as an alternative.
 
-- [ ] **Audit and rewrite `@Tool`/`@P` descriptions** — All three registered tool classes (`ReadFileTools`, `WorkspaceContextTools`, `WebSearchTools`). Apply `pdhd-tool-grounding` skill. Priority: unblock S01/S02 CDI proxy echo.
-- [ ] **Harden `DEFAULT_TOOL_SYSTEM_PROMPT` in `LLMSettings`** — Must list tool dispatch names, path convention, error-string contract, and tool-call cap. Apply `pdhd-system-prompt-maintenance` skill.
-- [ ] **Add explicit `@Tool(name=...)` to methods using method-name fallback** — `getCurrentWorkingDirectory`, `getOpenProjectDirectories`, `searchWeb`.
-- [ ] **Validate a tool-calling-capable model** — Test `qwen2.5` or `mistral-nemo` at `host.docker.internal:11434` before re-running the full benchmark suite.
+- [x] **Audit and rewrite `@Tool`/`@P` descriptions** — Completed. All three tool classes grounded; explicit `@Tool(name=...)` added to all fallback methods. Fabrication-prevention wording removed (not a security control).
+- [x] **Replace `AiServices` tool dispatch with low-level implicit-context loop** — Completed in `services.ai` using manual `ChatRequest` + `ToolExecutionResultMessage` orchestration with eager implicit context injection for `getCurrentWorkingDirectory` and `getOpenProjectDirectories`. `./mvnw compile` passes (2026-04-26).
+- [x] **Harden `DEFAULT_TOOL_SYSTEM_PROMPT` in `LLMSettings`** — Completed with explicit tool dispatch names, path convention guidance, failed-call error-string contract, and a 4-call sequential cap. `./mvnw compile` passes (2026-04-26).
+- [x] **Pull models on ws-raretower** — All three pulled successfully (confirmed 2026-04-26). ws-raretower now has: `llama3.1:latest`, `qwen3.6:27b-q4_K_M`, `qwen3.6:latest`, `gemma4:31b-it-q4_K_M`, `gemma4:26b`.
+- [ ] **Run benchmark — leg 1 (local host)** — Run from inside the dev container once PDHD app is running in dev mode. Uses `host.docker.internal:11434`. All three cross-host models are present locally.
+  ```
+  python3 scripts/benchlam/benchmark_ollama.py \
+      --host http://host.docker.internal:11434 \
+      --models llama3.1:latest qwen3.6:latest qwen3.6:27b-q4_K_M \
+      --skip-pull \
+      --test-cases scripts/benchlam/pdhd_test_cases.json
+  ```
+  Results written to `scripts/benchlam/results/benchmark_results.sqlite`.
+- [ ] **Run benchmark — leg 2 (ws-raretower)** — Route confirmed via port forward: `http://ws-raretower:11434` is reachable from the dev container. Run after all three ws-raretower pulls complete. Cross-host comparison model is `llama3.1:latest`.
+  ```
+  python3 scripts/benchlam/benchmark_ollama.py \
+      --host http://ws-raretower:11434 \
+      --models llama3.1:latest qwen3.6:latest qwen3.6:27b-q4_K_M \
+      --skip-pull \
+      --test-cases scripts/benchlam/pdhd_test_cases.json
+  ```
+- [ ] **Generate comparative graphs** — Once both legs are recorded in the same SQLite DB, run the plot script from inside the dev container:
+  ```
+  python3 scripts/matplot/plot_benchmarks.py
+  ```
+  Outputs to `scripts/matplot/output/`. `HOST_LABELS` now maps `host.docker.internal` → `minifridge` and `192.168.137.55`/`ws-raretower` → `ws-raretower`.
 - [ ] **Enforce CODESTYLE on tool try-finally telemetry** — Manual `try-finally` blocks in all three tool classes violate `CODESTYLE.md`. Tracked as follow-on after stability work.
 
 ## Benchmark / Evaluation
 
-- [ ] Run `python3 scripts/benchlam/benchmark_ollama.py` — **Blocked** pending tool description and system prompt hardening above.
-- [ ] Review S08 security scenario pass rate after the HTTP-status-aware fix applied 2026-04-14 — **Blocked**, same dependency.
+- [ ] Run benchmark — see two-phase procedure above. **Unblocked** — all models confirmed on both hosts (2026-04-26). Ready to run legs 1 and 2.
+- [ ] Review S08 security scenario pass rate after the HTTP-status-aware fix applied 2026-04-14 — **Blocked** pending the post-validation benchmark run.

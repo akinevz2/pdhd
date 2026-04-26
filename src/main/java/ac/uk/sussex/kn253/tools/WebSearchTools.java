@@ -34,10 +34,15 @@ public class WebSearchTools {
     @Inject
     TelemetryService telemetryService;
 
-    @Tool("Run a web search and return top results (title + URL).")
+    @Tool(name = "searchWeb", value = {
+            "Executes a live DuckDuckGo web search and returns the top matching results as numbered title-and-URL pairs.",
+            " Call this tool when the user asks to search the web, find online resources, or look up information on the internet.",
+            " Does NOT read local files from disk — use readFile for that.",
+            " On success, returns a numbered list starting with 'Top results for: <query>\\n1. <title>\\n   <url>\\n...'.",
+            " On failure, returns a string starting with 'Web search failed:' or 'No results found for:'." })
     public String searchWeb(
-            @P("Search query") final String query,
-            @P("Maximum number of results to return (1-10)") final Integer maxResults) {
+            @P("The search query string. Must not be blank.") final String query,
+            @P("Maximum number of search results to return. Integer between 1 and 10 inclusive. Values outside this range are clamped. If omitted, defaults to 5.") final Integer maxResults) {
         final Instant started = Instant.now();
         String result = null;
         String errorClass = null;

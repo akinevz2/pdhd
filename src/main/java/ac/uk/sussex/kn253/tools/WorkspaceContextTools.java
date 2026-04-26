@@ -26,7 +26,12 @@ public class WorkspaceContextTools {
     @Inject
     TelemetryService telemetryService;
 
-    @Tool("Get the backend current working directory as an absolute path.")
+    @Tool(name = "getCurrentWorkingDirectory", value = {
+            "Returns the server-side current working directory as an absolute filesystem path string (e.g. '/home/user/projects/myapp').",
+            " Call this tool when the user asks about the current directory, working directory, or base path.",
+            " Do NOT use this tool to list directory contents — use listDirectoryContents instead.",
+            " On success, returns the absolute path as a plain string.",
+            " On failure, returns a string starting with 'Error getting working directory:'." })
     public String getCurrentWorkingDirectory() {
         final long started = System.nanoTime();
         String result = null;
@@ -52,7 +57,12 @@ public class WorkspaceContextTools {
         }
     }
 
-    @Tool("List the root directories of currently open projects.")
+    @Tool(name = "getOpenProjectDirectories", value = {
+            "Returns a list of absolute path strings for all currently open/loaded project root directories.",
+            " Call this tool when the user asks which projects are open, available, or loaded.",
+            " Do NOT use this to get the current working directory — use getCurrentWorkingDirectory for that.",
+            " On success, returns a list of absolute path strings (may be empty if no projects are loaded).",
+            " On failure, returns a single-element list containing a string starting with 'Error listing project directories:'." })
     @Transactional
     public List<String> getOpenProjectDirectories() {
         final long started = System.nanoTime();
@@ -79,10 +89,13 @@ public class WorkspaceContextTools {
     }
 
     @Tool(name = "listDirectoryContents", value = {
-            "List direct files and folders from a directory path. If blank, use the current working directory."
-    })
+            "Lists the immediate (non-recursive) children of a directory, showing files as '[F] name' and subdirectories as '[D] name'.",
+            " Call this tool to browse top-level directory contents.",
+            " Use list_files_recursive instead when you need to search all nested files.",
+            " On success, returns a string starting with 'Directory: <path>' followed by sorted entries.",
+            " On failure, returns a string starting with 'Error listing directory:'." })
     public String listDirectoryContents(
-            @P("Directory path to list. If blank, current working directory is used.") final String directoryPath) {
+            @P("Absolute or relative directory path to list. If blank or omitted, the current working directory is used. Relative paths are resolved from the current working directory.") final String directoryPath) {
         final long started = System.nanoTime();
         String result = null;
         String errorClass = null;
@@ -138,10 +151,13 @@ public class WorkspaceContextTools {
     }
 
     @Tool(name = "change_working_directory", value = {
-            "Change the backend working directory to a validated directory within known workspace roots."
-    })
+            "Changes the server-side working directory to the given path, which must be inside a known open project root.",
+            " Call this tool when the user explicitly asks to change, switch, or navigate to a different directory.",
+            " Does NOT list or read directory contents — use listDirectoryContents or readFile for that.",
+            " On success, returns a string starting with 'Current working directory changed to: <path>'.",
+            " On failure, returns a string starting with 'Error changing working directory:'." })
     public String changeWorkingDirectory(
-            @P("Directory path to switch to.") final String directoryPath) {
+            @P("Absolute or relative path of the directory to switch to. Must resolve to a directory within an open project root. Required — must not be blank.") final String directoryPath) {
         final long started = System.nanoTime();
         String result = null;
         String errorClass = null;
@@ -175,11 +191,14 @@ public class WorkspaceContextTools {
     }
 
     @Tool(name = "list_files_recursive", value = {
-            "Recursively list files under a directory with a maximum number of results."
-    })
+            "Recursively lists all regular files under a directory tree, sorted by path, up to a configurable limit.",
+            " Call this tool to discover nested files or explore a project's full file tree.",
+            " Use listDirectoryContents instead when you only need top-level directory entries.",
+            " On success, returns a string starting with 'Directory: <path>\\nFiles listed: <count> (limit <n>)' followed by relative file paths.",
+            " On failure, returns a string starting with 'Error listing files recursively:'." })
     public String listFilesRecursive(
-            @P("Directory path to scan. If blank, current working directory is used.") final String directoryPath,
-            @P("Maximum files to include in the result. Defaults to 200, min 1, max 1000.") final Integer maxResults) {
+            @P("Absolute or relative directory path to scan. If blank or omitted, the current working directory is used. Relative paths are resolved from the current working directory.") final String directoryPath,
+            @P("Maximum number of files to include. Integer between 1 and 1000 inclusive. If omitted, defaults to 200.") final Integer maxResults) {
         final long started = System.nanoTime();
         String result = null;
         String errorClass = null;
@@ -227,10 +246,13 @@ public class WorkspaceContextTools {
     }
 
     @Tool(name = "analyze_path_detailed", value = {
-            "Return detailed metadata and a compact preview for a file or directory path."
-    })
+            "Returns detailed metadata for a file or directory: type, readable/writable flags, size, last-modified time, MIME type (for files), and either a content preview or a child listing (up to 30 entries for directories).",
+            " Call this tool when you need to inspect file metadata or get a quick preview without reading the full file.",
+            " Use readFile to retrieve complete file contents. Use summarize_path for a lighter-weight count-only summary.",
+            " On success, returns a multi-line string starting with 'Path: <absolute-path>'.",
+            " On failure, returns a string starting with 'Error analyzing path:'." })
     public String analyzePathDetailed(
-            @P("Path to inspect. If blank, current working directory is used.") final String path) {
+            @P("Absolute or relative path of the file or directory to inspect. If blank or omitted, the current working directory is used. Must be within an open project root.") final String path) {
         final long started = System.nanoTime();
         String result = null;
         String errorClass = null;
@@ -298,10 +320,13 @@ public class WorkspaceContextTools {
     }
 
     @Tool(name = "summarize_path", value = {
-            "Summarize a file or directory quickly with lightweight counts and metadata."
-    })
+            "Returns a lightweight summary of a file or directory: for directories, total file and subdirectory counts; for files, size, MIME type, and a short content preview.",
+            " Call this tool for a quick structural overview without reading the full file.",
+            " Use readFile for complete file contents. Use analyze_path_detailed for full metadata including last-modified time.",
+            " On success, returns a string starting with 'Directory summary' or 'File summary'.",
+            " On failure, returns a string starting with 'Error summarizing path:'." })
     public String summarizePath(
-            @P("Path to summarize. If blank, current working directory is used.") final String path) {
+            @P("Absolute or relative path to summarize. If blank or omitted, the current working directory is used. Must be within an open project root.") final String path) {
         final long started = System.nanoTime();
         String result = null;
         String errorClass = null;

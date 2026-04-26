@@ -25,9 +25,15 @@ public class ReadFileTools {
     @Inject
     TelemetryService telemetryService;
 
-    @Tool("Read the contents of a file from an absolute or relative path. The tool normalizes and enforces project-boundary security internally.")
+    @Tool(name = "readFile", value = {
+            "Reads and returns the complete raw text content of a file.",
+            " Call this tool for any request that requires knowing what a file actually contains: source code, configuration, README text, build files, etc.",
+            " Does NOT list directory contents — use listDirectoryContents or listFilesRecursive for that.",
+            " On success, returns the full file content as a plain string.",
+            " On failure or access denial, returns a string starting with 'Error reading file:', 'Access denied:', or 'Error: path must not be blank'." })
     @Transactional
-    public String readFile(@P("Path to the file (absolute or relative)") final String path) {
+    public String readFile(
+            @P("Path to the file to read. Accepts absolute paths or relative paths resolved against any open project root. Must not be blank. If a relative path matches files in multiple open projects, the first match is returned.") final String path) {
         final long started = System.nanoTime();
         String result = null;
         String errorClass = null;

@@ -2,7 +2,17 @@ SHELL := /bin/sh
 
 MVNW := ./mvnw
 
-.PHONY: help clean version bump-version package run dev release release-copilot-commit
+.PHONY: help clean version bump-version package run dev bench release release-copilot-commit
+
+OLLAMA_HOST ?= http://ws-raretower:11434
+PDHD_BASE_URL ?= http://localhost:8080
+BENCH_TEST_CASES ?= scripts/benchlam/pdhd_test_cases.json
+BENCH_MODELS ?= llama3.1:latest
+BENCH_ALL_MODELS ?= 0
+BENCH_SKIP_PULL ?= 0
+BENCH_JUDGE_HOST ?= http://host.docker.internal:11434
+BENCH_JUDGE_FALLBACK_MODEL ?= llama3.1:latest
+BENCH_PYTHON ?= python3
 
 help:
 	@echo "Targets:"
@@ -12,8 +22,20 @@ help:
 	@echo "  make package       - build runner jar (skip tests)"
 	@echo "  make run           - run the built runner jar in prod profile"
 	@echo "  make dev           - run Quarkus dev mode (enables /q/dev-ui)"
+	@echo "  make bench         - run benchmark harness against PDHD API base URL"
 	@echo "  make release                 - bump version, package, and run"
 	@echo "  make release-copilot-commit  - stage all changes and use gh copilot to commit"
+	@echo ""
+	@echo "Benchmark variables:"
+	@echo "  OLLAMA_HOST=<url>                 (Ollama runtime host for PDHD, default: $(OLLAMA_HOST))"
+	@echo "  PDHD_BASE_URL=<url>               (PDHD API base URL, default: $(PDHD_BASE_URL))"
+	@echo "  BENCH_TEST_CASES=<path>           (default: $(BENCH_TEST_CASES))"
+	@echo "  BENCH_MODELS=model1,model2        (default: $(BENCH_MODELS))"
+	@echo "  BENCH_ALL_MODELS=1                (benchmark all discovered models)"
+	@echo "  BENCH_SKIP_PULL=1                 (skip pulling missing models)"
+	@echo "  BENCH_JUDGE_HOST=<url>            (judge host, default: $(BENCH_JUDGE_HOST))"
+	@echo "  BENCH_JUDGE_FALLBACK_MODEL=<name> (default: $(BENCH_JUDGE_FALLBACK_MODEL))"
+	@echo "  BENCH_PYTHON=<python-executable>  (default: $(BENCH_PYTHON))"
 
 clean:
 	@find target -maxdepth 1 -type f -name 'pdhd-*-runner.jar' -delete
@@ -53,6 +75,25 @@ run:
 
 dev:
 	@TESTCONTAINERS_RYUK_DISABLED=true $(MVNW) quarkus:dev
+
+bench:
+	@set -e; \
+	if printf '%s' "$(OLLAMA_HOST)" | grep -q ','; then \
+		echo "bench expects a single OLLAMA_HOST for PDHD runtime configuration."; \
+		echo "Received: $(OLLAMA_HOST)"; \
+		exit 1; \
+	fi; \
+	CMD="$(BENCH_PYTHON) scripts/benchlam/benchmark_ollama.py --target pdhd --pdhd-base-url \"$(PDHD_BASE_URL)\" --pdhd-ollama-host \"$(OLLAMA_HOST)\" --test-cases \"$(BENCH_TEST_CASES)\" --judge-host \"$(BENCH_JUDGE_HOST)\" --judge-fallback-model \"$(BENCH_JUDGE_FALLBACK_MODEL)\""; \
+	if [ "$(BENCH_ALL_MODELS)" = "1" ]; then \
+		CMD="$$CMD --all-models"; \
+	elif [ -n "$(BENCH_MODELS)" ]; then \
+		CMD="$$CMD --models \"$(BENCH_MODELS)\""; \
+	fi; \
+	if [ "$(BENCH_SKIP_PULL)" = "1" ]; then \
+		CMD="$$CMD --skip-pull"; \
+	fi; \
+	echo "Running: $$CMD"; \
+	eval $$CMD
 
 release: bump-version package run
 debug: package run

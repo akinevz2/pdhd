@@ -5,7 +5,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Logger;
 
-import ac.uk.sussex.kn253.services.CwdService;
+import ac.uk.sussex.kn253.ollama.OllamaConfig;
+import ac.uk.sussex.kn253.repository.LLMSettings;
+import ac.uk.sussex.kn253.services.*;
 import ac.uk.sussex.kn253.services.ai.ProjectAssistant;
 import ac.uk.sussex.kn253.services.ai.WebUiChatMemoryProviderSupplier;
 import dev.langchain4j.service.TokenStream;
@@ -15,6 +17,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 
 @jakarta.ws.rs.Path("/api/chat")
 @ApplicationScoped
@@ -34,6 +37,15 @@ public class ChatResource {
     @Inject
     CwdService cwdService;
 
+    @Inject
+    ModelConfigService modelConfigService;
+
+    @Inject
+    OllamaManagementService ollamaManagementService;
+
+    @Inject
+    OllamaConfig ollamaConfig;
+
     @POST
     @Produces(MediaType.TEXT_PLAIN)
     @org.jboss.resteasy.reactive.RestStreamElementType(MediaType.TEXT_PLAIN)
@@ -41,6 +53,8 @@ public class ChatResource {
         if (request == null || request.message() == null || request.message().isBlank()) {
             throw new BadRequestException("message must not be blank");
         }
+
+        ensureChatRuntimeReady();
 
         if (containsDisallowedAbsolutePath(request.message())) {
             return Multi.createFrom().item(
@@ -149,6 +163,32 @@ public class ChatResource {
             return "";
         }
         return rawToken.substring(start, end + 1);
+    }
+
+    private void ensureChatRuntimeReady() {
+        final LLMSettings settings = modelConfigService.load();
+        final String configuredBaseUrl = settings.getBaseUrl();
+        final String configuredModelName = settings.getModelName();
+        final String resolvedModelName = (configuredModelName != null && !configuredModelName.isBlank())
+                ? configuredModelName.trim()
+                : ollamaConfig.modelName();
+        final String resolvedBaseUrl = (configuredBaseUrl != null && !configuredBaseUrl.isBlank())
+                ? configuredBaseUrl.trim()
+                : ollamaConfig.baseUrl().orElse("<default>");
+
+        if (!ollamaManagementService.isHealthy(configuredBaseUrl)) {
+            throw new ServiceUnavailableException(Response.status(Response.Status.SERVICE_UNAVAILABLE)
+                    .type(MediaType.TEXT_PLAIN)
+                    .entity("Ollama backend unavailable at " + resolvedBaseUrl)
+                    .build());
+        }
+
+        if (!ollamaManagementService.isModelAvailable(configuredBaseUrl, resolvedModelName)) {
+            throw new ServiceUnavailableException(Response.status(Response.Status.SERVICE_UNAVAILABLE)
+                    .type(MediaType.TEXT_PLAIN)
+                    .entity("Configured model '" + resolvedModelName + "' is not available at " + resolvedBaseUrl)
+                    .build());
+        }
     }
 
     private boolean isLeadingWrapper(final char c) {

@@ -21,11 +21,15 @@ import jakarta.persistence.*;
 @Table(name = "ollama_settings")
 public class LLMSettings extends PanacheEntityBase {
 
-    public static final String DEFAULT_SYSTEM_PROMPT = "You are PDHD, an AI assistant specialising in software project analysis and discovery. "
-            + "You are helpful, focused and technically precise.";
+    public static final String DEFAULT_SYSTEM_PROMPT = "You are PDHD, an AI assistant for software project analysis and filesystem discovery. "
+            + "Stay within project-analysis scope; do not answer unrelated general chat from prior knowledge. "
+            + "Prefer tool-retrieved evidence over assumptions, and if evidence is missing, state what tool call is needed.";
 
-    public static final String DEFAULT_TOOL_SYSTEM_PROMPT = "When using tools, be precise and efficient. "
-            + "Only call tools when necessary to answer the user's question.";
+    public static final String DEFAULT_TOOL_SYSTEM_PROMPT = "Available tool names: listDirectoryContents, change_working_directory, list_files_recursive, analyze_path_detailed, summarize_path, readFile, searchWeb. "
+            + "Use absolute paths within open project roots when possible; if using relative paths, resolve from the current working directory and verify directory context before composing deeper paths. "
+            + "Call tools only when needed, with minimum required arguments. "
+            + "If a tool result starts with 'Error:' or 'Access denied:', treat it as a failed call and do not use it as evidence. "
+            + "Use at most 4 sequential tool calls before reporting findings, blockers, or next required input.";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
