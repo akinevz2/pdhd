@@ -8,6 +8,7 @@ import org.jboss.logging.Logger;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import ac.uk.sussex.kn253.AiToolCallException;
 import ac.uk.sussex.kn253.repository.*;
 import ac.uk.sussex.kn253.services.TelemetryService;
 import ac.uk.sussex.kn253.support.ToolSupport;
@@ -19,8 +20,10 @@ import jakarta.transaction.Transactional;
 public class FileSummarisationPipelineService {
 
     private static final Logger LOG = Logger.getLogger(FileSummarisationPipelineService.class);
-    private static final String BLANK_SUMMARY_FALLBACK = "No summary content was returned by the summarisation step.";
     private static final String EMPTY_PURPOSE_FALLBACK = "Summary payload did not include a purpose; using fallback summary text.";
+    private static final String ERR_BLANK_SUMMARY_OUTPUT = "Model returned blank summarisation output";
+    private static final String ERR_MALFORMED_SUMMARY_JSON = "Malformed JSON in summarisation model output";
+    private static final String ERR_NON_OBJECT_SUMMARY_JSON = "Model returned non-object JSON in summarisation output";
 
     private final AtomicLong parseSuccessCount = new AtomicLong();
     private final AtomicLong parseFallbackCount = new AtomicLong();
@@ -69,25 +72,13 @@ public class FileSummarisationPipelineService {
     private ParsedPayload parsePayload(final String rawSummary) {
         final String fallbackPurpose = rawSummary == null ? "" : rawSummary.trim();
         if (fallbackPurpose.isBlank()) {
-            parseFallbackCount.incrementAndGet();
-            return new ParsedPayload(
-                    new StructuredSummaryStoreService.StructuredSummaryPayload(BLANK_SUMMARY_FALLBACK, List.of(),
-                            List.of()),
-                    "blank_output_fallback",
-                    "Summary output was blank; a deterministic fallback summary was stored.",
-                    true);
+            throw new AiToolCallException(ERR_BLANK_SUMMARY_OUTPUT);
         }
 
         try {
             final JsonNode root = objectMapper.readTree(rawSummary);
             if (root == null || !root.isObject()) {
-                parseFallbackCount.incrementAndGet();
-                return new ParsedPayload(
-                        new StructuredSummaryStoreService.StructuredSummaryPayload(fallbackPurpose, List.of(),
-                                List.of()),
-                        "non_object_payload_fallback",
-                        "Summary output was not a JSON object; raw summary text was used as fallback.",
-                        true);
+                throw new AiToolCallException(ERR_NON_OBJECT_SUMMARY_JSON, null, rawSummary);
             }
 
             final String purpose = readText(root.get("purpose"), fallbackPurpose);
@@ -111,13 +102,10 @@ public class FileSummarisationPipelineService {
                     usedFallback ? "json_payload_with_fallback" : "json_payload",
                     fallbackReason,
                     usedFallback);
-        } catch (final Exception ignored) {
-            parseFallbackCount.incrementAndGet();
-            return new ParsedPayload(
-                    new StructuredSummaryStoreService.StructuredSummaryPayload(fallbackPurpose, List.of(), List.of()),
-                    "invalid_json_fallback",
-                    "Summary output was not valid JSON; raw summary text was used as fallback.",
-                    true);
+        } catch (final AiToolCallException e) {
+            throw e;
+        } catch (final Exception e) {
+            throw new AiToolCallException(ERR_MALFORMED_SUMMARY_JSON, e, rawSummary);
         }
     }
 

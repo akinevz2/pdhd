@@ -33,6 +33,7 @@ export function useConfigurationMenus() {
   const [configFields, setConfigFields] = useState<OllamaSettingField[]>([]);
   const [configLoading, setConfigLoading] = useState(false);
   const [configSaving, setConfigSaving] = useState(false);
+  const [configError, setConfigError] = useState<string | null>(null);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
   const [pullProgress, setPullProgress] = useState<PullProgressStatus | null>(
@@ -48,24 +49,55 @@ export function useConfigurationMenus() {
 
   const supportsManagedModels = currentProvider === "OLLAMA";
 
+  const CONFIG_LOAD_ERROR =
+    "Configuration opened with fallback values because menu settings could not be loaded.";
+  const CONFIG_STATUS_ERROR =
+    "Runtime status could not be loaded. You can still edit and save settings.";
+  const CONFIG_SAVE_ERROR = "Failed to save configuration.";
+
   const openConfiguration = useCallback(async () => {
+    setConfigOpen(true);
+    setConfigError(null);
+    if (!configForm) {
+      setConfigForm({ provider: DEFAULT_PROVIDER, modelName: "" });
+    }
     setConfigLoading(true);
     try {
-      const [data, status] = await Promise.all([
+      const [dataResult, statusResult] = await Promise.allSettled([
         api<OllamaSettings>("/api/menu/ollama"),
         api<OllamaRuntimeStatus>("/api/menu/ollama/status"),
       ]);
-      setConfigForm((data.settings ?? null) as ConfigurationForm | null);
-      setConfigFields(data.settingFields ?? []);
-      setRuntimeStatus(status);
+
+      if (dataResult.status === "fulfilled") {
+        const settings = (dataResult.value.settings ?? {
+          provider: DEFAULT_PROVIDER,
+          modelName: "",
+        }) as ConfigurationForm;
+        setConfigForm(settings);
+        setConfigFields(dataResult.value.settingFields ?? []);
+      } else {
+        setConfigForm({ provider: DEFAULT_PROVIDER, modelName: "" });
+        setConfigFields([]);
+        setConfigError(CONFIG_LOAD_ERROR);
+      }
+
+      if (statusResult.status === "fulfilled") {
+        setRuntimeStatus(statusResult.value);
+      } else {
+        setRuntimeStatus(null);
+        setConfigError((current) => current ?? CONFIG_STATUS_ERROR);
+      }
+
       setAvailableModels([]);
-      setConfigOpen(true);
     } catch {
-      // errors are surfaced by signal failure state
+      setConfigForm({ provider: DEFAULT_PROVIDER, modelName: "" });
+      setConfigFields([]);
+      setRuntimeStatus(null);
+      setConfigError(CONFIG_LOAD_ERROR);
     } finally {
       setConfigLoading(false);
     }
-  }, []);
+  }, [configForm]);
 
   const refreshModels = useCallback(async () => {
     setModelsLoading(true);
@@ -169,6 +201,7 @@ export function useConfigurationMenus() {
       return;
     }
     setConfigSaving(true);
+    setConfigError(null);
     try {
       const response = await apiPost<
         { settings: ConfigurationForm },
@@ -178,7 +211,7 @@ export function useConfigurationMenus() {
       setConfigFields(response.settingFields ?? []);
       setConfigOpen(false);
     } catch {
-      // errors are surfaced by signal failure state
+      setConfigError(CONFIG_SAVE_ERROR);
     } finally {
       setConfigSaving(false);
     }
@@ -192,7 +225,7 @@ export function useConfigurationMenus() {
     configFields,
     configLoading,
     configSaving,
-    configError: null,
+    configError,
     currentProvider,
     supportsManagedModels,
     availableModels,

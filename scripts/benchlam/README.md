@@ -34,19 +34,19 @@ BenchLam is a lightweight benchmarking harness designed to evaluate the performa
 Benchmark all models available on a specific Ollama host:
 
 ```bash
-python3 scripts/benchlam/benchmark_ollama.py --host http://localhost:11434 --all-models
+python3 scripts/benchlam/benchmark_ollama.py --host http://host.docker.internal:11434 --all-models
 ```
 
 Benchmark a comma-separated override set only. Missing models are pulled first on that host:
 
 ```bash
-python3 scripts/benchlam/benchmark_ollama.py --host localhost:11434 --models llama3,mistral:7b
+python3 scripts/benchlam/benchmark_ollama.py --host host.docker.internal:11434 --models llama3,mistral:7b
 ```
 
 Benchmark a comma-separated override set, but do not pull missing models:
 
 ```bash
-python3 scripts/benchlam/benchmark_ollama.py --host localhost:11434 --models llama3,mistral:7b --skip-pull
+python3 scripts/benchlam/benchmark_ollama.py --host host.docker.internal:11434 --models llama3,mistral:7b --skip-pull
 ```
 
 Notes:

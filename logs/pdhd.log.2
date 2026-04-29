@@ -1,2 +1,491 @@
-2026-04-26 12:22:14,501 a2693208573f /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[13539] WARN  [io.qua.run.log.LoggingSetupRecorder] (main) Log level FINEST for category 'ac.uk.sussex.kn253.resources.ChatResource' set below minimum logging level DEBUG, promoting it to DEBUG. Set the build time configuration property 'quarkus.log.category."ac.uk.sussex.kn253.resources.ChatResource".min-level' to 'FINEST' to avoid this warning
-2026-04-26 12:22:16,723 a2693208573f /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[13539] WARN  [io.qua.run.log.LoggingSetupRecorder] (main) Log level FINEST for category 'ac.uk.sussex.kn253.resources.ChatResource' set below minimum logging level DEBUG, promoting it to DEBUG. Set the build time configuration property 'quarkus.log.category."ac.uk.sussex.kn253.resources.ChatResource".min-level' to 'FINEST' to avoid this warning
+2026-04-29 17:16:30,091 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARN  [io.qua.run.log.LoggingSetupRecorder] (Quarkus Main Thread) Log level FINEST for category 'ac.uk.sussex.kn253.resources.ChatResource' set below minimum logging level DEBUG, promoting it to DEBUG. Set the build time configuration property 'quarkus.log.category."ac.uk.sussex.kn253.resources.ChatResource".min-level' to 'FINEST' to avoid this warning
+2026-04-29 17:16:30,230 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] INFO  [ac.uk.sus.kn2.ser.ai.ProjectAssistantProducer] (Quarkus Main Thread) Tool dispatch check passed: 7 unique tool names
+2026-04-29 17:16:30,266 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] INFO  [ac.uk.sus.kn2.ser.TelemetryService] (Quarkus Main Thread) Telemetry persistence confirmed: tool_telemetry=2383 rows, model_call_telemetry=4 rows
+2026-04-29 17:16:32,572 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARN  [io.qua.ver.htt.run.QuarkusErrorHandler] (vert.x-eventloop-thread-1) Worker thread pool exhaustion, no more worker threads available - returning a `503 - SERVICE UNAVAILABLE` response.
+2026-04-29 17:16:34,679 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARN  [io.qua.ver.htt.run.QuarkusErrorHandler] (vert.x-eventloop-thread-1) Worker thread pool exhaustion, no more worker threads available - returning a `503 - SERVICE UNAVAILABLE` response.
+2026-04-29 17:16:36,730 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARN  [io.qua.ver.htt.run.QuarkusErrorHandler] (vert.x-eventloop-thread-0) Worker thread pool exhaustion, no more worker threads available - returning a `503 - SERVICE UNAVAILABLE` response.
+2026-04-29 17:16:38,699 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARN  [io.qua.ver.htt.run.QuarkusErrorHandler] (vert.x-eventloop-thread-0) Worker thread pool exhaustion, no more worker threads available - returning a `503 - SERVICE UNAVAILABLE` response.
+2026-04-29 17:16:38,699 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARN  [io.qua.ver.htt.run.QuarkusErrorHandler] (vert.x-eventloop-thread-1) Worker thread pool exhaustion, no more worker threads available - returning a `503 - SERVICE UNAVAILABLE` response.
+2026-04-29 17:16:42,061 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARN  [org.hib.orm.jdb.error] (executor-thread-3) HHH000247: ErrorCode: 5, SQLState: null
+2026-04-29 17:16:42,063 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARN  [org.hib.orm.jdb.error] (executor-thread-3) [SQLITE_BUSY] The database file is locked (database is locked)
+2026-04-29 17:16:42,067 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARN  [org.hib.orm.jdb.error] (executor-thread-2) HHH000247: ErrorCode: 5, SQLState: null
+2026-04-29 17:16:42,068 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARN  [org.hib.orm.jdb.error] (executor-thread-2) [SQLITE_BUSY] The database file is locked (database is locked)
+2026-04-29 17:16:42,068 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARN  [com.arj.ats.arjuna] (executor-thread-3) ARJUNA012125: TwoPhaseCoordinator.beforeCompletion - failed for SynchronizationImple< 0:ffffac110002:a9eb:69f1ece3:77ff, org.hibernate.resource.transaction.backend.jta.internal.synchronization.RegisteredSynchronization@e772677 >: jakarta.persistence.PessimisticLockException: could not execute statement [[SQLITE_BUSY] The database file is locked (database is locked)] [update ProjectFolder set directory=?,gitRepository_id=?,githubRepository_id=?,loaded=? where id=?]
+	at org.hibernate.internal.ExceptionConverterImpl.wrapLockException(ExceptionConverterImpl.java:244)
+	at org.hibernate.internal.ExceptionConverterImpl.convert(ExceptionConverterImpl.java:88)
+	at org.hibernate.internal.ExceptionConverterImpl.convert(ExceptionConverterImpl.java:168)
+	at org.hibernate.internal.ExceptionConverterImpl.convert(ExceptionConverterImpl.java:174)
+	at org.hibernate.internal.SessionImpl.fireFlush(SessionImpl.java:1489)
+	at org.hibernate.internal.SessionImpl.managedFlush(SessionImpl.java:481)
+	at org.hibernate.internal.SessionImpl.flushBeforeTransactionCompletion(SessionImpl.java:2111)
+	at org.hibernate.internal.SessionImpl.beforeTransactionCompletion(SessionImpl.java:2033)
+	at org.hibernate.engine.jdbc.internal.JdbcCoordinatorImpl.beforeTransactionCompletion(JdbcCoordinatorImpl.java:410)
+	at org.hibernate.resource.transaction.backend.jta.internal.JtaTransactionCoordinatorImpl.beforeCompletion(JtaTransactionCoordinatorImpl.java:323)
+	at org.hibernate.resource.transaction.backend.jta.internal.synchronization.SynchronizationCallbackCoordinatorNonTrackingImpl.beforeCompletion(SynchronizationCallbackCoordinatorNonTrackingImpl.java:38)
+	at org.hibernate.resource.transaction.backend.jta.internal.synchronization.RegisteredSynchronization.beforeCompletion(RegisteredSynchronization.java:32)
+	at com.arjuna.ats.internal.jta.resources.arjunacore.SynchronizationImple.beforeCompletion(SynchronizationImple.java:52)
+	at com.arjuna.ats.arjuna.coordinator.TwoPhaseCoordinator.beforeCompletion(TwoPhaseCoordinator.java:348)
+	at com.arjuna.ats.arjuna.coordinator.TwoPhaseCoordinator.end(TwoPhaseCoordinator.java:66)
+	at com.arjuna.ats.arjuna.AtomicAction.commit(AtomicAction.java:135)
+	at com.arjuna.ats.internal.jta.transaction.arjunacore.TransactionImple.commitAndDisassociate(TransactionImple.java:1315)
+	at com.arjuna.ats.internal.jta.transaction.arjunacore.BaseTransaction.commit(BaseTransaction.java:104)
+	at io.quarkus.narayana.jta.runtime.NotifyingTransactionManager.commit(NotifyingTransactionManager.java:70)
+	at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorBase.endTransaction(TransactionalInterceptorBase.java:406)
+	at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorBase.invokeInOurTx(TransactionalInterceptorBase.java:171)
+	at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorBase.invokeInOurTx(TransactionalInterceptorBase.java:107)
+	at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorRequired.doIntercept(TransactionalInterceptorRequired.java:38)
+	at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorBase.intercept(TransactionalInterceptorBase.java:61)
+	at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorRequired.intercept(TransactionalInterceptorRequired.java:32)
+	at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorRequired_Bean.intercept(Unknown Source)
+	at io.quarkus.arc.impl.InterceptorInvocation.invoke(InterceptorInvocation.java:42)
+	at io.quarkus.arc.impl.AroundInvokeInvocationContext.perform(AroundInvokeInvocationContext.java:30)
+	at io.quarkus.arc.impl.InvocationContexts.performAroundInvoke(InvocationContexts.java:27)
+	at ac.uk.sussex.kn253.resources.ProjectResource_Subclass.open(Unknown Source)
+	at ac.uk.sussex.kn253.resources.ProjectResource_ClientProxy.open(Unknown Source)
+	at ac.uk.sussex.kn253.resources.ProjectResource$quarkusrestinvoker$open_539705735f07b2612dda3ee23b8cd48cf21e68a2.invoke(Unknown Source)
+	at org.jboss.resteasy.reactive.server.handlers.InvocationHandler.handle(InvocationHandler.java:29)
+	at io.quarkus.resteasy.reactive.server.runtime.QuarkusResteasyReactiveRequestContext.invokeHandler(QuarkusResteasyReactiveRequestContext.java:190)
+	at org.jboss.resteasy.reactive.common.core.AbstractResteasyReactiveContext.run(AbstractResteasyReactiveContext.java:147)
+	at io.quarkus.vertx.core.runtime.VertxCoreRecorder$15.runWith(VertxCoreRecorder.java:677)
+	at org.jboss.threads.EnhancedQueueExecutor$Task.doRunWith(EnhancedQueueExecutor.java:2651)
+	at org.jboss.threads.EnhancedQueueExecutor$Task.run(EnhancedQueueExecutor.java:2630)
+	at org.jboss.threads.EnhancedQueueExecutor.runThreadBody(EnhancedQueueExecutor.java:1622)
+	at org.jboss.threads.EnhancedQueueExecutor$ThreadBody.run(EnhancedQueueExecutor.java:1589)
+	at org.jboss.threads.DelegatingRunnable.run(DelegatingRunnable.java:11)
+	at org.jboss.threads.ThreadLocalResettingRunnable.run(ThreadLocalResettingRunnable.java:11)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:1516)
+Caused by: org.hibernate.exception.LockAcquisitionException: could not execute statement [[SQLITE_BUSY] The database file is locked (database is locked)] [update ProjectFolder set directory=?,gitRepository_id=?,githubRepository_id=?,loaded=? where id=?]
+	at org.hibernate.community.dialect.SQLiteDialect.lambda$buildSQLExceptionConversionDelegate$0(SQLiteDialect.java:460)
+	at org.hibernate.exception.internal.StandardSQLExceptionConverter.convert(StandardSQLExceptionConverter.java:34)
+	at org.hibernate.engine.jdbc.spi.SqlExceptionHelper.convert(SqlExceptionHelper.java:115)
+	at org.hibernate.engine.jdbc.internal.ResultSetReturnImpl.executeUpdate(ResultSetReturnImpl.java:184)
+	at org.hibernate.engine.jdbc.mutation.internal.AbstractMutationExecutor.performNonBatchedMutation(AbstractMutationExecutor.java:145)
+	at org.hibernate.engine.jdbc.mutation.internal.MutationExecutorSingleNonBatched.performNonBatchedOperations(MutationExecutorSingleNonBatched.java:53)
+	at org.hibernate.engine.jdbc.mutation.internal.AbstractMutationExecutor.execute(AbstractMutationExecutor.java:66)
+	at org.hibernate.persister.entity.mutation.UpdateCoordinatorStandard.doStaticUpdate(UpdateCoordinatorStandard.java:776)
+	at org.hibernate.persister.entity.mutation.UpdateCoordinatorStandard.performUpdate(UpdateCoordinatorStandard.java:313)
+	at org.hibernate.persister.entity.mutation.UpdateCoordinatorStandard.update(UpdateCoordinatorStandard.java:231)
+	at org.hibernate.action.internal.EntityUpdateAction.execute(EntityUpdateAction.java:161)
+	at org.hibernate.engine.spi.ActionQueue.executeActions(ActionQueue.java:634)
+	at org.hibernate.engine.spi.ActionQueue.executeActions(ActionQueue.java:505)
+	at org.hibernate.event.internal.AbstractFlushingEventListener.performExecutions(AbstractFlushingEventListener.java:381)
+	at org.hibernate.event.internal.DefaultFlushEventListener.onFlush(DefaultFlushEventListener.java:40)
+	at org.hibernate.event.service.internal.EventListenerGroupImpl.fireEventOnEachListener(EventListenerGroupImpl.java:138)
+	at org.hibernate.internal.SessionImpl.fireFlush(SessionImpl.java:1484)
+	... 39 more
+Caused by: org.sqlite.SQLiteException: [SQLITE_BUSY] The database file is locked (database is locked)
+	at org.sqlite.core.DB.newSQLException(DB.java:1179)
+	at org.sqlite.core.DB.newSQLException(DB.java:1190)
+	at org.sqlite.core.DB.execute(DB.java:985)
+	at org.sqlite.core.DB.executeUpdate(DB.java:1054)
+	at org.sqlite.jdbc3.JDBC3PreparedStatement.lambda$executeLargeUpdate$2(JDBC3PreparedStatement.java:129)
+	at org.sqlite.jdbc3.JDBC3Statement.withConnectionTimeout(JDBC3Statement.java:454)
+	at org.sqlite.jdbc3.JDBC3PreparedStatement.executeLargeUpdate(JDBC3PreparedStatement.java:124)
+	at org.sqlite.jdbc3.JDBC3PreparedStatement.executeUpdate(JDBC3PreparedStatement.java:105)
+	at io.agroal.pool.wrapper.PreparedStatementWrapper.executeUpdate(PreparedStatementWrapper.java:90)
+	at org.hibernate.engine.jdbc.internal.ResultSetReturnImpl.executeUpdate(ResultSetReturnImpl.java:181)
+	... 52 more
+
+2026-04-29 17:16:42,070 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARN  [com.arj.ats.arjuna] (executor-thread-2) ARJUNA012125: TwoPhaseCoordinator.beforeCompletion - failed for SynchronizationImple< 0:ffffac110002:a9eb:69f1ece3:7809, org.hibernate.resource.transaction.backend.jta.internal.synchronization.RegisteredSynchronization@5711a5aa >: jakarta.persistence.PessimisticLockException: could not execute statement [[SQLITE_BUSY] The database file is locked (database is locked)] [update ProjectFolder set directory=?,gitRepository_id=?,githubRepository_id=?,loaded=? where id=?]
+	at org.hibernate.internal.ExceptionConverterImpl.wrapLockException(ExceptionConverterImpl.java:244)
+	at org.hibernate.internal.ExceptionConverterImpl.convert(ExceptionConverterImpl.java:88)
+	at org.hibernate.internal.ExceptionConverterImpl.convert(ExceptionConverterImpl.java:168)
+	at org.hibernate.internal.ExceptionConverterImpl.convert(ExceptionConverterImpl.java:174)
+	at org.hibernate.internal.SessionImpl.fireFlush(SessionImpl.java:1489)
+	at org.hibernate.internal.SessionImpl.managedFlush(SessionImpl.java:481)
+	at org.hibernate.internal.SessionImpl.flushBeforeTransactionCompletion(SessionImpl.java:2111)
+	at org.hibernate.internal.SessionImpl.beforeTransactionCompletion(SessionImpl.java:2033)
+	at org.hibernate.engine.jdbc.internal.JdbcCoordinatorImpl.beforeTransactionCompletion(JdbcCoordinatorImpl.java:410)
+	at org.hibernate.resource.transaction.backend.jta.internal.JtaTransactionCoordinatorImpl.beforeCompletion(JtaTransactionCoordinatorImpl.java:323)
+	at org.hibernate.resource.transaction.backend.jta.internal.synchronization.SynchronizationCallbackCoordinatorNonTrackingImpl.beforeCompletion(SynchronizationCallbackCoordinatorNonTrackingImpl.java:38)
+	at org.hibernate.resource.transaction.backend.jta.internal.synchronization.RegisteredSynchronization.beforeCompletion(RegisteredSynchronization.java:32)
+	at com.arjuna.ats.internal.jta.resources.arjunacore.SynchronizationImple.beforeCompletion(SynchronizationImple.java:52)
+	at com.arjuna.ats.arjuna.coordinator.TwoPhaseCoordinator.beforeCompletion(TwoPhaseCoordinator.java:348)
+	at com.arjuna.ats.arjuna.coordinator.TwoPhaseCoordinator.end(TwoPhaseCoordinator.java:66)
+	at com.arjuna.ats.arjuna.AtomicAction.commit(AtomicAction.java:135)
+	at com.arjuna.ats.internal.jta.transaction.arjunacore.TransactionImple.commitAndDisassociate(TransactionImple.java:1315)
+	at com.arjuna.ats.internal.jta.transaction.arjunacore.BaseTransaction.commit(BaseTransaction.java:104)
+	at io.quarkus.narayana.jta.runtime.NotifyingTransactionManager.commit(NotifyingTransactionManager.java:70)
+	at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorBase.endTransaction(TransactionalInterceptorBase.java:406)
+	at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorBase.invokeInOurTx(TransactionalInterceptorBase.java:171)
+	at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorBase.invokeInOurTx(TransactionalInterceptorBase.java:107)
+	at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorRequired.doIntercept(TransactionalInterceptorRequired.java:38)
+	at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorBase.intercept(TransactionalInterceptorBase.java:61)
+	at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorRequired.intercept(TransactionalInterceptorRequired.java:32)
+	at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorRequired_Bean.intercept(Unknown Source)
+	at io.quarkus.arc.impl.InterceptorInvocation.invoke(InterceptorInvocation.java:42)
+	at io.quarkus.arc.impl.AroundInvokeInvocationContext.perform(AroundInvokeInvocationContext.java:30)
+	at io.quarkus.arc.impl.InvocationContexts.performAroundInvoke(InvocationContexts.java:27)
+	at ac.uk.sussex.kn253.resources.ProjectResource_Subclass.open(Unknown Source)
+	at ac.uk.sussex.kn253.resources.ProjectResource_ClientProxy.open(Unknown Source)
+	at ac.uk.sussex.kn253.resources.ProjectResource$quarkusrestinvoker$open_539705735f07b2612dda3ee23b8cd48cf21e68a2.invoke(Unknown Source)
+	at org.jboss.resteasy.reactive.server.handlers.InvocationHandler.handle(InvocationHandler.java:29)
+	at io.quarkus.resteasy.reactive.server.runtime.QuarkusResteasyReactiveRequestContext.invokeHandler(QuarkusResteasyReactiveRequestContext.java:190)
+	at org.jboss.resteasy.reactive.common.core.AbstractResteasyReactiveContext.run(AbstractResteasyReactiveContext.java:147)
+	at io.quarkus.vertx.core.runtime.VertxCoreRecorder$15.runWith(VertxCoreRecorder.java:677)
+	at org.jboss.threads.EnhancedQueueExecutor$Task.doRunWith(EnhancedQueueExecutor.java:2651)
+	at org.jboss.threads.EnhancedQueueExecutor$Task.run(EnhancedQueueExecutor.java:2630)
+	at org.jboss.threads.EnhancedQueueExecutor.runThreadBody(EnhancedQueueExecutor.java:1622)
+	at org.jboss.threads.EnhancedQueueExecutor$ThreadBody.run(EnhancedQueueExecutor.java:1589)
+	at org.jboss.threads.DelegatingRunnable.run(DelegatingRunnable.java:11)
+	at org.jboss.threads.ThreadLocalResettingRunnable.run(ThreadLocalResettingRunnable.java:11)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:1516)
+Caused by: org.hibernate.exception.LockAcquisitionException: could not execute statement [[SQLITE_BUSY] The database file is locked (database is locked)] [update ProjectFolder set directory=?,gitRepository_id=?,githubRepository_id=?,loaded=? where id=?]
+	at org.hibernate.community.dialect.SQLiteDialect.lambda$buildSQLExceptionConversionDelegate$0(SQLiteDialect.java:460)
+	at org.hibernate.exception.internal.StandardSQLExceptionConverter.convert(StandardSQLExceptionConverter.java:34)
+	at org.hibernate.engine.jdbc.spi.SqlExceptionHelper.convert(SqlExceptionHelper.java:115)
+	at org.hibernate.engine.jdbc.internal.ResultSetReturnImpl.executeUpdate(ResultSetReturnImpl.java:184)
+	at org.hibernate.engine.jdbc.mutation.internal.AbstractMutationExecutor.performNonBatchedMutation(AbstractMutationExecutor.java:145)
+	at org.hibernate.engine.jdbc.mutation.internal.MutationExecutorSingleNonBatched.performNonBatchedOperations(MutationExecutorSingleNonBatched.java:53)
+	at org.hibernate.engine.jdbc.mutation.internal.AbstractMutationExecutor.execute(AbstractMutationExecutor.java:66)
+	at org.hibernate.persister.entity.mutation.UpdateCoordinatorStandard.doStaticUpdate(UpdateCoordinatorStandard.java:776)
+	at org.hibernate.persister.entity.mutation.UpdateCoordinatorStandard.performUpdate(UpdateCoordinatorStandard.java:313)
+	at org.hibernate.persister.entity.mutation.UpdateCoordinatorStandard.update(UpdateCoordinatorStandard.java:231)
+	at org.hibernate.action.internal.EntityUpdateAction.execute(EntityUpdateAction.java:161)
+	at org.hibernate.engine.spi.ActionQueue.executeActions(ActionQueue.java:634)
+	at org.hibernate.engine.spi.ActionQueue.executeActions(ActionQueue.java:505)
+	at org.hibernate.event.internal.AbstractFlushingEventListener.performExecutions(AbstractFlushingEventListener.java:381)
+	at org.hibernate.event.internal.DefaultFlushEventListener.onFlush(DefaultFlushEventListener.java:40)
+	at org.hibernate.event.service.internal.EventListenerGroupImpl.fireEventOnEachListener(EventListenerGroupImpl.java:138)
+	at org.hibernate.internal.SessionImpl.fireFlush(SessionImpl.java:1484)
+	... 39 more
+Caused by: org.sqlite.SQLiteException: [SQLITE_BUSY] The database file is locked (database is locked)
+	at org.sqlite.core.DB.newSQLException(DB.java:1179)
+	at org.sqlite.core.DB.newSQLException(DB.java:1190)
+	at org.sqlite.core.DB.execute(DB.java:985)
+	at org.sqlite.core.DB.executeUpdate(DB.java:1054)
+	at org.sqlite.jdbc3.JDBC3PreparedStatement.lambda$executeLargeUpdate$2(JDBC3PreparedStatement.java:129)
+	at org.sqlite.jdbc3.JDBC3Statement.withConnectionTimeout(JDBC3Statement.java:454)
+	at org.sqlite.jdbc3.JDBC3PreparedStatement.executeLargeUpdate(JDBC3PreparedStatement.java:124)
+	at org.sqlite.jdbc3.JDBC3PreparedStatement.executeUpdate(JDBC3PreparedStatement.java:105)
+	at io.agroal.pool.wrapper.PreparedStatementWrapper.executeUpdate(PreparedStatementWrapper.java:90)
+	at org.hibernate.engine.jdbc.internal.ResultSetReturnImpl.executeUpdate(ResultSetReturnImpl.java:181)
+	... 52 more
+
+2026-04-29 17:16:42,083 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] ERROR [io.qua.ver.htt.run.QuarkusErrorHandler] (executor-thread-2) HTTP Request to /api/project/open failed, error id: 22f36b07-cea6-4fe3-aa3c-fb94231ce60a-1: io.quarkus.arc.ArcUndeclaredThrowableException: Error invoking subclass method
+	at ac.uk.sussex.kn253.resources.ProjectResource_Subclass.open(Unknown Source)
+	at ac.uk.sussex.kn253.resources.ProjectResource_ClientProxy.open(Unknown Source)
+	at ac.uk.sussex.kn253.resources.ProjectResource$quarkusrestinvoker$open_539705735f07b2612dda3ee23b8cd48cf21e68a2.invoke(Unknown Source)
+	at org.jboss.resteasy.reactive.server.handlers.InvocationHandler.handle(InvocationHandler.java:29)
+	at io.quarkus.resteasy.reactive.server.runtime.QuarkusResteasyReactiveRequestContext.invokeHandler(QuarkusResteasyReactiveRequestContext.java:190)
+	at org.jboss.resteasy.reactive.common.core.AbstractResteasyReactiveContext.run(AbstractResteasyReactiveContext.java:147)
+	at io.quarkus.vertx.core.runtime.VertxCoreRecorder$15.runWith(VertxCoreRecorder.java:677)
+	at org.jboss.threads.EnhancedQueueExecutor$Task.doRunWith(EnhancedQueueExecutor.java:2651)
+	at org.jboss.threads.EnhancedQueueExecutor$Task.run(EnhancedQueueExecutor.java:2630)
+	at org.jboss.threads.EnhancedQueueExecutor.runThreadBody(EnhancedQueueExecutor.java:1622)
+	at org.jboss.threads.EnhancedQueueExecutor$ThreadBody.run(EnhancedQueueExecutor.java:1589)
+	at org.jboss.threads.DelegatingRunnable.run(DelegatingRunnable.java:11)
+	at org.jboss.threads.ThreadLocalResettingRunnable.run(ThreadLocalResettingRunnable.java:11)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:1516)
+Caused by: jakarta.transaction.RollbackException: ARJUNA016053: Could not commit transaction.
+	at com.arjuna.ats.internal.jta.transaction.arjunacore.TransactionImple.commitAndDisassociate(TransactionImple.java:1327)
+	at com.arjuna.ats.internal.jta.transaction.arjunacore.BaseTransaction.commit(BaseTransaction.java:104)
+	at io.quarkus.narayana.jta.runtime.NotifyingTransactionManager.commit(NotifyingTransactionManager.java:70)
+	at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorBase.endTransaction(TransactionalInterceptorBase.java:406)
+	at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorBase.invokeInOurTx(TransactionalInterceptorBase.java:171)
+	at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorBase.invokeInOurTx(TransactionalInterceptorBase.java:107)
+	at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorRequired.doIntercept(TransactionalInterceptorRequired.java:38)
+	at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorBase.intercept(TransactionalInterceptorBase.java:61)
+	at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorRequired.intercept(TransactionalInterceptorRequired.java:32)
+	at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorRequired_Bean.intercept(Unknown Source)
+	at io.quarkus.arc.impl.InterceptorInvocation.invoke(InterceptorInvocation.java:42)
+	at io.quarkus.arc.impl.AroundInvokeInvocationContext.perform(AroundInvokeInvocationContext.java:30)
+	at io.quarkus.arc.impl.InvocationContexts.performAroundInvoke(InvocationContexts.java:27)
+	... 15 more
+Caused by: jakarta.persistence.PessimisticLockException: could not execute statement [[SQLITE_BUSY] The database file is locked (database is locked)] [update ProjectFolder set directory=?,gitRepository_id=?,githubRepository_id=?,loaded=? where id=?]
+	at org.hibernate.internal.ExceptionConverterImpl.wrapLockException(ExceptionConverterImpl.java:244)
+	at org.hibernate.internal.ExceptionConverterImpl.convert(ExceptionConverterImpl.java:88)
+	at org.hibernate.internal.ExceptionConverterImpl.convert(ExceptionConverterImpl.java:168)
+	at org.hibernate.internal.ExceptionConverterImpl.convert(ExceptionConverterImpl.java:174)
+	at org.hibernate.internal.SessionImpl.fireFlush(SessionImpl.java:1489)
+	at org.hibernate.internal.SessionImpl.managedFlush(SessionImpl.java:481)
+	at org.hibernate.internal.SessionImpl.flushBeforeTransactionCompletion(SessionImpl.java:2111)
+	at org.hibernate.internal.SessionImpl.beforeTransactionCompletion(SessionImpl.java:2033)
+	at org.hibernate.engine.jdbc.internal.JdbcCoordinatorImpl.beforeTransactionCompletion(JdbcCoordinatorImpl.java:410)
+	at org.hibernate.resource.transaction.backend.jta.internal.JtaTransactionCoordinatorImpl.beforeCompletion(JtaTransactionCoordinatorImpl.java:323)
+	at org.hibernate.resource.transaction.backend.jta.internal.synchronization.SynchronizationCallbackCoordinatorNonTrackingImpl.beforeCompletion(SynchronizationCallbackCoordinatorNonTrackingImpl.java:38)
+	at org.hibernate.resource.transaction.backend.jta.internal.synchronization.RegisteredSynchronization.beforeCompletion(RegisteredSynchronization.java:32)
+	at com.arjuna.ats.internal.jta.resources.arjunacore.SynchronizationImple.beforeCompletion(SynchronizationImple.java:52)
+	at com.arjuna.ats.arjuna.coordinator.TwoPhaseCoordinator.beforeCompletion(TwoPhaseCoordinator.java:348)
+	at com.arjuna.ats.arjuna.coordinator.TwoPhaseCoordinator.end(TwoPhaseCoordinator.java:66)
+	at com.arjuna.ats.arjuna.AtomicAction.commit(AtomicAction.java:135)
+	at com.arjuna.ats.internal.jta.transaction.arjunacore.TransactionImple.commitAndDisassociate(TransactionImple.java:1315)
+	... 27 more
+Caused by: org.hibernate.exception.LockAcquisitionException: could not execute statement [[SQLITE_BUSY] The database file is locked (database is locked)] [update ProjectFolder set directory=?,gitRepository_id=?,githubRepository_id=?,loaded=? where id=?]
+	at org.hibernate.community.dialect.SQLiteDialect.lambda$buildSQLExceptionConversionDelegate$0(SQLiteDialect.java:460)
+	at org.hibernate.exception.internal.StandardSQLExceptionConverter.convert(StandardSQLExceptionConverter.java:34)
+	at org.hibernate.engine.jdbc.spi.SqlExceptionHelper.convert(SqlExceptionHelper.java:115)
+	at org.hibernate.engine.jdbc.internal.ResultSetReturnImpl.executeUpdate(ResultSetReturnImpl.java:184)
+	at org.hibernate.engine.jdbc.mutation.internal.AbstractMutationExecutor.performNonBatchedMutation(AbstractMutationExecutor.java:145)
+	at org.hibernate.engine.jdbc.mutation.internal.MutationExecutorSingleNonBatched.performNonBatchedOperations(MutationExecutorSingleNonBatched.java:53)
+	at org.hibernate.engine.jdbc.mutation.internal.AbstractMutationExecutor.execute(AbstractMutationExecutor.java:66)
+	at org.hibernate.persister.entity.mutation.UpdateCoordinatorStandard.doStaticUpdate(UpdateCoordinatorStandard.java:776)
+	at org.hibernate.persister.entity.mutation.UpdateCoordinatorStandard.performUpdate(UpdateCoordinatorStandard.java:313)
+	at org.hibernate.persister.entity.mutation.UpdateCoordinatorStandard.update(UpdateCoordinatorStandard.java:231)
+	at org.hibernate.action.internal.EntityUpdateAction.execute(EntityUpdateAction.java:161)
+	at org.hibernate.engine.spi.ActionQueue.executeActions(ActionQueue.java:634)
+	at org.hibernate.engine.spi.ActionQueue.executeActions(ActionQueue.java:505)
+	at org.hibernate.event.internal.AbstractFlushingEventListener.performExecutions(AbstractFlushingEventListener.java:381)
+	at org.hibernate.event.internal.DefaultFlushEventListener.onFlush(DefaultFlushEventListener.java:40)
+	at org.hibernate.event.service.internal.EventListenerGroupImpl.fireEventOnEachListener(EventListenerGroupImpl.java:138)
+	at org.hibernate.internal.SessionImpl.fireFlush(SessionImpl.java:1484)
+	... 39 more
+Caused by: org.sqlite.SQLiteException: [SQLITE_BUSY] The database file is locked (database is locked)
+	at org.sqlite.core.DB.newSQLException(DB.java:1179)
+	at org.sqlite.core.DB.newSQLException(DB.java:1190)
+	at org.sqlite.core.DB.execute(DB.java:985)
+	at org.sqlite.core.DB.executeUpdate(DB.java:1054)
+	at org.sqlite.jdbc3.JDBC3PreparedStatement.lambda$executeLargeUpdate$2(JDBC3PreparedStatement.java:129)
+	at org.sqlite.jdbc3.JDBC3Statement.withConnectionTimeout(JDBC3Statement.java:454)
+	at org.sqlite.jdbc3.JDBC3PreparedStatement.executeLargeUpdate(JDBC3PreparedStatement.java:124)
+	at org.sqlite.jdbc3.JDBC3PreparedStatement.executeUpdate(JDBC3PreparedStatement.java:105)
+	at io.agroal.pool.wrapper.PreparedStatementWrapper.executeUpdate(PreparedStatementWrapper.java:90)
+	at org.hibernate.engine.jdbc.internal.ResultSetReturnImpl.executeUpdate(ResultSetReturnImpl.java:181)
+	... 52 more
+
+2026-04-29 17:16:42,083 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] ERROR [io.qua.ver.htt.run.QuarkusErrorHandler] (executor-thread-3) HTTP Request to /api/project/open failed, error id: 22f36b07-cea6-4fe3-aa3c-fb94231ce60a-2: io.quarkus.arc.ArcUndeclaredThrowableException: Error invoking subclass method
+	at ac.uk.sussex.kn253.resources.ProjectResource_Subclass.open(Unknown Source)
+	at ac.uk.sussex.kn253.resources.ProjectResource_ClientProxy.open(Unknown Source)
+	at ac.uk.sussex.kn253.resources.ProjectResource$quarkusrestinvoker$open_539705735f07b2612dda3ee23b8cd48cf21e68a2.invoke(Unknown Source)
+	at org.jboss.resteasy.reactive.server.handlers.InvocationHandler.handle(InvocationHandler.java:29)
+	at io.quarkus.resteasy.reactive.server.runtime.QuarkusResteasyReactiveRequestContext.invokeHandler(QuarkusResteasyReactiveRequestContext.java:190)
+	at org.jboss.resteasy.reactive.common.core.AbstractResteasyReactiveContext.run(AbstractResteasyReactiveContext.java:147)
+	at io.quarkus.vertx.core.runtime.VertxCoreRecorder$15.runWith(VertxCoreRecorder.java:677)
+	at org.jboss.threads.EnhancedQueueExecutor$Task.doRunWith(EnhancedQueueExecutor.java:2651)
+	at org.jboss.threads.EnhancedQueueExecutor$Task.run(EnhancedQueueExecutor.java:2630)
+	at org.jboss.threads.EnhancedQueueExecutor.runThreadBody(EnhancedQueueExecutor.java:1622)
+	at org.jboss.threads.EnhancedQueueExecutor$ThreadBody.run(EnhancedQueueExecutor.java:1589)
+	at org.jboss.threads.DelegatingRunnable.run(DelegatingRunnable.java:11)
+	at org.jboss.threads.ThreadLocalResettingRunnable.run(ThreadLocalResettingRunnable.java:11)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:1516)
+Caused by: jakarta.transaction.RollbackException: ARJUNA016053: Could not commit transaction.
+	at com.arjuna.ats.internal.jta.transaction.arjunacore.TransactionImple.commitAndDisassociate(TransactionImple.java:1327)
+	at com.arjuna.ats.internal.jta.transaction.arjunacore.BaseTransaction.commit(BaseTransaction.java:104)
+	at io.quarkus.narayana.jta.runtime.NotifyingTransactionManager.commit(NotifyingTransactionManager.java:70)
+	at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorBase.endTransaction(TransactionalInterceptorBase.java:406)
+	at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorBase.invokeInOurTx(TransactionalInterceptorBase.java:171)
+	at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorBase.invokeInOurTx(TransactionalInterceptorBase.java:107)
+	at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorRequired.doIntercept(TransactionalInterceptorRequired.java:38)
+	at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorBase.intercept(TransactionalInterceptorBase.java:61)
+	at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorRequired.intercept(TransactionalInterceptorRequired.java:32)
+	at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorRequired_Bean.intercept(Unknown Source)
+	at io.quarkus.arc.impl.InterceptorInvocation.invoke(InterceptorInvocation.java:42)
+	at io.quarkus.arc.impl.AroundInvokeInvocationContext.perform(AroundInvokeInvocationContext.java:30)
+	at io.quarkus.arc.impl.InvocationContexts.performAroundInvoke(InvocationContexts.java:27)
+	... 15 more
+Caused by: jakarta.persistence.PessimisticLockException: could not execute statement [[SQLITE_BUSY] The database file is locked (database is locked)] [update ProjectFolder set directory=?,gitRepository_id=?,githubRepository_id=?,loaded=? where id=?]
+	at org.hibernate.internal.ExceptionConverterImpl.wrapLockException(ExceptionConverterImpl.java:244)
+	at org.hibernate.internal.ExceptionConverterImpl.convert(ExceptionConverterImpl.java:88)
+	at org.hibernate.internal.ExceptionConverterImpl.convert(ExceptionConverterImpl.java:168)
+	at org.hibernate.internal.ExceptionConverterImpl.convert(ExceptionConverterImpl.java:174)
+	at org.hibernate.internal.SessionImpl.fireFlush(SessionImpl.java:1489)
+	at org.hibernate.internal.SessionImpl.managedFlush(SessionImpl.java:481)
+	at org.hibernate.internal.SessionImpl.flushBeforeTransactionCompletion(SessionImpl.java:2111)
+	at org.hibernate.internal.SessionImpl.beforeTransactionCompletion(SessionImpl.java:2033)
+	at org.hibernate.engine.jdbc.internal.JdbcCoordinatorImpl.beforeTransactionCompletion(JdbcCoordinatorImpl.java:410)
+	at org.hibernate.resource.transaction.backend.jta.internal.JtaTransactionCoordinatorImpl.beforeCompletion(JtaTransactionCoordinatorImpl.java:323)
+	at org.hibernate.resource.transaction.backend.jta.internal.synchronization.SynchronizationCallbackCoordinatorNonTrackingImpl.beforeCompletion(SynchronizationCallbackCoordinatorNonTrackingImpl.java:38)
+	at org.hibernate.resource.transaction.backend.jta.internal.synchronization.RegisteredSynchronization.beforeCompletion(RegisteredSynchronization.java:32)
+	at com.arjuna.ats.internal.jta.resources.arjunacore.SynchronizationImple.beforeCompletion(SynchronizationImple.java:52)
+	at com.arjuna.ats.arjuna.coordinator.TwoPhaseCoordinator.beforeCompletion(TwoPhaseCoordinator.java:348)
+	at com.arjuna.ats.arjuna.coordinator.TwoPhaseCoordinator.end(TwoPhaseCoordinator.java:66)
+	at com.arjuna.ats.arjuna.AtomicAction.commit(AtomicAction.java:135)
+	at com.arjuna.ats.internal.jta.transaction.arjunacore.TransactionImple.commitAndDisassociate(TransactionImple.java:1315)
+	... 27 more
+Caused by: org.hibernate.exception.LockAcquisitionException: could not execute statement [[SQLITE_BUSY] The database file is locked (database is locked)] [update ProjectFolder set directory=?,gitRepository_id=?,githubRepository_id=?,loaded=? where id=?]
+	at org.hibernate.community.dialect.SQLiteDialect.lambda$buildSQLExceptionConversionDelegate$0(SQLiteDialect.java:460)
+	at org.hibernate.exception.internal.StandardSQLExceptionConverter.convert(StandardSQLExceptionConverter.java:34)
+	at org.hibernate.engine.jdbc.spi.SqlExceptionHelper.convert(SqlExceptionHelper.java:115)
+	at org.hibernate.engine.jdbc.internal.ResultSetReturnImpl.executeUpdate(ResultSetReturnImpl.java:184)
+	at org.hibernate.engine.jdbc.mutation.internal.AbstractMutationExecutor.performNonBatchedMutation(AbstractMutationExecutor.java:145)
+	at org.hibernate.engine.jdbc.mutation.internal.MutationExecutorSingleNonBatched.performNonBatchedOperations(MutationExecutorSingleNonBatched.java:53)
+	at org.hibernate.engine.jdbc.mutation.internal.AbstractMutationExecutor.execute(AbstractMutationExecutor.java:66)
+	at org.hibernate.persister.entity.mutation.UpdateCoordinatorStandard.doStaticUpdate(UpdateCoordinatorStandard.java:776)
+	at org.hibernate.persister.entity.mutation.UpdateCoordinatorStandard.performUpdate(UpdateCoordinatorStandard.java:313)
+	at org.hibernate.persister.entity.mutation.UpdateCoordinatorStandard.update(UpdateCoordinatorStandard.java:231)
+	at org.hibernate.action.internal.EntityUpdateAction.execute(EntityUpdateAction.java:161)
+	at org.hibernate.engine.spi.ActionQueue.executeActions(ActionQueue.java:634)
+	at org.hibernate.engine.spi.ActionQueue.executeActions(ActionQueue.java:505)
+	at org.hibernate.event.internal.AbstractFlushingEventListener.performExecutions(AbstractFlushingEventListener.java:381)
+	at org.hibernate.event.internal.DefaultFlushEventListener.onFlush(DefaultFlushEventListener.java:40)
+	at org.hibernate.event.service.internal.EventListenerGroupImpl.fireEventOnEachListener(EventListenerGroupImpl.java:138)
+	at org.hibernate.internal.SessionImpl.fireFlush(SessionImpl.java:1484)
+	... 39 more
+Caused by: org.sqlite.SQLiteException: [SQLITE_BUSY] The database file is locked (database is locked)
+	at org.sqlite.core.DB.newSQLException(DB.java:1179)
+	at org.sqlite.core.DB.newSQLException(DB.java:1190)
+	at org.sqlite.core.DB.execute(DB.java:985)
+	at org.sqlite.core.DB.executeUpdate(DB.java:1054)
+	at org.sqlite.jdbc3.JDBC3PreparedStatement.lambda$executeLargeUpdate$2(JDBC3PreparedStatement.java:129)
+	at org.sqlite.jdbc3.JDBC3Statement.withConnectionTimeout(JDBC3Statement.java:454)
+	at org.sqlite.jdbc3.JDBC3PreparedStatement.executeLargeUpdate(JDBC3PreparedStatement.java:124)
+	at org.sqlite.jdbc3.JDBC3PreparedStatement.executeUpdate(JDBC3PreparedStatement.java:105)
+	at io.agroal.pool.wrapper.PreparedStatementWrapper.executeUpdate(PreparedStatementWrapper.java:90)
+	at org.hibernate.engine.jdbc.internal.ResultSetReturnImpl.executeUpdate(ResultSetReturnImpl.java:181)
+	... 52 more
+
+2026-04-29 17:17:59,958 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] ERROR [io.qua.ver.htt.run.QuarkusErrorHandler] (executor-thread-3) HTTP Request to /api/summary/folder failed, error id: 22f36b07-cea6-4fe3-aa3c-fb94231ce60a-3
+
+Exception in FileSummarisationPipelineService.java:49
+	  47      public StructuredSummary summariseFileAndStore(final ProjectFolder project, final String filePath,
+	  48              final String fileContents) {
+	→ 49          final String rawSummary = fileSummarisationSubagent.summarise(fileContents, filePath);
+	  50          final ParsedPayload parsed = parsePayload(rawSummary);
+	  51          recordParseTelemetry("file", filePath, parsed, rawSummary);
+
+Exception in SummaryResource.java:262
+	  260  
+	  261              final String relativeFilePath = normalizeRelativePath(root, file);
+	→ 262              final StructuredSummary fileSummary = fileSummarisationPipelineService.summariseFileAndStore(
+	  263                      project,
+	  264                      relativeFilePath,
+
+Exception in SummaryResource.java:83
+	  81  
+	  82          final String folderPath = normalizeRelativePath(root, folder);
+	→ 83          final FolderAnalysisInput analysisInput = buildFolderAnalysisInput(project, root, folder, folderPath);
+	  84          final FileSummarisationPipelineService.FolderSummaryResult folderSummaryResult = fileSummarisationPipelineService
+	  85                  .summariseFolderAndStoreWithMetadata(
+
+Exception in SummaryResource.java:178
+	  176          final String normalized = normalizeOperation(operation);
+	  177          return switch (normalized) {
+	→ 178              case "/folder" -> folder(request);
+	  179              case "/analyze" -> folder(request);
+	  180              case "/file" -> file(request);: io.quarkus.qute.TemplateException: Parser error: invalid virtual method in {operation: (/.*)?}
+	at io.quarkus.qute.TemplateException$Builder.build(TemplateException.java:173)
+	at io.quarkus.qute.Expressions.parseVirtualMethodParams(Expressions.java:42)
+	at io.quarkus.qute.Parser.createPart(Parser.java:1051)
+	at io.quarkus.qute.Parser.parseExpression(Parser.java:1037)
+	at io.quarkus.qute.Parser.createExpression(Parser.java:1117)
+	at io.quarkus.qute.Parser.flushTag(Parser.java:446)
+	at io.quarkus.qute.Parser.tag(Parser.java:352)
+	at io.quarkus.qute.Parser.processCharacter(Parser.java:253)
+	at io.quarkus.qute.Parser.parse(Parser.java:160)
+	at io.quarkus.qute.EngineImpl.parse(EngineImpl.java:65)
+	at io.quarkus.qute.Engine.parse(Engine.java:37)
+	at io.quarkiverse.langchain4j.QuarkusPromptTemplateFactory.create(QuarkusPromptTemplateFactory.java:45)
+	at dev.langchain4j.model.input.PromptTemplate.<init>(PromptTemplate.java:85)
+	at dev.langchain4j.model.input.PromptTemplate.from(PromptTemplate.java:186)
+	at dev.langchain4j.model.input.PromptTemplate.from(PromptTemplate.java:152)
+	at io.quarkiverse.langchain4j.runtime.aiservice.AiServiceMethodImplementationSupport.prepareUserMessage(AiServiceMethodImplementationSupport.java:951)
+	at io.quarkiverse.langchain4j.runtime.aiservice.AiServiceMethodImplementationSupport.doImplement0(AiServiceMethodImplementationSupport.java:226)
+	at io.quarkiverse.langchain4j.runtime.aiservice.AiServiceMethodImplementationSupport.doImplement(AiServiceMethodImplementationSupport.java:205)
+	at io.quarkiverse.langchain4j.runtime.aiservice.AiServiceMethodImplementationSupport.implement(AiServiceMethodImplementationSupport.java:180)
+	at io.quarkiverse.langchain4j.runtime.aiservice.MethodImplementationSupportProducer$1$1.apply(MethodImplementationSupportProducer.java:31)
+	at io.quarkiverse.langchain4j.runtime.aiservice.MethodImplementationSupportProducer$1$1.apply(MethodImplementationSupportProducer.java:28)
+	at io.quarkiverse.langchain4j.runtime.aiservice.MetricsTimedWrapper$2.get(MetricsTimedWrapper.java:42)
+	at io.micrometer.core.instrument.composite.CompositeTimer.record(CompositeTimer.java:69)
+	at io.quarkiverse.langchain4j.runtime.aiservice.MetricsTimedWrapper.wrap(MetricsTimedWrapper.java:39)
+	at io.quarkiverse.langchain4j.runtime.aiservice.MethodImplementationSupportProducer$1$2.apply(MethodImplementationSupportProducer.java:40)
+	at io.quarkiverse.langchain4j.runtime.aiservice.MethodImplementationSupportProducer$1$2.apply(MethodImplementationSupportProducer.java:37)
+	at io.quarkiverse.langchain4j.runtime.aiservice.MetricsCountedWrapper.wrap(MetricsCountedWrapper.java:22)
+	at io.quarkiverse.langchain4j.runtime.aiservice.MethodImplementationSupportProducer$1$2.apply(MethodImplementationSupportProducer.java:40)
+	at io.quarkiverse.langchain4j.runtime.aiservice.MethodImplementationSupportProducer$1$2.apply(MethodImplementationSupportProducer.java:37)
+	at io.quarkiverse.langchain4j.runtime.aiservice.MethodImplementationSupportProducer$1.implement(MethodImplementationSupportProducer.java:46)
+	at ac.uk.sussex.kn253.services.ai.FileSummarisationSubagent$$QuarkusImpl.summarise(Unknown Source)
+	at ac.uk.sussex.kn253.services.ai.FileSummarisationSubagent$$QuarkusImpl_ClientProxy.summarise(Unknown Source)
+	at ac.uk.sussex.kn253.services.ai.FileSummarisationPipelineService.summariseFileAndStore(FileSummarisationPipelineService.java:49)
+	at ac.uk.sussex.kn253.services.ai.FileSummarisationPipelineService_Subclass.summariseFileAndStore$$superforward(Unknown Source)
+	at ac.uk.sussex.kn253.services.ai.FileSummarisationPipelineService_Subclass$0.apply(Unknown Source)
+	at io.quarkus.arc.impl.AroundInvokeInvocationContext.proceed(AroundInvokeInvocationContext.java:73)
+	at io.quarkus.arc.impl.AroundInvokeInvocationContext.proceed(AroundInvokeInvocationContext.java:62)
+	at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorBase.invokeInCallerTx(TransactionalInterceptorBase.java:335)
+	at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorRequired.doIntercept(TransactionalInterceptorRequired.java:40)
+	at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorBase.intercept(TransactionalInterceptorBase.java:61)
+	at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorRequired.intercept(TransactionalInterceptorRequired.java:32)
+	at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorRequired_Bean.intercept(Unknown Source)
+	at io.quarkus.arc.impl.InterceptorInvocation.invoke(InterceptorInvocation.java:42)
+	at io.quarkus.arc.impl.AroundInvokeInvocationContext.perform(AroundInvokeInvocationContext.java:30)
+	at io.quarkus.arc.impl.InvocationContexts.performAroundInvoke(InvocationContexts.java:27)
+	at ac.uk.sussex.kn253.services.ai.FileSummarisationPipelineService_Subclass.summariseFileAndStore(Unknown Source)
+	at ac.uk.sussex.kn253.services.ai.FileSummarisationPipelineService_ClientProxy.summariseFileAndStore(Unknown Source)
+	at ac.uk.sussex.kn253.resources.SummaryResource.buildFolderAnalysisInput(SummaryResource.java:262)
+	at ac.uk.sussex.kn253.resources.SummaryResource.folder(SummaryResource.java:83)
+	at ac.uk.sussex.kn253.resources.SummaryResource.put(SummaryResource.java:178)
+	at ac.uk.sussex.kn253.resources.SummaryResource_Subclass.put$$superforward(Unknown Source)
+	at ac.uk.sussex.kn253.resources.SummaryResource_Subclass$0.apply(Unknown Source)
+	at io.quarkus.arc.impl.AroundInvokeInvocationContext.proceed(AroundInvokeInvocationContext.java:73)
+	at io.quarkus.arc.impl.AroundInvokeInvocationContext.proceed(AroundInvokeInvocationContext.java:62)
+	at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorBase.invokeInOurTx(TransactionalInterceptorBase.java:136)
+	at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorBase.invokeInOurTx(TransactionalInterceptorBase.java:107)
+	at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorRequired.doIntercept(TransactionalInterceptorRequired.java:38)
+	at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorBase.intercept(TransactionalInterceptorBase.java:61)
+	at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorRequired.intercept(TransactionalInterceptorRequired.java:32)
+	at io.quarkus.narayana.jta.runtime.interceptor.TransactionalInterceptorRequired_Bean.intercept(Unknown Source)
+	at io.quarkus.arc.impl.InterceptorInvocation.invoke(InterceptorInvocation.java:42)
+	at io.quarkus.arc.impl.AroundInvokeInvocationContext.perform(AroundInvokeInvocationContext.java:30)
+	at io.quarkus.arc.impl.InvocationContexts.performAroundInvoke(InvocationContexts.java:27)
+	at ac.uk.sussex.kn253.resources.SummaryResource_Subclass.put(Unknown Source)
+	at ac.uk.sussex.kn253.resources.SummaryResource_ClientProxy.put(Unknown Source)
+	at ac.uk.sussex.kn253.resources.SummaryResource$quarkusrestinvoker$put_a5784e5f3ad05b83beb6e4757ff45ca58f27fd8f.invoke(Unknown Source)
+	at org.jboss.resteasy.reactive.server.handlers.InvocationHandler.handle(InvocationHandler.java:29)
+	at io.quarkus.resteasy.reactive.server.runtime.QuarkusResteasyReactiveRequestContext.invokeHandler(QuarkusResteasyReactiveRequestContext.java:190)
+	at org.jboss.resteasy.reactive.common.core.AbstractResteasyReactiveContext.run(AbstractResteasyReactiveContext.java:147)
+	at io.quarkus.vertx.core.runtime.VertxCoreRecorder$15.runWith(VertxCoreRecorder.java:677)
+	at org.jboss.threads.EnhancedQueueExecutor$Task.doRunWith(EnhancedQueueExecutor.java:2651)
+	at org.jboss.threads.EnhancedQueueExecutor$Task.run(EnhancedQueueExecutor.java:2630)
+	at org.jboss.threads.EnhancedQueueExecutor.runThreadBody(EnhancedQueueExecutor.java:1622)
+	at org.jboss.threads.EnhancedQueueExecutor$ThreadBody.run(EnhancedQueueExecutor.java:1589)
+	at org.jboss.threads.DelegatingRunnable.run(DelegatingRunnable.java:11)
+	at org.jboss.threads.ThreadLocalResettingRunnable.run(ThreadLocalResettingRunnable.java:11)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:1516)
+
+2026-04-29 18:19:08,811 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-22) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:19:49,694 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-22) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:20:31,109 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-22) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:21:12,119 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-22) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:21:52,899 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-22) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:22:33,770 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-22) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:23:15,455 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-22) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:23:56,335 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-22) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:24:38,901 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-22) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:25:18,385 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-22) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:25:58,986 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-22) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:26:40,445 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-22) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:27:20,572 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-22) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:28:00,379 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-22) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:28:42,885 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-22) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:29:23,036 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-22) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:30:03,498 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-22) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:30:44,744 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-22) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:31:24,899 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-22) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:32:04,919 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-22) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:32:46,004 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-22) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:33:27,438 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-22) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:34:07,840 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-22) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:34:48,580 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-22) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:35:29,796 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-22) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:36:09,890 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-22) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:36:51,196 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-22) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:37:29,259 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-22) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:38:11,138 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-22) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:38:52,121 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-22) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:39:32,723 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-22) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:40:12,929 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-22) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:40:54,591 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-22) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:41:34,985 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-22) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:42:15,947 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-22) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:42:56,875 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-22) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:43:36,825 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-22) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:44:16,822 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-22) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:44:56,220 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-46) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:45:38,606 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-46) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:46:19,387 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-46) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:46:59,706 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-48) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:47:41,762 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-48) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:48:22,360 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-49) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:49:01,431 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-50) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:49:43,751 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-50) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:50:25,172 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-50) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:51:04,036 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-50) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:51:45,666 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-50) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:52:27,167 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-50) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:53:05,888 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-54) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:53:48,338 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-54) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException
+2026-04-29 18:54:29,193 7820daad953e /usr/local/sdkman/candidates/java/26.ea.35-open/bin/java[6956] WARNING [ac.uk.sus.kn2.ser.OllamaManagementService] (executor-thread-54) Ollama health check failed for http://ws-raretower.local:11434: java.net.ConnectException

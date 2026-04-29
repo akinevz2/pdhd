@@ -7,6 +7,9 @@ import java.util.function.Consumer;
 
 import org.jboss.logging.Logger;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import ac.uk.sussex.kn253.AiToolCallException;
 import ac.uk.sussex.kn253.repository.LLMSettings;
 import ac.uk.sussex.kn253.services.ModelConfigService;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
@@ -26,6 +29,8 @@ import jakarta.inject.Inject;
 public class LowLevelProjectAssistant implements ProjectAssistant {
 
     private static final Logger LOG = Logger.getLogger(LowLevelProjectAssistant.class);
+    private static final String ERR_UNKNOWN_TOOL = "Model called unknown tool: ";
+    private static final String ERR_MALFORMED_TOOL_ARGS = "Malformed tool-call arguments from model";
 
     private final ChatMemoryProvider chatMemoryProvider = new WebUiChatMemoryProviderSupplier().get();
 
@@ -43,6 +48,9 @@ public class LowLevelProjectAssistant implements ProjectAssistant {
 
     @Inject
     ImplicitContextBuilder implicitContextBuilder;
+
+    @Inject
+    ObjectMapper objectMapper;
 
     @Override
     public TokenStream stream(final String memoryId, final String message) {
@@ -180,6 +188,7 @@ public class LowLevelProjectAssistant implements ProjectAssistant {
             loopMessages.add(aiMessage);
 
             for (final ToolExecutionRequest request : aiMessage.toolExecutionRequests()) {
+                validateToolRequest(request);
                 final String result = toolRegistry.execute(request);
                 if (state.toolExecutedHandler != null) {
                     state.toolExecutedHandler.accept(request);
@@ -215,6 +224,21 @@ public class LowLevelProjectAssistant implements ProjectAssistant {
                 ? LLMSettings.DEFAULT_TOOL_SYSTEM_PROMPT
                 : settings.getToolSystemPrompt();
         return system + "\n\n" + toolSystem;
+    }
+
+    private void validateToolRequest(final ToolExecutionRequest request) {
+        final String name = request.name();
+        if (!toolRegistry.registeredToolNames().contains(name)) {
+            throw new AiToolCallException(ERR_UNKNOWN_TOOL + name);
+        }
+        final String arguments = request.arguments();
+        if (arguments != null && !arguments.isBlank()) {
+            try {
+                objectMapper.readTree(arguments);
+            } catch (final Exception e) {
+                throw new AiToolCallException(ERR_MALFORMED_TOOL_ARGS, e, arguments);
+            }
+        }
     }
 
     private void handleError(final Throwable error, final ManualTokenState state) {

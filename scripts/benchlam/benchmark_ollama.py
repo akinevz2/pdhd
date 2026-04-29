@@ -77,7 +77,7 @@ def run_maven_prompt_tests():
         return False
 
 # Configuration
-DEFAULT_OLLAMA_HOST = "http://localhost:11434"
+DEFAULT_OLLAMA_HOST = "http://host.docker.internal:11434"
 DEFAULT_PDHD_BASE_URL = "http://localhost:8080"
 OLLAMA_LIST_CMD = ["ollama", "list"]
 OLLAMA_PULL_CMD = ["ollama", "pull"]
@@ -152,6 +152,30 @@ def init_sqlite(db_path):
                 FOREIGN KEY(run_id) REFERENCES benchmark_runs(run_id)
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS benchmark_telemetry_snapshot (
+                run_id TEXT PRIMARY KEY,
+                captured_at TEXT NOT NULL,
+                total_invocations INTEGER NOT NULL,
+                total_failures INTEGER NOT NULL,
+                tool_failure_rate REAL NOT NULL,
+                arg_validation_failure_rate REAL NOT NULL,
+                payload TEXT,
+                FOREIGN KEY(run_id) REFERENCES benchmark_runs(run_id)
+            )
+        """)
+        # Additive migration: add new columns to benchmark_results if absent
+        for _col, _spec in [("http_status", "INTEGER DEFAULT 0"), ("error_kind", "TEXT DEFAULT ''")]:
+            try:
+                conn.execute(f"ALTER TABLE benchmark_results ADD COLUMN {_col} {_spec}")
+            except sqlite3.OperationalError:
+                pass  # column already present
+        # Additive migration: add P50/P95 columns to benchmark_model_summary if absent
+        for _col, _spec in [("p50_latency", "REAL DEFAULT 0"), ("p95_latency", "REAL DEFAULT 0"), ("http_error_rate", "REAL DEFAULT 0")]:
+            try:
+                conn.execute(f"ALTER TABLE benchmark_model_summary ADD COLUMN {_col} {_spec}")
+            except sqlite3.OperationalError:
+                pass  # column already present
 
 
 def save_results_to_sqlite(db_path, run_id, run_started_at, run_finished_at, maven_ok, results, host_snapshot):
@@ -195,8 +219,8 @@ def save_results_to_sqlite(db_path, run_id, run_started_at, run_finished_at, mav
             conn.executemany(
                 """
                 INSERT INTO benchmark_results
-                    (run_id, model_name, test_case, prompt, response, latency, correctness_score)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                    (run_id, model_name, test_case, prompt, response, latency, correctness_score, http_status, error_kind)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 [
                     (
@@ -207,6 +231,8 @@ def save_results_to_sqlite(db_path, run_id, run_started_at, run_finished_at, mav
                         r["response"],
                         float(r["latency"]),
                         int(r["correctness_score"]),
+                        int(r.get("http_status", 0)),
+                        r.get("error_kind", ""),
                     )
                     for r in results
                 ],
@@ -216,15 +242,23 @@ def save_results_to_sqlite(db_path, run_id, run_started_at, run_finished_at, mav
             for r in results:
                 model_name = r["model_name"]
                 if model_name not in model_stats:
-                    model_stats[model_name] = {"latencies": [], "scores": []}
+                    model_stats[model_name] = {"latencies": [], "scores": [], "http_errors": 0}
                 model_stats[model_name]["latencies"].append(float(r["latency"]))
                 model_stats[model_name]["scores"].append(int(r["correctness_score"]))
+                if int(r.get("http_status", 0)) >= 400:
+                    model_stats[model_name]["http_errors"] += 1
+
+            def _pct(sorted_vals, p):
+                if not sorted_vals:
+                    return 0.0
+                idx = max(0, int(len(sorted_vals) * p / 100) - 1)
+                return sorted(sorted_vals)[idx]
 
             conn.executemany(
                 """
                 INSERT INTO benchmark_model_summary
-                    (run_id, model_name, tests_run, avg_latency, avg_accuracy)
-                VALUES (?, ?, ?, ?, ?)
+                    (run_id, model_name, tests_run, avg_latency, avg_accuracy, p50_latency, p95_latency, http_error_rate)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 [
                     (
@@ -233,13 +267,16 @@ def save_results_to_sqlite(db_path, run_id, run_started_at, run_finished_at, mav
                         len(stats["latencies"]),
                         sum(stats["latencies"]) / len(stats["latencies"]),
                         sum(stats["scores"]) / len(stats["scores"]),
+                        _pct(stats["latencies"], 50),
+                        _pct(stats["latencies"], 95),
+                        stats["http_errors"] / len(stats["latencies"]) if stats["latencies"] else 0.0,
                     )
                     for model_name, stats in model_stats.items()
                 ],
             )
 
 def normalize_ollama_host(host):
-    """Normalizes host values like localhost:11434 to http://localhost:11434."""
+    """Normalizes host values like host.docker.internal:11434 to http://host.docker.internal:11434."""
     normalized = host.strip()
     if not normalized.startswith("http://") and not normalized.startswith("https://"):
         normalized = f"http://{normalized}"
@@ -373,7 +410,14 @@ def query_ollama(model_name, prompt, ollama_api_url):
 
 
 def query_pdhd(prompt, pdhd_chat_url):
-    """Queries the PDHD chat API for a given prompt."""
+    """Queries the PDHD chat API for a given prompt.
+
+    Returns (response_text, latency, http_status, error_kind).
+    On HTTP error responses the error_kind is extracted from the JSON body
+    when the server returns {"errorKind": "...", "detail": "..."} (e.g. 502
+    AI_LAYER_FAILURE or 500 SERVICE_LAYER_FAILURE from ExceptionMappers).
+    response_text is None on transport-level errors.
+    """
     payload = {
         "message": prompt,
     }
@@ -384,12 +428,21 @@ def query_pdhd(prompt, pdhd_chat_url):
     start_time = time.time()
     try:
         response = requests.post(pdhd_chat_url, json=payload, headers=headers, timeout=180)
-        response.raise_for_status()
         latency = time.time() - start_time
-        return response.text, latency
+        if response.status_code >= 400:
+            error_kind = ""
+            try:
+                body = response.json()
+                error_kind = body.get("errorKind", "") or ""
+            except Exception:
+                pass
+            print(f"[pdhd] HTTP {response.status_code} from chat API; errorKind={error_kind or '<none>'}")
+            return None, latency, response.status_code, error_kind
+        return response.text, latency, response.status_code, ""
     except Exception as e:
+        latency = time.time() - start_time
         print(f"Error querying PDHD chat API: {e}")
-        return None, 0
+        return None, latency, 0, ""
 
 
 def configure_pdhd_ollama_runtime(pdhd_base_url, ollama_host):
@@ -461,6 +514,59 @@ def reset_pdhd_chat_memory(pdhd_base_url):
     except Exception:
         # Non-fatal; benchmark can proceed without reset.
         pass
+
+
+def fetch_pdhd_telemetry_snapshot(pdhd_base_url):
+    """Fetches /api/telemetry from PDHD and returns a structured snapshot dict.
+
+    Returns a dict ready for INSERT into benchmark_telemetry_snapshot, or None
+    if the endpoint is not reachable.
+    """
+    url = f"{normalize_pdhd_base_url(pdhd_base_url)}/api/telemetry"
+    payload = safe_get_json(url, timeout_seconds=10)
+    if payload is None:
+        print(f"[pdhd] Could not fetch telemetry from {url}", flush=True)
+        return None
+
+    items = payload.get("items") or []
+    total_invocations = sum(int(i.get("invocations", 0)) for i in items)
+    total_failures = sum(int(i.get("failures", 0)) for i in items)
+    total_arg_failures = sum(int(i.get("argumentValidationFailures", 0)) for i in items)
+    tool_failure_rate = total_failures / total_invocations if total_invocations else 0.0
+    arg_failure_rate = total_arg_failures / total_invocations if total_invocations else 0.0
+
+    return {
+        "captured_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "total_invocations": total_invocations,
+        "total_failures": total_failures,
+        "tool_failure_rate": tool_failure_rate,
+        "arg_validation_failure_rate": arg_failure_rate,
+        "payload": json.dumps(payload),
+    }
+
+
+def save_telemetry_snapshot(db_path, run_id, snapshot):
+    """Persists a PDHD telemetry snapshot to SQLite."""
+    if snapshot is None:
+        return
+    with sqlite3.connect(db_path, timeout=30) as conn:
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO benchmark_telemetry_snapshot
+                (run_id, captured_at, total_invocations, total_failures,
+                 tool_failure_rate, arg_validation_failure_rate, payload)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                run_id,
+                snapshot["captured_at"],
+                int(snapshot["total_invocations"]),
+                int(snapshot["total_failures"]),
+                float(snapshot["tool_failure_rate"]),
+                float(snapshot["arg_validation_failure_rate"]),
+                snapshot["payload"],
+            ),
+        )
 
 
 def safe_get_json(url, timeout_seconds=6):
@@ -732,6 +838,7 @@ def run_benchmark(
     pdhd_ollama_host=None,
     judge_host=None,
     judge_fallback_model=None,
+    repeat=1,
 ):
     run_started_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     run_id = datetime.now().strftime('%Y%m%d_%H%M%S') + "_" + uuid.uuid4().hex[:8]
@@ -808,45 +915,49 @@ def run_benchmark(
             print(f"  Running test: {test_case['name']}", flush=True)
             prompt = test_case['prompt']
             verification = test_case.get('verification', {})
-            
-            if target == "ollama":
-                response, latency = query_ollama(model, prompt, ollama_api_url)
-            else:
-                response, latency = query_pdhd(prompt, pdhd_chat_url)
-            
-            if response is None:
-                continue
 
-            correctness_score = 0
-            
-            if verification.get("type") == "regex":
-                pattern = verification.get("pattern")
-                correctness_score = 1 if re.search(pattern, response) else 0
-            
-            elif verification.get("type") == "judge":
-                judge_model = verification.get("judge_model")
-                rubric = verification.get("rubric")
-                judge_prompt = f"Rubric: {rubric}\n\nResponse to evaluate:\n{response}\n\nReturn only '1' if it passes or '0' if it fails."
-                judge_response, _ = query_ollama(judge_model, judge_prompt, judge_api_url)
-                if judge_response:
-                    correctness_score = 1 if '1' in judge_response else 0
+            run_count = max(1, repeat)
+            for rep in range(run_count):
+                if run_count > 1:
+                    print(f"    repeat {rep + 1}/{run_count}", flush=True)
+
+                http_status = 0
+                error_kind = ""
+                if target == "ollama":
+                    response, latency = query_ollama(model, prompt, ollama_api_url)
                 else:
-                    correctness_score = 0
-            
-            # Support for simple string match if 'expected' is provided
-            elif "expected" in test_case:
-                correctness_score = 1 if test_case["expected"] in response else 0
-            else:
+                    response, latency, http_status, error_kind = query_pdhd(prompt, pdhd_chat_url)
+
                 correctness_score = 0
 
-            results.append({
-                "model_name": model,
-                "test_case": test_case["name"],
-                "prompt": prompt,
-                "response": response.replace('\n', ' '),
-                "latency": latency,
-                "correctness_score": correctness_score
-            })
+                if response is not None:
+                    if verification.get("type") == "regex":
+                        pattern = verification.get("pattern")
+                        correctness_score = 1 if re.search(pattern, response) else 0
+
+                    elif verification.get("type") == "judge":
+                        judge_model = verification.get("judge_model")
+                        rubric = verification.get("rubric")
+                        judge_prompt = f"Rubric: {rubric}\n\nResponse to evaluate:\n{response}\n\nReturn only '1' if it passes or '0' if it fails."
+                        judge_response, _ = query_ollama(judge_model, judge_prompt, judge_api_url)
+                        if judge_response:
+                            correctness_score = 1 if '1' in judge_response else 0
+                        else:
+                            correctness_score = 0
+
+                    elif "expected" in test_case:
+                        correctness_score = 1 if test_case["expected"] in response else 0
+
+                results.append({
+                    "model_name": model,
+                    "test_case": test_case["name"],
+                    "prompt": prompt,
+                    "response": response.replace('\n', ' ') if response else "",
+                    "latency": latency,
+                    "correctness_score": correctness_score,
+                    "http_status": http_status,
+                    "error_kind": error_kind,
+                })
 
     # Save CSV
     csv_path = os.path.join(RESULTS_DIR, csv_output_filename)
@@ -862,25 +973,36 @@ def run_benchmark(
     # Save Markdown Leaderboard
     md_path = os.path.join(RESULTS_DIR, md_output_filename)
     with open(md_path, 'w') as f:
-        f.write(f"# Ollama Benchmark Leaderboard\n")
-        f.write(f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
-        f.write("| Model | Test Case | Avg Latency (s) | Accuracy |\n")
-        f.write("|-------|-----------|-----------------|----------|\n")
-        
-        # Group by model
+        f.write(f"# Benchmark Leaderboard\n")
+        f.write(f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        f.write(f"Target: {target}  Repeat: {repeat}\n\n")
+        f.write("| Model | Tests | Avg Latency (s) | P50 (s) | P95 (s) | Accuracy | HTTP Error Rate |\n")
+        f.write("|-------|-------|-----------------|---------|---------|----------|-----------------|\n")
+
         model_stats = {}
         for r in results:
             m = r['model_name']
             if m not in model_stats:
-                model_stats[m] = {"latencies": [], "scores": [], "tests": 0}
+                model_stats[m] = {"latencies": [], "scores": [], "http_errors": 0}
             model_stats[m]["latencies"].append(r['latency'])
             model_stats[m]["scores"].append(r['correctness_score'])
-            model_stats[m]["tests"] += 1
-        
+            if int(r.get("http_status", 0)) >= 400:
+                model_stats[m]["http_errors"] += 1
+
+        def _pct_md(vals, p):
+            if not vals:
+                return 0.0
+            return sorted(vals)[max(0, int(len(vals) * p / 100) - 1)]
+
         for m, stats in model_stats.items():
-            avg_lat = sum(stats["latencies"]) / len(stats["latencies"])
-            avg_acc = sum(stats["scores"]) / len(stats["scores"])
-            f.write(f"| {m} | {stats['tests']} tests | {avg_lat:.2f}s | {avg_acc:.2%}\n")
+            lats = stats["latencies"]
+            n = len(lats)
+            avg_lat = sum(lats) / n if n else 0.0
+            p50 = _pct_md(lats, 50)
+            p95 = _pct_md(lats, 95)
+            avg_acc = sum(stats["scores"]) / n if n else 0.0
+            http_err_rate = stats["http_errors"] / n if n else 0.0
+            f.write(f"| {m} | {n} | {avg_lat:.2f} | {p50:.2f} | {p95:.2f} | {avg_acc:.2%} | {http_err_rate:.2%} |\n")
 
     run_finished_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     save_results_to_sqlite(
@@ -899,6 +1021,18 @@ def run_benchmark(
             (resolved_test_cases_file, run_id),
         )
 
+    # Capture PDHD telemetry snapshot after run (PDHD target only)
+    if target == "pdhd":
+        telemetry_snapshot = fetch_pdhd_telemetry_snapshot(pdhd_base_url or DEFAULT_PDHD_BASE_URL)
+        save_telemetry_snapshot(sqlite_path, run_id, telemetry_snapshot)
+        if telemetry_snapshot:
+            print(
+                f"[telemetry] tool_failure_rate={telemetry_snapshot['tool_failure_rate']:.2%}  "
+                f"arg_validation_failure_rate={telemetry_snapshot['arg_validation_failure_rate']:.2%}  "
+                f"total_invocations={telemetry_snapshot['total_invocations']}",
+                flush=True,
+            )
+
     print(f"Benchmark complete. Results saved to {RESULTS_DIR}/")
     print(f"SQLite results saved to {sqlite_path} (run_id={run_id})")
 
@@ -913,7 +1047,7 @@ def parse_args():
     parser.add_argument(
         "--host",
         default=DEFAULT_OLLAMA_HOST,
-        help="Ollama host, e.g. http://localhost:11434 or localhost:11434",
+        help="Ollama host, e.g. http://host.docker.internal:11434 or host.docker.internal:11434",
     )
     parser.add_argument(
         "--pdhd-base-url",
@@ -971,6 +1105,16 @@ def parse_args():
         metavar="MODELS",
         help="Comma-separated model names to skip, even when --all-models is set.",
     )
+    parser.add_argument(
+        "--repeat",
+        type=int,
+        default=1,
+        metavar="N",
+        help=(
+            "Run each test case N times per model. "
+            "Latency P50/P95 are computed across all N repetitions. Default: 1."
+        ),
+    )
     return parser.parse_args()
 
 if __name__ == "__main__":
@@ -987,4 +1131,5 @@ if __name__ == "__main__":
         pdhd_ollama_host=args.pdhd_ollama_host,
         judge_host=args.judge_host,
         judge_fallback_model=(args.judge_fallback_model.strip() if args.judge_fallback_model else None),
+        repeat=args.repeat,
     )

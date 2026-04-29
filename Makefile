@@ -4,7 +4,7 @@ MVNW := ./mvnw
 
 .PHONY: help clean version bump-version package run dev bench release release-copilot-commit
 
-OLLAMA_HOST ?= http://ws-raretower:11434
+OLLAMA_HOST ?= http://host.docker.internal:11434
 PDHD_BASE_URL ?= http://localhost:8080
 BENCH_TEST_CASES ?= scripts/benchlam/pdhd_test_cases.json
 BENCH_MODELS ?= llama3.1:latest

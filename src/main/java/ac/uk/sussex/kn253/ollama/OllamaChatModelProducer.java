@@ -9,8 +9,8 @@ import ac.uk.sussex.kn253.services.OllamaManagementService;
 import dev.langchain4j.http.client.jdk.JdkHttpClientBuilder;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
-import dev.langchain4j.model.ollama.OllamaChatModel;
-import dev.langchain4j.model.ollama.OllamaStreamingChatModel;
+import dev.langchain4j.model.embedding.EmbeddingModel;
+import dev.langchain4j.model.ollama.*;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Produces;
 import jakarta.inject.Inject;
@@ -103,5 +103,25 @@ public class OllamaChatModelProducer {
                         return configuredModelName;
                 }
                 return config.modelName();
+        }
+
+        @Produces
+        @ApplicationScoped
+        public EmbeddingModel produceEmbeddingModel() {
+                final var settings = modelConfigService.load();
+                final String baseUrl = resolveBaseUrl(settings.getBaseUrl());
+                final String persistedEmbeddingModelName = settings.getEmbeddingModelName();
+                final String modelName;
+                if (persistedEmbeddingModelName != null && !persistedEmbeddingModelName.isBlank()) {
+                        modelName = persistedEmbeddingModelName;
+                } else {
+                        modelName = config.embeddingModelName();
+                }
+                return OllamaEmbeddingModel.builder()
+                                .baseUrl(baseUrl)
+                                .modelName(modelName)
+                                .httpClientBuilder(new JdkHttpClientBuilder())
+                                .timeout(java.time.Duration.ofSeconds(config.timeoutSeconds()))
+                                .build();
         }
 }

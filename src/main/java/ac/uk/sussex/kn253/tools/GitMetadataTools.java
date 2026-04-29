@@ -33,7 +33,6 @@ public class GitMetadataTools {
 
     private static final Logger LOG = Logger.getLogger(GitMetadataTools.class.getName());
     private static final int GIT_TIMEOUT_SECONDS = 10;
-    private static final int LOG_LIMIT = 30;
 
     @Inject
     CwdService cwdService;

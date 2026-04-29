@@ -1,6 +1,8 @@
 package ac.uk.sussex.kn253.repository;
 
 import java.time.Instant;
+import java.util.EnumMap;
+import java.util.Map;
 
 import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 import jakarta.persistence.*;
@@ -63,6 +65,74 @@ public class ProjectKnowledge extends PanacheEntityBase {
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
         this.embeddingVector = embeddingVector;
+    }
+
+    // -------------------------------------------------------------------------
+    // Dependent embeddable
+    // -------------------------------------------------------------------------
+
+    /**
+     * A single dependent attached to a {@link ProjectKnowledge} record.
+     *
+     * <p>
+     * Carries a raw token byte-vector (stored as a JSON-serialised {@code byte[]}
+     * in the {@code token_vector} column) and a cached embedding float-vector
+     * (stored as a JSON-serialised {@code float[]} in the {@code cached_embedding}
+     * column).  Both columns are TEXT to remain consistent with how
+     * {@link ProjectKnowledge#embeddingVector} is persisted.
+     */
+    @Embeddable
+    public static class Dependent {
+
+        @Column(name = "token_vector", columnDefinition = "TEXT")
+        private String tokenVector;
+
+        @Column(name = "cached_embedding", columnDefinition = "TEXT")
+        private String cachedEmbedding;
+
+        public Dependent() {
+        }
+
+        public Dependent(final String tokenVector, final String cachedEmbedding) {
+            this.tokenVector = tokenVector;
+            this.cachedEmbedding = cachedEmbedding;
+        }
+
+        public String getTokenVector() {
+            return tokenVector;
+        }
+
+        public void setTokenVector(final String tokenVector) {
+            this.tokenVector = tokenVector;
+        }
+
+        public String getCachedEmbedding() {
+            return cachedEmbedding;
+        }
+
+        public void setCachedEmbedding(final String cachedEmbedding) {
+            this.cachedEmbedding = cachedEmbedding;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Dependents map (byte-vector + cached Embedding keyed by DependentKey)
+    // -------------------------------------------------------------------------
+
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(
+            name = "project_knowledge_dependents",
+            joinColumns = @JoinColumn(name = "knowledge_id"))
+    @MapKeyEnumerated(EnumType.STRING)
+    @MapKeyColumn(name = "dependent_key", length = 20)
+    private Map<DependentKey, Dependent> dependents = new EnumMap<>(DependentKey.class);
+
+    public Map<DependentKey, Dependent> getDependents() {
+        return dependents;
+    }
+
+    public void setDependents(final Map<DependentKey, Dependent> dependents) {
+        this.dependents = dependents;
     }
 
     public ProjectFolder getProject() {

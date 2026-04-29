@@ -7,43 +7,59 @@ import java.util.*;
  * tool-calling mechanism, providing categorized, actionable error information
  * for both immediate handling and accumulated failure reporting.
  *
+ * <h2>When to throw this exception</h2>
  * <p>
- * Failure modes supported:
+ * Throw {@code AiToolsFailureException} whenever the fault originates in
+ * <em>runtime execution after a structurally valid tool call has been
+ * dispatched</em>:
  * <ul>
- * <li>{@link FailureMode#TOOL_NOT_FOUND} — requested tool name is not
- * registered
- * <li>{@link FailureMode#ARGUMENT_VALIDATION} — input arguments are null,
- * blank, invalid, or out of bounds
- * <li>{@link FailureMode#FILE_ACCESS_DENIED} — attempt to access file outside
- * allowed roots or permission denied
- * <li>{@link FailureMode#FILE_NOT_FOUND} — requested file does not exist or
- * path cannot be resolved
- * <li>{@link FailureMode#IO_ERROR} — I/O operation failed (read, write, seek,
- * etc.)
- * <li>{@link FailureMode#NETWORK_ERROR} — network operation failed (timeout,
- * connection refused, DNS)
- * <li>{@link FailureMode#RESOURCE_UNAVAILABLE} — required resource is
- * temporarily unavailable
- * <li>{@link FailureMode#EXECUTION_TIMEOUT} — tool execution did not complete
- * within time limit
- * <li>{@link FailureMode#SECURITY_VIOLATION} — unauthorized operation or
- * security policy violation
- * <li>{@link FailureMode#TOOL_IMPLEMENTATION_ERROR} — bug in tool
- * implementation (null pointer, index out of bounds, etc.)
- * <li>{@link FailureMode#CONFIGURATION_ERROR} — invalid configuration or
- * missing required settings
- * <li>{@link FailureMode#UNKNOWN} — error type cannot be determined
+ * <li>A CDI bean or service dependency required for execution is unavailable
+ * ({@link FailureMode#TOOL_NOT_FOUND}).
+ * <li>A service-layer business rule rejects a parameter value that was
+ * structurally valid at the parse boundary — for example, {@code maxResults=50}
+ * when the service only accepts 1–10 ({@link FailureMode#ARGUMENT_VALIDATION}).
+ * <li>An I/O, network, security, or timeout failure during tool execution.
+ * </ul>
+ * Multiple failures may be accumulated across sequential tool calls by using
+ * the
+ * copy-constructor before propagating to the caller.
+ *
+ * <h2>When NOT to throw this exception</h2>
+ * <p>
+ * Do not use {@code AiToolsFailureException} for failures that originate in the
+ * <em>model's output</em> — that is, before or during dispatch. If the model
+ * named an unknown tool, produced malformed JSON, sent wrong argument types, or
+ * exhausted schema-correction retries, throw {@link AiToolCallException}
+ * instead.
+ * That exception carries {@code rawModelOutput} and maps to
+ * {@code AI_LAYER_FAILURE} at the REST boundary, while this exception maps to
+ * {@code SERVICE_LAYER_FAILURE}.
+ *
+ * <h2>Failure modes</h2>
+ * <p>
+ * See {@link FailureMode} for the full list. Key modes:
+ * <ul>
+ * <li>{@link FailureMode#TOOL_NOT_FOUND} — CDI/service dependency unavailable
+ * at
+ * execution time (not: model named an unknown tool)
+ * <li>{@link FailureMode#ARGUMENT_VALIDATION} — business rule rejects a
+ * structurally valid value (not: schema/type mismatch from the model)
+ * <li>{@link FailureMode#FILE_ACCESS_DENIED} — access outside allowed roots or
+ * permission denied
+ * <li>{@link FailureMode#FILE_NOT_FOUND} — path does not exist or cannot be
+ * resolved
+ * <li>{@link FailureMode#IO_ERROR} — I/O operation failed
+ * <li>{@link FailureMode#NETWORK_ERROR} — network operation failed
+ * <li>{@link FailureMode#EXECUTION_TIMEOUT} — tool did not complete in time
+ * <li>{@link FailureMode#SECURITY_VIOLATION} — security policy violation
  * </ul>
  *
- * <p>
- * Usage patterns:
+ * <h2>Usage patterns</h2>
  * <ul>
  * <li>Single tool failure:
  * {@code throw new AiToolsFailureException(FailureMode.FILE_NOT_FOUND, "config.json", cause); }
  * <li>Argument validation:
  * {@code throw new AiToolsFailureException(FailureMode.ARGUMENT_VALIDATION, "maxResults must be 1-10, got: " + value); }
- * <li>Tool dispatch:
- * {@code throw new AiToolsFailureException(FailureMode.TOOL_NOT_FOUND, "requestedTool: " + toolName); }
  * <li>Accumulate multiple failures:
  * {@code throw new AiToolsFailureException(existing, FailureMode.NETWORK_ERROR, "timeout connecting to search service", cause); }
  * </ul>
@@ -64,11 +80,18 @@ public class AiToolsFailureException extends RuntimeException {
      * may want to handle differently.
      */
     public enum FailureMode {
-        /** Tool name requested does not exist in the registry. */
+        /**
+         * A CDI bean, service dependency, or runtime resource required to execute the
+         * tool is not available. Do NOT use for model-output failures (a model naming
+         * an unknown tool is an {@code AiToolCallException}, not this).
+         */
         TOOL_NOT_FOUND("Tool not registered"),
 
         /**
-         * Input arguments failed validation (null, blank, wrong type, out of bounds).
+         * A service-layer business rule rejects a parameter value after the model's
+         * output has been accepted as structurally valid (for example, maxResults=50
+         * when the service only accepts 1–10). Do NOT use for schema-level or
+         * type-level mismatches from the model — those are {@code AiToolCallException}.
          */
         ARGUMENT_VALIDATION("Argument validation failed"),
 

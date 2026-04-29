@@ -2,7 +2,7 @@
 
 Version: 1  
 Date: 2026-04-14  
-Environment: see [environment-spec.md](environment-spec.md)
+Environment: see [environment-spec.md](./environment-spec.md)
 
 ---
 
