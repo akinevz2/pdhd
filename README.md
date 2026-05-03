@@ -1,4 +1,4 @@
-# Project Discovery in High Definition (PDHD)
+# Project Discovery and Hierarchical Data
 
 PDHD is a Quarkus application for inspecting the local filesystem, documenting the files and folders inside software projects, and building reusable knowledge about known projects and their purposes.
 
