@@ -42,6 +42,19 @@ export function PaneWindow({
   const isExternalAsset = (value: string): boolean =>
     /^(?:https?:|data:|blob:|mailto:|#)/i.test(value);
 
+  const stripFolderSummaryScaffolding = (content: string): string => {
+    if (!content) {
+      return content;
+    }
+
+    return content
+      .replace(/^===.*?===\s*$/gm, "")
+      .replace(/\(evidence only\)/gi, "")
+      .replace(/\.\.\.\(truncated\)/gi, "")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  };
+
   const normalizeAbsolutePath = (value: string): string => {
     const unix = toUnixPath(value);
     const isAbsolute = unix.startsWith("/") || /^[A-Za-z]:\//.test(unix);
@@ -125,6 +138,12 @@ export function PaneWindow({
     !!windowState.fileContent &&
     (!!windowState.fileContentMarkdown || isFolderSummaryPath);
 
+  const normalizedMarkdownContent = isFolderSummaryPath
+    ? stripFolderSummaryScaffolding(
+        normalizeToolCallMarkup(windowState.fileContent || ""),
+      )
+    : normalizeToolCallMarkup(windowState.fileContent || "");
+
   const hasContentSelection =
     !!windowState.selectedFilePath ||
     !!windowState.fileLoading ||
@@ -207,10 +226,6 @@ export function PaneWindow({
       );
     },
   };
-
-  const normalizedMarkdownContent = normalizeToolCallMarkup(
-    windowState.fileContent || "",
-  );
 
   const repositoryLabel = windowState.project.hasGithubRepository
     ? "GitHub"

@@ -6,7 +6,7 @@ It consolidates the previously split recommendations files.
 For recommendation completion status and validation evidence, see:
 
 - `docs/implementation-checklist.md`
-- `docs/operation-summary-2026-04-14.md`
+- `archive/operation-summary-2026-04-15.md`
 
 ## 6.2 Recommendations for Implementation
 

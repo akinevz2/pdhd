@@ -246,7 +246,7 @@ curl -X POST http://localhost:8080/api/chat \
   -d '{"message": "list files in src/main/java"}'
 
 # Request a folder summary
-curl -X POST http://localhost:8080/api/chat/summarize-folder \
+curl -X PUT http://localhost:8080/api/summary/folder \
   -H "Content-Type: application/json" \
   -d '{"path": "."}'
 ```

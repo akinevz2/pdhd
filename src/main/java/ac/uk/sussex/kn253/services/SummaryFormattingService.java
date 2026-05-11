@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.regex.Pattern;
 
 import ac.uk.sussex.kn253.repository.ProjectFolder;
 import ac.uk.sussex.kn253.repository.StructuredSummary;
@@ -18,6 +19,10 @@ public class SummaryFormattingService {
 
     private static final int MAX_SUMMARY_FILES = 32;
     private static final int MAX_SUMMARY_FILE_CHARS = 24_000;
+    private static final Pattern EVIDENCE_HEADER_PATTERN = Pattern
+            .compile("(?m)^===.*?===\\s*$|^---\\s*File:.*?---\\s*$");
+    private static final Pattern EVIDENCE_NOTICE_PATTERN = Pattern
+            .compile("(?i)\\(evidence only\\)|\\.\\.\\.\\(truncated\\)");
 
     @Inject
     FileTypeDetectionService fileTypeDetectionService;
@@ -59,7 +64,11 @@ public class SummaryFormattingService {
         if (value == null || value.isBlank()) {
             return "(no description)";
         }
-        return value.trim();
+        String cleaned = EVIDENCE_HEADER_PATTERN.matcher(value).replaceAll("");
+        cleaned = EVIDENCE_NOTICE_PATTERN.matcher(cleaned).replaceAll("");
+        cleaned = cleaned.replaceAll("(?m)^[\\t ]+$", "");
+        cleaned = cleaned.replaceAll("\\n{3,}", "\\n\\n").trim();
+        return cleaned.isBlank() ? "(no description)" : cleaned;
     }
 
     public String readFileForSummary(final Path file) throws Exception {

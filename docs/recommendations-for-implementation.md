@@ -22,7 +22,7 @@ Recommendations 1, 2, 3, 4, 5, 7, 8, and 9 have been implemented and moved to co
 - `docs/evaluation/environment-spec.md`
 - `docs/evaluation/decision-log.md`
 - `docs/implementation-checklist.md`
-- `docs/operation-summary-2026-04-14.md`
+- `archive/operation-summary-2026-04-15.md`
 
 Recommendation 6 remains as the active planning section in this file.
 

@@ -70,33 +70,34 @@ public class FileSummarisationPipelineService {
     }
 
     private ParsedPayload parsePayload(final String rawSummary) {
-        final String fallbackPurpose = rawSummary == null ? "" : rawSummary.trim();
-        if (fallbackPurpose.isBlank()) {
+        final String jsonPayload = extractJsonPayload(rawSummary);
+        if (jsonPayload == null || jsonPayload.isBlank()) {
             throw new AiToolCallException(ERR_BLANK_SUMMARY_OUTPUT);
         }
 
         try {
-            final JsonNode root = objectMapper.readTree(rawSummary);
+            final JsonNode root = objectMapper.readTree(jsonPayload);
             if (root == null || !root.isObject()) {
                 throw new AiToolCallException(ERR_NON_OBJECT_SUMMARY_JSON, null, rawSummary);
             }
 
-            final String purpose = readText(root.get("purpose"), fallbackPurpose);
+            final String purpose = readText(root.get("purpose"));
             final List<String> keyComponents = readStringArray(root.get("keyComponents"));
             final List<String> dependencies = readStringArray(root.get("dependencies"));
             parseSuccessCount.incrementAndGet();
 
-            final String fallbackReason = purpose.equals(fallbackPurpose)
+            final boolean usedFallbackPurpose = purpose.isBlank();
+            final String fallbackReason = usedFallbackPurpose
                     ? "Summary payload omitted a usable purpose; fallback summary text was used for purpose."
                     : null;
-            final boolean usedFallback = fallbackReason != null;
+            final boolean usedFallback = usedFallbackPurpose;
             if (usedFallback) {
                 parseFallbackCount.incrementAndGet();
             }
 
             return new ParsedPayload(
                     new StructuredSummaryStoreService.StructuredSummaryPayload(
-                            purpose.isBlank() ? EMPTY_PURPOSE_FALLBACK : purpose,
+                            usedFallbackPurpose ? EMPTY_PURPOSE_FALLBACK : purpose,
                             keyComponents,
                             dependencies),
                     usedFallback ? "json_payload_with_fallback" : "json_payload",
@@ -152,12 +153,26 @@ public class FileSummarisationPipelineService {
             boolean usedFallback) {
     }
 
-    private String readText(final JsonNode node, final String fallback) {
+    private String extractJsonPayload(final String rawSummary) {
+        if (rawSummary == null) {
+            return null;
+        }
+
+        final int firstBrace = rawSummary.indexOf('{');
+        final int lastBrace = rawSummary.lastIndexOf('}');
+        if (firstBrace >= 0 && lastBrace > firstBrace) {
+            return rawSummary.substring(firstBrace, lastBrace + 1).trim();
+        }
+
+        return rawSummary.trim();
+    }
+
+    private String readText(final JsonNode node) {
         if (node == null || node.isNull()) {
-            return fallback;
+            return "";
         }
         final String text = node.asText("").trim();
-        return text.isBlank() ? fallback : text;
+        return text;
     }
 
     private List<String> readStringArray(final JsonNode node) {

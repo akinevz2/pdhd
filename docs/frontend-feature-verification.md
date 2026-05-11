@@ -23,13 +23,13 @@ The verification is code-contract based (frontend expected routes/protocols vs b
 
 ## Feature Status Matrix
 
-| Feature                 | Frontend contract                                                                                       | Backend counterpart                                                      | Status  |
-| ----------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ------- |
-| Chat                    | `POST /api/chat/stream` with JSON `{ message }`, consumed incrementally in `sendChatMessage(...)`       | `ChatResource` dispatches `/stream` and returns a streaming text body    | Working |
-| Open GitHub repo link   | Client-side `openExternalUrl(repoUrl)` after `isBrowsableRepoUrl(...)` check                            | No backend required                                                      | Working |
-| Preview file            | `SIGNALS.PROJECT_FILE` -> `POST /api/project/file`; raw assets use `GET /api/project/{id}/raw?path=...` | `ProjectResource` dispatches `/file` and `/{id}/raw`                     | Working |
-| Summarise file/folder   | `SIGNALS.SUMMARY_FILE`, `SIGNALS.SUMMARY_FOLDER`, and `SIGNALS.SUMMARY_STATUS`                          | `SummaryResource` dispatches `/file`, `/folder`, and `/status`           | Working |
-| Viewing loaded projects | `SIGNALS.WORKSPACE_LIST` and `SIGNALS.PROJECT_BROWSE`                                                   | `WorkspaceResource` and `ProjectResource` dispatch `/list` and `/browse` | Working |
+| Feature                 | Frontend contract                                                                                       | Backend counterpart                                                            | Status  |
+| ----------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ------- |
+| Chat                    | `POST /api/chat` with JSON `{ message }`, consumed incrementally in `sendChatMessage(...)`              | `ChatResource` handles `POST /api/chat` streaming and `DELETE /api/chat` reset | Working |
+| Open GitHub repo link   | Client-side `openExternalUrl(repoUrl)` after `isBrowsableRepoUrl(...)` check                            | No backend required                                                            | Working |
+| Preview file            | `SIGNALS.PROJECT_FILE` -> `POST /api/project/file`; raw assets use `GET /api/project/{id}/raw?path=...` | `ProjectResource` dispatches `/file` and `/{id}/raw`                           | Working |
+| Summarise file/folder   | `SIGNALS.SUMMARY_FILE`, `SIGNALS.SUMMARY_FOLDER`, and `SIGNALS.SUMMARY_STATUS`                          | `SummaryResource` dispatches `/file`, `/folder`, and `/status`                 | Working |
+| Viewing loaded projects | `SIGNALS.WORKSPACE_LIST` and `SIGNALS.PROJECT_BROWSE`                                                   | `WorkspaceResource` and `ProjectResource` dispatch `/list` and `/browse`       | Working |
 
 ## Detailed Findings
 
@@ -47,12 +47,12 @@ The verification is code-contract based (frontend expected routes/protocols vs b
 - `/api/summary/folder`
 - `/api/summary/file`
 - `/api/summary/status`
-- `/api/chat/reset`
+- `chat:reset`
 
 2. Chat is now aligned to backend streaming REST endpoints.
 
-- Frontend `sendChatMessage(...)` streams from `POST /api/chat/stream`.
-- `ChatResource` dispatches `/api/chat/stream` and `/api/chat/reset`.
+- Frontend `sendChatMessage(...)` streams from `POST /api/chat`.
+- `ChatResource` serves `POST /api/chat` and `DELETE /api/chat`.
 - The response is consumed as an incremental text stream rather than an SSE-only contract.
 
 3. File preview and markdown asset loading are routed through project signals.

@@ -8,7 +8,10 @@ import {
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { apiPostTextStream, apiWithTimeout } from "./api";
-import { normalizeToolCallMarkup } from "./assistantActions";
+import {
+  normalizeToolCallMarkup,
+  sanitizeFolderSummaryContent,
+} from "./assistantActions";
 import { ChatDock } from "./components/ChatDock";
 import { CwdNavigator } from "./components/CwdNavigator";
 import { FileWindow } from "./components/FileWindow";
@@ -123,6 +126,19 @@ function resolveTargetPath(
     return raw;
   }
   return `${base}/${raw}`;
+}
+
+function stripFolderSummaryScaffolding(content: string): string {
+  if (!content) {
+    return content;
+  }
+
+  return content
+    .replace(/^===.*?===\s*$/gm, "")
+    .replace(/\(evidence only\)/gi, "")
+    .replace(/\.\.\.\(truncated\)/gi, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 type AssistantActionPayload = {
@@ -1104,22 +1120,24 @@ export function App() {
           FolderSummaryResponse
         >(SIGNALS.SUMMARY_FOLDER, { projectId, entryUuid });
 
-        const renderedSummary = summary.fallbackReason
-          ? [
-              "# Summary Notice",
-              "",
-              summary.fallbackReason,
-              "",
-              summary.summary,
-            ].join("\n")
-          : summary.summary;
+        const renderedSummary = sanitizeFolderSummaryContent(
+          summary.fallbackReason
+            ? [
+                "# Summary Notice",
+                "",
+                summary.fallbackReason,
+                "",
+                summary.summary,
+              ].join("\n")
+            : summary.summary,
+        );
 
         updateWindow(windowId, {
           fileLoading: false,
           fileLoadingFolderSummary: false,
           folderSummaryStatus: "generated",
           fileError: undefined,
-          fileContent: renderedSummary,
+          fileContent: stripFolderSummaryScaffolding(renderedSummary),
           fileContentMarkdown: true,
         });
       } catch {
@@ -1264,47 +1282,50 @@ export function App() {
 
       let errorOccurred = false;
       startStreamingStats();
-      await apiPostTextStream(
-        "/api/chat",
-        { message },
-        {
-          onChunk: (fragment) => {
-            updateStreamingStats(fragment);
-            setChatMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === placeholderId
-                  ? { ...msg, content: msg.content + fragment }
-                  : msg,
-              ),
-            );
+      try {
+        await apiPostTextStream(
+          "/api/chat",
+          { message },
+          {
+            onChunk: (fragment) => {
+              updateStreamingStats(fragment);
+              setChatMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === placeholderId
+                    ? { ...msg, content: msg.content + fragment }
+                    : msg,
+                ),
+              );
+            },
+            onError: (detail) => {
+              errorOccurred = true;
+              setChatUnavailable(true);
+              setChatMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === placeholderId
+                    ? { ...msg, content: `_(error: ${detail})_` }
+                    : msg,
+                ),
+              );
+              loadTelemetry().catch(() => {
+                // errors are surfaced by signal failure state
+              });
+            },
+            onDone: () => {
+              if (!errorOccurred) {
+                setChatUnavailable(false);
+              }
+              loadTelemetry().catch(() => {
+                // errors are surfaced by signal failure state
+              });
+            },
           },
-          onError: (detail) => {
-            errorOccurred = true;
-            setChatUnavailable(true);
-            setChatMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === placeholderId
-                  ? { ...msg, content: `_(error: ${detail})_` }
-                  : msg,
-              ),
-            );
-            loadTelemetry().catch(() => {
-              // errors are surfaced by signal failure state
-            });
-          },
-          onDone: () => {
-            if (!errorOccurred) {
-              setChatUnavailable(false);
-            }
-            loadTelemetry().catch(() => {
-              // errors are surfaced by signal failure state
-            });
-            finishStreamingStats();
-            setChatLoading(false);
-          },
-        },
-        CHAT_TIMEOUT_MS,
-      );
+          CHAT_TIMEOUT_MS,
+        );
+      } finally {
+        finishStreamingStats();
+        setChatLoading(false);
+      }
     },
     [
       chatInput,

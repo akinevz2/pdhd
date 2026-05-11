@@ -16,12 +16,12 @@ The current stretch goal is AI-assisted completion estimation: using the accumul
 
 ## Versioning Note
 
-During the rewrite phase of this application, the working schema/version marker was `0.99.0`.
+During the rewrite phase of this application, the working schema/version marker is `0.99.55`.
 This explicitly denotes a pre-release stabilization cycle before the first stable `1.0.0` release.
 
 ## Prerequisites
 
-- Java 25
+- Java 21
 - Node.js and npm (for frontend development/build)
 - Ollama for `webui` startup and assistant-backed inspection flows
 - Optional: GitHub CLI (`gh`) for GitHub repository metadata lookup
@@ -45,7 +45,7 @@ Build:
 Run:
 
 ```sh
-java -jar target/pdhd-0.1.0-runner.jar
+java -jar target/pdhd-0.99.55-runner.jar
 ```
 
 The jar starts in production mode and listens on `http://0.0.0.0:8080`.
@@ -55,13 +55,13 @@ The jar starts in production mode and listens on `http://0.0.0.0:8080`.
 The Picocli entry point is `pdhd`.
 
 - Running `pdhd` with no arguments defaults to the `webui` subcommand.
-- `pdhd webui` starts Quarkus, performs the launcher preflight check against the configured Ollama endpoint, and prints the local Web UI URL.
-- `pdhd configure` updates persisted Ollama settings non-interactively and skips the launcher preflight so broken Ollama configuration can be repaired.
+- `pdhd webui` starts Quarkus and prints the local Web UI URL before attempting to open it in a browser.
+- `pdhd configure` updates persisted Ollama settings non-interactively so broken Ollama configuration can be repaired.
 
 Example:
 
 ```sh
-java -jar target/pdhd-0.1.0-runner.jar configure --base-url http://host.docker.internal:11434 --model llama3.2
+java -jar target/pdhd-0.99.55-runner.jar configure --base-url http://host.docker.internal:11434 --model llama3.2
 ```
 
 ## Web UI Notes
@@ -70,7 +70,7 @@ See `docs/frontend.md` for detailed frontend architecture, API integration, stat
 For current launcher and package-ownership notes, see `docs/architecture.md`.
 For API route conventions, see `docs/api-listing-specification.md`.
 For backend constants and extensibility patterns, see `docs/support-classes.md`.
-For the assistant TUI behaviour specification and pre-rewrite architecture review, see `docs/assistant-menu-rewrite-spec.md`.
+For historical assistant TUI notes, see `docs/assistant-menu-rewrite-spec.md`.
 
 - The top bar shows the current working folder.
 - The left-hand `File Browser` is a compact explorer-style list for the current working folder.
@@ -86,23 +86,11 @@ For the assistant TUI behaviour specification and pre-rewrite architecture revie
 
 ## Screenshots
 
-Add screenshots to `docs/screenshots/` and update the image links below.
-
 ### Main Workspace
 
 ![Main workspace](docs/screenshots/main-workspace.png)
 
-### Project Explorer and File View
-
-![Project explorer and file view](docs/screenshots/project-explorer-file-view.png)
-
-### Folder Summary Interaction
-
-![Folder summary interaction](docs/screenshots/folder-summary.png)
-
-### Assistant Chat Panel
-
-![Assistant chat panel](docs/screenshots/assistant-chat-panel.png)
+Additional demo screenshots can be added here as they are captured.
 
 ## Assistant Tools Added
 

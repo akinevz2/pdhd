@@ -8,6 +8,7 @@
   --warn: #ffd166;
   --surface: rgba(7, 25, 39, 0.74);
   --edge: rgba(103, 215, 255, 0.34);
+  --radius: 12px;
 }
 
 * {
@@ -20,9 +21,23 @@ body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: radial-gradient(circle at 18% 12%, var(--bg2), var(--bg0) 62%);
+  color-scheme: dark;
+  background:
+    radial-gradient(circle at 18% 12%, rgba(26, 61, 89, 0.92), rgba(8, 20, 34, 0.98) 60%),
+    radial-gradient(circle at 82% 18%, rgba(89, 244, 198, 0.08), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 28%);
+  background-color: var(--bg0);
+  background-attachment: fixed;
   color: var(--ink);
   font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: rgba(89, 244, 198, 0.28);
+  color: #f3fffb;
 }
 
 #app {
@@ -177,12 +192,14 @@ body {
 .panel {
   background: var(--surface);
   border: 1px solid var(--edge);
+  border-radius: var(--radius);
   backdrop-filter: blur(6px);
   box-shadow: 0 16px 40px rgba(2, 7, 12, 0.38);
 }
 
 .window {
   border: 1px solid var(--edge);
+  border-radius: var(--radius);
   background: rgba(8, 30, 47, 0.86);
 }
 
@@ -228,6 +245,12 @@ button {
   font: inherit;
   padding: 4px 10px;
   cursor: pointer;
+  border-radius: 8px;
+  transition:
+    transform 0.15s,
+    filter 0.15s,
+    box-shadow 0.15s,
+    border-color 0.15s;
 }
 
 button:hover {
@@ -236,6 +259,12 @@ button:hover {
 
 button:active {
   transform: translateY(1px);
+}
+
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 3px rgba(89, 244, 198, 0.16);
 }
 
 .title-bar-controls button {
@@ -883,6 +912,27 @@ pre {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 6px;
+}
+
+.toolbar-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.chat-stream-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border: 1px solid rgba(89, 244, 198, 0.35);
+  border-radius: 999px;
+  background: rgba(89, 244, 198, 0.12);
+  color: var(--accent);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .activity-item {

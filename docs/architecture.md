@@ -2,7 +2,7 @@
 
 ## Application Structure
 
-The application is a Quarkus Picocli CLI tool that runs an AI-powered developer assistant in the terminal. It is composed of five main layers:
+The application is a Quarkus Picocli CLI tool with a browser-based web UI and assistant-backed inspection flows. It is composed of five main layers:
 
 ```
 ┌────────────────────────────────────────────────────────┐
@@ -22,8 +22,7 @@ ModelConfigService            Quarkus HTTP runtime
 
 The current launcher path is:
 
-- `PdhdLauncher.main(String[] args)` optionally runs `PreCdiOllamaBootstrap.prepareForLaunch(args)` before Quarkus startup.
-- The bootstrap preflight is skipped for `configure`, `help`, and version requests so configuration can be repaired without a healthy Ollama endpoint.
+- `PdhdLauncher.main(String[] args)` starts Quarkus directly.
 - `PdhdLauncher.run(String... args)` defaults to `webui` when no arguments are provided.
 - Picocli dispatch then resolves either `WebUiCommand` or `OllamaConfigCommand` through the injected CDI-aware `IFactory`.
 
@@ -35,7 +34,6 @@ The current launcher path is:
 | ------------------------------- | --------------------------------------------------- |
 | `ac.uk.sussex.kn253`            | Root: `PdhdLauncher` Picocli entry point            |
 | `ac.uk.sussex.kn253.commands`   | Picocli subcommands: `configure`, `webui`           |
-| `ac.uk.sussex.kn253.menu`       | Assistant/UI menu and terminal support classes      |
 | `ac.uk.sussex.kn253.events`     | CDI event records for cwd and model-config signals  |
 | `ac.uk.sussex.kn253.services`   | Application-scoped business logic and CDI producers |
 | `ac.uk.sussex.kn253.ollama`     | REST client and data types for the Ollama HTTP API  |
@@ -63,9 +61,7 @@ PdhdLauncher
           └── webui      -> WebUiCommand
 ```
 
-`PdhdLauncher.run(String... args)` defaults to `webui` when no command-line arguments are provided. `PdhdLauncher.main(String[] args)` performs pre-CDI Ollama bootstrap before starting Quarkus for default and `webui` launches.
-
-The pre-CDI bootstrap is intentionally bypassed for `configure`, `help`, and version requests.
+`PdhdLauncher.run(String... args)` defaults to `webui` when no command-line arguments are provided. `PdhdLauncher.main(String[] args)` starts Quarkus directly, and `configure`, `help`, and version requests are handled through Picocli without any extra bootstrap layer.
 
 ---
 

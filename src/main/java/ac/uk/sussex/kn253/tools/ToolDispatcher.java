@@ -4,7 +4,7 @@ import java.util.*;
 
 import org.jboss.logging.Logger;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
@@ -91,9 +91,23 @@ public class ToolDispatcher {
             final List<AiToolCallException> accumulator) {
         validateAccumulator(accumulator);
         try {
-            final ObjectNode json = (ObjectNode) MAPPER.readTree(rawModelOutput);
-            final String name = json.get("name").asText();
-            final ObjectNode args = (ObjectNode) json.get("arguments");
+            final JsonNode parsed = MAPPER.readTree(rawModelOutput);
+            if (!(parsed instanceof ObjectNode)) {
+                throw new IllegalArgumentException(MSG_MALFORMED);
+            }
+
+            final ObjectNode json = (ObjectNode) parsed;
+            final String name = json.path("name").asText();
+            final JsonNode argumentsNode = json.get("arguments");
+            final ObjectNode args;
+
+            if (argumentsNode == null) {
+                args = MAPPER.createObjectNode();
+            } else if (argumentsNode instanceof ObjectNode) {
+                args = (ObjectNode) argumentsNode;
+            } else {
+                throw new IllegalArgumentException(MSG_MALFORMED);
+            }
 
             if (!toolRegistry.isKnownTool(name)) {
                 final AiToolCallException ex = new AiToolCallException(MSG_UNKNOWN_TOOL + name);
@@ -101,8 +115,8 @@ public class ToolDispatcher {
                 return null;
             }
 
-            return new ToolCall(name, args != null ? args : MAPPER.createObjectNode());
-        } catch (final JsonProcessingException | NullPointerException | ClassCastException e) {
+            return new ToolCall(name, args);
+        } catch (final Exception e) {
             final AiToolCallException ex = new AiToolCallException(MSG_MALFORMED, e, rawModelOutput);
             accumulator.add(ex);
             return null;

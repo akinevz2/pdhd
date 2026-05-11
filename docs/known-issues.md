@@ -89,15 +89,11 @@ The documentation plan still references deliverables that are not yet present as
 
 ## Frontend UI Integration Gap: Explore Button
 
-**Issue**: There is no visible "Explore" or "Open in Canvas" button for quick access to opening folders/files in the explorer window from the filesystem browser.
+**Status**: Resolved in the current web UI.
 
-**Impact**: Users must either:
+The left-pane browser now exposes an `Explore Current` button and inline explore actions on folder rows, so canvas access is discoverable without relying on auto-open behavior.
 
-- Manually alt-tab or arrange windows to see both browser and explorer
-- Use the canvas auto-open feature on activity items (if triggered)
-- Directly click tree items (which works, but isn't discoverable)
-
-**Expected Behavior**: Folders and files in the left-pane browser should have secondary action buttons (e.g., "→ Explore" icon) to open them in the floating explorer canvas on demand.
+**Remaining UX gap**: the parent-directory row is still a dedicated control above the listing rather than a native `..` entry inside the browser list.
 
 ---
 

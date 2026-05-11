@@ -1,18 +1,22 @@
 package ac.uk.sussex.kn253.commands;
 
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+
 import io.quarkus.arc.Unremovable;
 import jakarta.enterprise.context.ApplicationScoped;
 import picocli.CommandLine.Command;
 
 @Unremovable
 @ApplicationScoped
-@Command(name = "webui", description = "Launch web UI")
+@Command(name = "webui", description = "Open the local web UI")
 public class WebUiCommand implements Runnable {
+
+    @ConfigProperty(name = "quarkus.http.port", defaultValue = "8080")
+    int httpPort;
 
     @Override
     public void run() {
-        final String port = System.getProperty("quarkus.http.port", "8080");
-        final String url = "http://localhost:" + port;
+        final String url = "http://localhost:" + httpPort;
         System.out.println("\nWeb UI available at: " + url);
 
         try {

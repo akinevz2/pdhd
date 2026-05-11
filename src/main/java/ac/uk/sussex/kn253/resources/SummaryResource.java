@@ -7,6 +7,7 @@ import java.util.*;
 import java.util.stream.Stream;
 
 import ac.uk.sussex.kn253.repository.*;
+import ac.uk.sussex.kn253.services.SummaryFormattingService;
 import ac.uk.sussex.kn253.services.ai.FileSummarisationPipelineService;
 import io.smallrye.common.annotation.Blocking;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -27,6 +28,9 @@ public class SummaryResource {
 
     @Inject
     FileSummarisationPipelineService fileSummarisationPipelineService;
+
+    @Inject
+    SummaryFormattingService summaryFormattingService;
 
     public record FolderSummaryResponse(
             String folderPath,
@@ -131,7 +135,7 @@ public class SummaryResource {
         final List<FolderSubsummaryItem> items = summaries.stream()
                 .map(summary -> new FolderSubsummaryItem(
                         summary.getTargetPath(),
-                        safeText(summary.getPurpose()),
+                        summaryFormattingService.safeText(summary.getPurpose()),
                         summary.getUpdatedAt() == null ? null : summary.getUpdatedAt().toString()))
                 .toList();
 
@@ -275,9 +279,9 @@ public class SummaryResource {
     }
 
     private String formatFileSummary(final String relativeFilePath, final StructuredSummary fileSummary) {
-        final String purpose = safeText(fileSummary.getPurpose());
-        final String keyComponents = safeText(fileSummary.getKeyComponentsJson());
-        final String dependencies = safeText(fileSummary.getDependenciesJson());
+        final String purpose = summaryFormattingService.safeText(fileSummary.getPurpose());
+        final String keyComponents = summaryFormattingService.safeText(fileSummary.getKeyComponentsJson());
+        final String dependencies = summaryFormattingService.safeText(fileSummary.getDependenciesJson());
 
         return "File: " + relativeFilePath + "\n"
                 + "Purpose: " + purpose + "\n"
@@ -290,9 +294,9 @@ public class SummaryResource {
             final StructuredSummary summary,
             final int analysedFiles,
             final int skippedFiles) {
-        final String purpose = safeText(summary.getPurpose());
-        final String keyComponents = safeText(summary.getKeyComponentsJson());
-        final String dependencies = safeText(summary.getDependenciesJson());
+        final String purpose = summaryFormattingService.safeText(summary.getPurpose());
+        final String keyComponents = summaryFormattingService.safeText(summary.getKeyComponentsJson());
+        final String dependencies = summaryFormattingService.safeText(summary.getDependenciesJson());
 
         return String.join("\n",
                 "# Folder Summary",
@@ -374,10 +378,6 @@ public class SummaryResource {
             return ".";
         }
         return normalizedRoot.relativize(normalizedPath).toString().replace('\\', '/');
-    }
-
-    private String safeText(final String value) {
-        return value == null || value.isBlank() ? "[]" : value;
     }
 
     private record FolderAnalysisInput(String promptInput, int analysedFiles, int skippedFiles) {

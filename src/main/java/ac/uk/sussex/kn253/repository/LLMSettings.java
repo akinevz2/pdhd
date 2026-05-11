@@ -25,7 +25,7 @@ public class LLMSettings extends PanacheEntityBase {
             + "Stay within project-analysis scope; do not answer unrelated general chat from prior knowledge. "
             + "Prefer tool-retrieved evidence over assumptions, and if evidence is missing, state what tool call is needed.";
 
-    public static final String DEFAULT_TOOL_SYSTEM_PROMPT = "Available tool names: listDirectoryContents, change_working_directory, list_files_recursive, analyze_path_detailed, summarize_path, readFile, searchWeb. "
+    public static final String DEFAULT_TOOL_SYSTEM_PROMPT = "Available tool names: listDirectoryContents, change_working_directory, list_files_recursive, analyze_path_detailed, summarize_path, readFile, searchWeb, get_repository_status, get_recent_commits, get_git_branches, get_git_remotes, get_git_diff_stat. "
             + "Use absolute paths within open project roots when possible; if using relative paths, resolve from the current working directory and verify directory context before composing deeper paths. "
             + "Call tools only when needed, with minimum required arguments. "
             + "If a tool result starts with 'Error:' or 'Access denied:', treat it as a failed call and do not use it as evidence. "

@@ -53,7 +53,12 @@ export function ChatDock({
   return (
     <section className="chat-dock panel">
       <div className="toolbar">
-        <strong>Assistant Chat</strong>
+        <div className="toolbar-title-row">
+          <strong>Assistant Chat</strong>
+          {chatLoading && (
+            <span className="chat-stream-status">Streaming...</span>
+          )}
+        </div>
         <button onClick={resetChat} disabled={chatLoading}>
           Reset
         </button>

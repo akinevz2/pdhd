@@ -113,8 +113,8 @@ Filesystem and project endpoints:
 
 Assistant and activity endpoints:
 
-- `POST /api/chat/stream`
-- `POST /api/chat/reset`
+- `POST /api/chat`
+- `DELETE /api/chat`
 - `GET /api/telemetry`
 
 Configuration endpoints:
@@ -184,15 +184,13 @@ For backend-connected features, verify endpoint contracts and default timeouts b
 
 ---
 
-### File Browser: Missing "Explore" Action
+### File Browser: Explore Actions
 
-**Current Behavior**: Users must click on files/folders in the explorer canvas or wait for activity-based auto-open. There is no quick-access button in the left-pane browser to open an item in a new explorer window.
+**Current Behavior**: The left-pane browser includes an `Explore Current` button plus inline explore actions for folder rows, so opening the canvas is available without waiting for auto-open behavior.
 
-**Expected Behavior**: Folders and files should have inline action buttons (e.g., "→" or "explore" icon) to trigger `openInCanvas()` on demand, making the feature discoverable and reducing friction.
+**Notes**: The remaining browser navigation quirk is the dedicated parent-directory row above the listing. That is still a real UX gap, but it is separate from canvas access.
 
-**Location**: `App.tsx`, browser entry rendering (lines 740-830+).
-
-**Impact**: Reduced discoverability of the explorer canvas feature; users may not realize they can open multiple folders side-by-side.
+**Location**: `App.tsx`, browser entry rendering and `openInCanvas()` wiring.
 
 ---
 

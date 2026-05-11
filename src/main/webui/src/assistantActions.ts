@@ -1,6 +1,11 @@
 const TOOLCALL_TAG_PATTERN =
   /\[toolcall\s+([^\]]*?)\]([\s\S]*?)\[\/toolcall\]/gi;
 const ATTRIBUTE_PATTERN = /(\w+)=(?:"([^"]*)"|'([^']*)'|([^\s\]]+))/g;
+const FOLDER_SUMMARY_EVIDENCE_PATTERNS = [
+  /^===.*?===\s*$/gm,
+  /\(evidence only\)/gi,
+  /\.\.\.\(truncated\)/gi,
+];
 
 function parseAttributes(rawAttributes: string): Record<string, string> {
   const attributes: Record<string, string> = {};
@@ -36,4 +41,17 @@ export function normalizeToolCallMarkup(content: string): string {
       );
     },
   );
+}
+
+export function sanitizeFolderSummaryContent(content: string): string {
+  if (!content) {
+    return content;
+  }
+
+  const sanitized = FOLDER_SUMMARY_EVIDENCE_PATTERNS.reduce(
+    (currentContent, pattern) => currentContent.replace(pattern, ""),
+    content,
+  );
+
+  return sanitized.replace(/\n{3,}/g, "\n\n").trim();
 }

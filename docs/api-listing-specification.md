@@ -26,13 +26,14 @@ The backend API must follow these conventions:
 - `summary:folder` -> `PUT /api/summary/folder` (projectId and entryUuid in body)
 - `summary:file` -> `PUT /api/summary/file` (projectId and entryUuid in body)
 - `summary:status` -> `PUT /api/summary/status` (projectId and entryUuid in body)
-- `chat:stream` -> `POST /api/chat/stream`
-- `chat:reset` -> `POST /api/chat/reset`
+- `chat:stream` -> `POST /api/chat`
+- `chat:reset` -> `DELETE /api/chat`
 - `menu:*` -> `GET|POST /api/menu/<operation>` under the same namespaced policy
 
 ## Dispatch Model
 
 - Path suffix (for example `/open`, `/list`, `/status`) is captured by the class-level regex path parameter (`operation`).
+- Chat is currently the exception: it is exposed as a dedicated `/api/chat` resource with no suffix dispatch.
 - Public dispatcher methods provide the effective runtime endpoint bindings.
 - Dispatcher methods route requests to internal signal-aligned action methods that carry the HTTP verb annotations.
 - Transactional behavior is applied at the public dispatcher entrypoint level where Quarkus interception is effective.

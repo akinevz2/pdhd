@@ -78,17 +78,26 @@ export function ProjectWindow({
     dragRef.current.originY = windowState.y;
   };
 
+  const stripFolderSummaryScaffolding = (content: string): string => {
+    if (!content) {
+      return content;
+    }
+
+    return content
+      .replace(/^===.*?===\s*$/gm, "")
+      .replace(/\(evidence only\)/gi, "")
+      .replace(/\.\.\.\(truncated\)/gi, "")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  };
+
   const showImage =
     !windowState.fileLoading &&
     !windowState.fileError &&
     windowState.selectedFilePath &&
     isImagePath(windowState.selectedFilePath);
 
-  const showPdf =
-    !windowState.fileLoading &&
-    !windowState.fileError &&
-    !!windowState.selectedFilePath &&
-    isPdfPath(windowState.selectedFilePath);
+  !!windowState.selectedFilePath && isPdfPath(windowState.selectedFilePath);
 
   const looksLikeMarkdown = !!windowState.fileContent?.match(
     MARKDOWN_SIGNAL_PATTERN,
