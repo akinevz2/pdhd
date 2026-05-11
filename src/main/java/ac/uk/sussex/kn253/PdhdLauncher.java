@@ -1,6 +1,5 @@
 package ac.uk.sussex.kn253;
 
-import ac.uk.sussex.kn253.bootstrap.PreCdiOllamaBootstrap;
 import ac.uk.sussex.kn253.commands.OllamaConfigCommand;
 import ac.uk.sussex.kn253.commands.WebUiCommand;
 import io.quarkus.picocli.runtime.annotations.TopCommand;
@@ -27,9 +26,6 @@ public class PdhdLauncher implements QuarkusApplication, Runnable {
     private CommandLine commandLine;
 
     public static void main(final String[] args) {
-        if (shouldRunBootstrap(args)) {
-            PreCdiOllamaBootstrap.prepareForLaunch(args);
-        }
         Quarkus.run(PdhdLauncher.class, args);
     }
 
