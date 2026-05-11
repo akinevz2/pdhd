@@ -56,3 +56,4 @@ logs/pdhd.log.2
 logs/pdhd.log.3
 logs/pdhd.log.4
 logs/pdhd.log.5
+src/main/resources/application.properties
